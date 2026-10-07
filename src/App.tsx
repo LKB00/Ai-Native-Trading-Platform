@@ -259,10 +259,11 @@ function RiskCenter({ net }: { net: number }) {
   const num = 'num h-8 w-28 rounded-full border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
   return (
     <Popover label="Risk limits" align="end" trigger={({ toggle, triggerProps }) => (
-      <button onClick={toggle} {...triggerProps} className={cn('flex h-8 items-center gap-2 rounded-full border px-3 text-[12px]', risk.killed ? 'border-danger bg-danger-soft text-danger-fg' : cooling ? 'border-attention bg-attention-soft text-attention-fg' : 'border-line bg-surface')}>
-        <ShieldIcon width={14} height={14} />
-        <span className="max-sm:hidden">{risk.killed ? 'Locked' : cooling ? 'Cool-off' : 'Day'}</span>
-        <Money v={net} className="font-bold" />
+      <button onClick={toggle} {...triggerProps} className="flex h-8 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[12px] hover:border-line-strong">
+        {/* State shows as the icon's colour only, so a lock reads at a glance without the pill shouting over the bar. */}
+        <ShieldIcon width={14} height={14} className={risk.killed ? 'text-danger-fg' : cooling ? 'text-attention-fg' : 'text-fg-subtle'} />
+        <span className="text-fg-muted max-sm:hidden">{risk.killed ? 'Locked' : cooling ? 'Cool-off' : 'Day'}</span>
+        <Money v={net} className="font-medium" />
       </button>)}>
       <div className="w-[320px] space-y-4 p-3">
         <div><p className="font-serif text-base">Risk limits for today</p><p className="text-[12px] text-fg-subtle">Checked every second. When a limit is hit, positions close and new entries lock until tomorrow. Exits always work.</p></div>
