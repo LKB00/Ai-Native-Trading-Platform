@@ -251,7 +251,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
         {/* Locked mode: the state of the day sits where you're about to type, with the way forward next to it. */}
         {gate && <div role="status" className="mb-2 flex items-center gap-2.5 rounded-xl border border-line bg-sunken py-1.5 pl-3 pr-1.5 text-[12px] leading-5 text-fg-muted">
           <span className="shrink-0 text-fg"><GateIcon g={gate} size={14} /></span>
-          <p className="min-w-0 flex-1"><b className="font-medium text-fg">{gate.kind === 'locked' ? 'Locked for today.' : gate.kind === 'cooloff' ? `Paused for ${gate.short.split('· ')[1]}.` : 'Trade limit reached.'}</b> <span className="max-sm:hidden">{gate.why} </span>Exits and stops still work.</p>
+          <p className="min-w-0 flex-1"><b className="font-medium text-fg">{gate.kind === 'locked' ? 'Locked for today.' : gate.kind === 'cooloff' ? `Paused for ${gate.short.split('· ')[1]}.` : gate.kind === 'rule' ? `${gate.short}.` : 'Trade limit reached.'}</b> <span className="max-sm:hidden">{gate.why} </span>Exits and stops still work.</p>
           <button type="button" onClick={() => say('review today')} className="inline-flex h-7 shrink-0 items-center rounded-full border border-line-strong bg-surface px-3 text-[12px] font-medium text-fg shadow-xs transition-colors hover:bg-hover">Review today</button>
         </div>}
         {chips}

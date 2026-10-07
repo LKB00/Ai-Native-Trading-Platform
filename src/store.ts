@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { INSTS, bySym, nextExpiries, optQuote, simNow, keyOf, parseKey, labelOf, history, charges, FREEZE, isExpiryDay, SQUARE_OFF, secOfDay, sessionDay, expiryDate, type Leg, type TF } from './market'
+import { DEFAULT_RULES, hhmm, type Rules } from './rules'
 import type { Action, Card, Filter, OrderAction, ViewName } from './actions'
 
 export type OType = 'MARKET' | 'LIMIT' | 'SL' | 'SL-M'
@@ -71,7 +72,7 @@ type S = {
   orders: Order[]; positions: Record<string, Position>; brackets: Record<string, Bracket>; cash: number
   /** Session day on which intraday positions were auto squared off; no new intraday entries that day. */
   misClosed?: string
-  triggers: Trigger[]; trades: Trade[]; holdings: Holding[]; sips: Sip[]; risk: Risk; audit: Audit[]
+  triggers: Trigger[]; trades: Trade[]; holdings: Holding[]; sips: Sip[]; risk: Risk; rules: Rules; audit: Audit[]
   fnoAck: boolean; needAck: boolean; instant: boolean
   chart: ChartCfg; drawings: Record<string, number[]>; aiLevels: Record<string, boolean>
   scan: { filters: Filter[]; name: string; sort: string }
@@ -106,6 +107,8 @@ type S = {
   addTrigger: (t: Omit<Trigger, 'id' | 'created'>) => void
   removeTrigger: (id: number) => void
   setRisk: (r: Partial<Risk>) => void
+  /** Turn rules on (values) or off (undefined). Persisted, and logged like risk settings. */
+  setRules: (r: Partial<Rules>) => void
   setChart: (c: Partial<ChartCfg>) => void
   toggleDrawing: (sym: string, price: number) => void
   setScan: (s: Partial<S['scan']>) => void
@@ -285,6 +288,7 @@ export const useStore = create<S>((set, get) => ({
   ],
   sips: [{ id: sid++, sym: 'NIFTYBEES', amount: 10000, day: 5, active: true, runs: 28 }, { id: sid++, sym: 'GOLDBEES', amount: 3000, day: 10, active: true, runs: 19 }],
   risk: loadJSON('risk', DEFAULT_RISK),
+  rules: loadJSON('rules', DEFAULT_RULES),
   audit: [],
   fnoAck: loadJSON('fnoAck', false), needAck: false, instant: false,
   chart: { ...DEFAULT_CHART, ...loadJSON('chart2', {}) },
@@ -418,6 +422,8 @@ export const useStore = create<S>((set, get) => ({
       if (s.risk.killed) return reject(`Trading locked: ${s.risk.reason ?? 'kill switch on'}`)
       if (product === 'MIS' && !k.strike && (secOfDay() >= SQUARE_OFF || s.misClosed === sessionDay())) return reject('Intraday (MIS) entries stop at 3:20 pm. Choose Delivery, or trade in the next session')
       if (s.risk.cooloffUntil && Date.now() < s.risk.cooloffUntil) return reject(`Cool-off after ${s.risk.cooloffAfter} losses in a row, ${Math.ceil((s.risk.cooloffUntil - Date.now()) / 60000)} min left`)
+      if (s.rules.noEntryAfter && secOfDay() >= s.rules.noEntryAfter) return reject(`Your rule: no new entries after ${hhmm(s.rules.noEntryAfter)}`)
+      if (s.rules.stopRequired && !k.strike && opts.sl == null && via !== 'sip') return reject('Your rule: every entry needs a stop')
       const today = s.orders.filter((o) => o.status === 'COMPLETE' && new Date(o.ts).toDateString() === new Date().toDateString() && o.via !== 'bracket' && o.via !== 'risk').length
       if (today >= s.risk.maxTrades) return reject(`Daily trade limit of ${s.risk.maxTrades} reached`)
       if (k.strike && !s.fnoAck) { set({ needAck: true }); return reject('Read and accept the F&O risk disclosure first') }
@@ -465,6 +471,7 @@ export const useStore = create<S>((set, get) => ({
   watchOp: (op, sym) => { const w = op === 'add' ? (get().watch.includes(sym) ? get().watch : [...get().watch, sym]) : get().watch.filter((x) => x !== sym); saveJSON('watch', w); set({ watch: w }) },
   addTrigger: (t) => set({ triggers: [{ ...t, id: ++tid, created: Date.now() }, ...get().triggers] }),
   removeTrigger: (id) => set({ triggers: get().triggers.filter((t) => t.id !== id) }),
+  setRules: (r) => { const rules = Object.fromEntries(Object.entries({ ...get().rules, ...r }).filter(([, v]) => v != null && v !== false)) as Rules; saveJSON('rules', rules); set({ rules }); get().log('user', `Rules: ${JSON.stringify(r)}`) },
   setRisk: (r) => { const risk = { ...get().risk, ...r }; saveJSON('risk', { ...risk, cooloffUntil: undefined }); set({ risk }); get().log('user', `Risk settings: ${JSON.stringify(r)}`) },
   setChart: (c) => { const chart = { ...get().chart, ...c }; saveJSON('chart2', chart); set({ chart }) },
   toggleDrawing: (sym, price) => {
@@ -499,6 +506,7 @@ export const useStore = create<S>((set, get) => ({
         if (a.kill) { const n = s.squareoff(undefined, 'kill switch'); s.setRisk({ killed: true, reason: 'Kill switch turned on' }); return `Kill switch on. Closed ${n} position(s); new trades are blocked for today.` }
         const { t: _t, kill: _k, ...rest } = a; s.setRisk(Object.fromEntries(Object.entries(rest).filter(([, v]) => v != null))); return 'Risk limits updated'
       }
+      case 'rules': { const { t: _t, off, ...on } = a; s.setRules(off ? { [off]: undefined } : on); return off ? 'Rule turned off' : 'Rule on' }
       case 'scan': set({ scan: { filters: a.filters, name: a.name ?? 'Custom scan', sort: a.sort ?? get().scan.sort }, view: 'scanner' }); return ''
       case 'chart': { if (a.sym) get().setSym(a.sym); if (a.tf) get().setPane(get().charts.active, { tf: a.tf }); if (a.indicators) { const cur = get().chart.inds; const add = a.indicators.map(indFromName).filter((x): x is IndInstance => !!x && !cur.some((y) => y.type === x.type && JSON.stringify(y.params) === JSON.stringify(x.params))); s.setChart({ inds: [...cur, ...add] }) } if (a.levels && a.sym) set({ aiLevels: { ...get().aiLevels, [a.sym]: true } }); set({ view: 'chart' }); return '' }
       case 'sip': { set({ sips: [...get().sips, { id: sid++, sym: a.sym, amount: a.amount, day: a.day ?? 5, active: true, runs: 0 }] }); return `SIP started: ₹${a.amount.toLocaleString('en-IN')} into ${a.sym} on day ${a.day ?? 5} of each month` }

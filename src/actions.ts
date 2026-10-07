@@ -24,6 +24,8 @@ export type Action =
   | { t: 'trigger'; sym: string; dir: 'above' | 'below'; price: number; then?: OrderAction }
   | { t: 'bracket'; key: string; sl?: number; tgt?: number; trail?: number }
   | { t: 'risk'; maxLoss?: number; maxProfit?: number; maxTrades?: number; kill?: boolean }
+  /** Standing trading rules (see rules.ts). `off` turns one off. */
+  | { t: 'rules'; stopRequired?: boolean; maxRiskPct?: number; noEntryAfter?: number; off?: 'stopRequired' | 'maxRiskPct' | 'noEntryAfter' }
   | { t: 'scan'; filters: Filter[]; name?: string; sort?: string }
   | { t: 'chart'; sym?: string; tf?: TF; indicators?: string[]; levels?: boolean }
   | { t: 'sip'; sym: string; amount: number; day?: number }
@@ -44,6 +46,7 @@ export type Card =
   | { k: 'alerts' }
   | { k: 'journal' }
   | { k: 'risk' }
+  | { k: 'rules' }
   | { k: 'funds' }
 
 export type AIResult = { reply: string; actions: Action[]; cards?: Card[]; follow?: string[] }

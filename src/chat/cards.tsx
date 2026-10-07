@@ -2,11 +2,12 @@
 // Cards never trade on their own: buttons either ask the agent something or turn into a draft to approve.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createChart, AreaSeries, CandlestickSeries, LineStyle, type IChartApi, type ISeriesApi, type UTCTimestamp, type IPriceLine } from 'lightweight-charts'
-import { ArrowUpRight, Bell, ChevronDown, Maximize2, Minus, Plus, X } from 'lucide-react'
+import { ArrowUpRight, Bell, Check, ChevronDown, Maximize2, Minus, Plus, X } from 'lucide-react'
 import { AIMark, Badge, Button, MeterBar, cn } from '../ds'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore } from '../store'
 import { useEntryGate, isEntry, GatePill, GateIcon } from '../gate'
+import { insights, ruleText, type Insight, type RuleId } from '../rules'
 import type { Action, Card, Filter, OrderAction, ViewName } from '../actions'
 import {
   SECTORS, STRATEGIES, bySym, chain, charges, history, levels, legPrice, nextExpiries, barStart, simNow, fmtIST,
@@ -86,6 +87,34 @@ function Facts({ items, cols = 4, top = true }: { items: Fact[]; cols?: 2 | 3 | 
             {note && <span className={cn('truncate text-[11px]', warn ? 'text-[var(--attention-fg)]' : 'text-fg-subtle')}>{note}</span>}</dd>
         </div>))}
     </dl>
+  )
+}
+
+/** Does this draft break a standing rule? Same numbers the order draft shows, so the reason and the disabled Place agree. */
+function ruleBreak(a: Action): { kind: 'stop' } | { kind: 'risk'; risk: number; cap: number; fit: number } | null {
+  const s = useStore.getState(); if (a.t !== 'order' || !isEntry(a, s)) return null
+  if (s.rules.stopRequired && !a.strike && a.sl == null) return { kind: 'stop' }
+  if (s.rules.maxRiskPct && a.sl != null) {
+    const { key, qty } = s.resolveOrder(a); const ref = a.otype === 'LIMIT' && a.price ? a.price : s.ltp(key)
+    const unit = Math.abs(ref - a.sl) * (qty / a.qty); const risk = unit * a.qty; const cap = s.cash * s.rules.maxRiskPct / 100
+    if (risk > cap) return { kind: 'risk', risk, cap, fit: Math.max(1, Math.floor(cap / unit)) }
+  }
+  return null
+}
+
+/**
+ * The strongest finding from your trades with the rule that answers it, one tap to switch on. After the tap it stays
+ * as a confirmation with Undo (instead of jumping straight to the next finding), so you see what changed.
+ */
+function InsightRead({ list, fallback = null }: { list: Insight[]; fallback?: ReactNode }) {
+  const rules = useStore((s) => s.rules); const [done, setDone] = useState<RuleId | null>(null)
+  if (done && rules[done] != null) return <Read><b>Rule on: {ruleText(done, rules)}.</b> I'll hold every new entry to it. <button type="button" onClick={() => { useStore.getState().setRules({ [done]: undefined }); setDone(null) }} className="font-medium text-fg underline underline-offset-2">Undo</button></Read>
+  const it = list[0]; if (!it) return <>{fallback}</>
+  return (
+    <Read tone="attention"><b>{it.lead}.</b> {it.detail}
+      <span className="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => { useStore.getState().setRules(it.rule); setDone(it.id) }} className="inline-flex h-8 items-center rounded-full bg-fg px-3.5 text-[12px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">Make it a rule: {ruleText(it.id, it.rule).replace(/^./, (c) => c.toLowerCase())}</button>
+      </span></Read>
   )
 }
 
@@ -695,6 +724,7 @@ function OrderDraft({ msgId, i, a, live }: { msgId: number; i: number; a: OrderA
   const tone = long ? 'bg-success text-white shadow-sm dark:text-[var(--bg)]' : 'bg-danger text-white shadow-sm dark:text-[var(--bg)]'
   // Approve in one look: the summary is the decision; every field sits behind Adjust. Errors open it themselves.
   const [adjust, setAdjust] = useState(false); const open = adjust || slBad || tgBad
+  const rules = useStore((st) => st.rules); const brk = ruleBreak(a)
   const addPlan = () => set({ sl: +(long ? ref - atrPts : ref + atrPts).toFixed(1), tgt: +(long ? ref + 2 * atrPts : ref - 2 * atrPts).toFixed(1) })
   const chip = 'inline-flex h-8 items-center gap-1 rounded-full border border-line bg-surface px-3 text-[12px] text-fg-muted transition-colors hover:border-line-strong hover:text-fg'
   if (!live) return null
@@ -702,7 +732,13 @@ function OrderDraft({ msgId, i, a, live }: { msgId: number; i: number; a: OrderA
     <div className="space-y-3">
       <Hero label={<>{long ? 'Buy' : 'Sell'} {shares} {opt ? 'qty' : shares === 1 ? 'share' : 'shares'} {a.otype === 'LIMIT' && a.price ? `at ₹${fmt(a.price)} limit` : 'at market'} · now ₹{fmt(ltp)}</>}
         sub={<span className="tabular-nums">Margin <span className={cn('font-medium text-fg', short && '!text-danger-fg')}>{inr(margin)}</span> of {inr(avail)} free · round-trip charges {inr(fees)}</span>}><Rs />{fmt(value, 0)}</Hero>
-      {a.sl == null
+      {brk?.kind === 'stop'
+        ? <Read tone="attention"><b>Your rule: every entry needs a stop.</b> Add one to place this.
+            <span className="mt-2 flex flex-wrap items-center gap-2"><button type="button" onClick={addPlan} className="inline-flex h-8 items-center rounded-full bg-fg px-3.5 text-[12px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">Add stop ₹{fmt(long ? ref - atrPts : ref + atrPts, 1)} · target ₹{fmt(long ? ref + 2 * atrPts : ref - 2 * atrPts, 1)}</button></span></Read>
+        : brk?.kind === 'risk'
+        ? <Read tone="attention"><b>Risking {inr(brk.risk)} breaks your rule of {rules.maxRiskPct}% per trade ({inr(brk.cap)}).</b>
+            <span className="mt-2 flex flex-wrap items-center gap-2"><button type="button" onClick={() => set({ qty: brk.fit })} className="inline-flex h-8 items-center rounded-full bg-fg px-3.5 text-[12px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">Size to {brk.fit} {opt ? (brk.fit === 1 ? 'lot' : 'lots') : 'qty'}</button><span className="text-[11px]">or move the stop closer</span></span></Read>
+        : a.sl == null
         ? <Read tone="attention"><b>No stop on this order.</b> If it moves against you, nothing limits the loss.
             <span className="mt-2 flex flex-wrap items-center gap-2"><button type="button" onClick={addPlan} className="inline-flex h-8 items-center rounded-full bg-fg px-3.5 text-[12px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">Add stop ₹{fmt(long ? ref - atrPts : ref + atrPts, 1)} · target ₹{fmt(long ? ref + 2 * atrPts : ref - 2 * atrPts, 1)}</button><span className="text-[11px]">2× ATR away, 1 : 2</span></span></Read>
         : risk > 0 ? <Read><b>Risking {inr(risk)}{reward > 0 ? ` to make ${inr(reward)} (1 : ${(reward / risk).toFixed(1)})` : ''}.</b> That's {risk / Math.max(avail, 1) < 0.001 ? 'under 0.1' : (risk / Math.max(avail, 1) * 100).toFixed(1)}% of your free funds{risk / Math.max(avail, 1) > 0.02 ? ', above the usual 2% per trade' : ', inside the usual 2% per trade'}.</Read> : null}
@@ -825,22 +861,24 @@ function describeOther(a: Action) {
 
 /** The approval surface for everything the agent drafted in one message. */
 export function DraftCard({ msgId }: { msgId: number }) {
-  const m = useStore((s) => s.msgs.find((x) => x.id === msgId))!; const gate = useEntryGate()
+  const m = useStore((s) => s.msgs.find((x) => x.id === msgId))!; const gate = useEntryGate(); useStore((s) => s.rules)
   const known = useStore((s) => !!m.orderIds?.some((id) => s.orders.some((o) => o.id === id)))
   if (!m.pending) return null
   const live = m.state === 'pending'
   const risky = m.pending.some((a) => (a.t === 'order' && a.side === 'SELL' && a.strike) || (a.t === 'squareoff' && !a.key) || (a.t === 'risk' && a.kill))
   const invalid = m.pending.some((a) => a.t === 'order' && ((a.sl != null && (a.side === 'BUY' ? a.sl >= useStore.getState().ltp(useStore.getState().resolveOrder(a).key) : a.sl <= useStore.getState().ltp(useStore.getState().resolveOrder(a).key))) || a.qty < 1))
   const blocked = live && gate && m.pending.some((a) => isEntry(a))
+  const broken = live && m.pending.some((a) => !!ruleBreak(a))
   const verb = m.pending[0].t === 'order' ? 'Place order' : m.pending[0].t === 'legs' ? `Place ${m.pending[0].legs.length} orders` : m.pending[0].t === 'squareoff' ? 'Exit' : m.pending[0].t === 'risk' ? 'Turn on kill switch' : m.pending[0].t === 'sip' ? 'Start SIP' : 'Confirm'
   return (
     <Shell className={cn(live && !blocked && '!border-[var(--attention)] ring-1 ring-[var(--attention)]', blocked && 'opacity-80')}
       title={m.pending.length === 1 ? draftTitle(m.pending[0]) : `${m.pending.length} actions`}
       meta={blocked ? <Badge tone="neutral">On hold</Badge> : live ? <Badge tone="warning">Needs your approval</Badge> : m.state === 'confirmed' ? <Badge tone="success">Approved</Badge> : <Badge tone="neutral">Cancelled</Badge>}
       foot={live ? <>
-        <Button size="sm" variant={risky ? 'danger' : 'primary'} disabled={invalid || !!blocked} onClick={() => confirm(msgId)}>{verb}</Button>
+        <Button size="sm" variant={risky ? 'danger' : 'primary'} disabled={invalid || !!blocked || broken} onClick={() => confirm(msgId)}>{verb}</Button>
         <Button size="sm" variant="ghost" leading={<X size={12} strokeWidth={1.5} />} onClick={() => dismiss(msgId)}>Discard</Button>
         {blocked && gate ? <span className="ml-auto flex min-w-0 items-center gap-1.5 text-[12px] text-fg-muted" title={gate.why}><GateIcon g={gate} size={12} /><span className="truncate">{gate.short}. This draft can't be placed until entries reopen.</span></span>
+          : broken ? <span className="ml-auto text-[12px] text-fg-muted">Breaks one of your rules. Fix it above, or change your rules.</span>
           : <span className="ml-auto text-[11px] text-fg-subtle">Paper trade · checks run again when you place it</span>}
       </> : undefined}>
       {live
@@ -887,6 +925,8 @@ export function JournalCard() {
   const avgL = losers.length ? -losers.reduce((a, x) => a + net(x), 0) / losers.length : 0
   const winRate = t.length ? winners.length / t.length : 0; const need = avgW + avgL ? avgL / (avgW + avgL) : 0
   const worst = losers.length ? Math.min(...losers.map(net)) : 0
+  const rules = useStore((s) => s.rules); const cash = useStore((s) => s.cash)
+  const found = useMemo(() => insights(trades, rules, cash), [trades, rules, cash])
   let run = 0; const eq = [0, ...t.map((x) => (run += net(x)))]
   const lo = Math.min(0, ...eq), hi = Math.max(0, ...eq); const W = 320, H = 84
   const y = (v: number) => H - 6 - ((v - lo) / (hi - lo || 1)) * (H - 12); const x = (i: number) => (i / Math.max(eq.length - 1, 1)) * W
@@ -896,7 +936,7 @@ export function JournalCard() {
     <Shell pad={false} title="Your last 30 days" foot={<><span className="text-[12px] text-fg-subtle">Includes sample history</span><span className="ml-auto" /><Act icon={<ArrowUpRight size={13} strokeWidth={1.75} />} onClick={() => openCanvas('journal')}>Open the journal</Act></>}>
       <div className="space-y-3 px-5 pb-4">
         <Hero label="Net after charges" aside={<span className="rounded-full bg-sunken px-2.5 py-1 text-[12px] font-medium text-fg-muted">{(winRate * 100).toFixed(0)}% of trades won</span>}><Money v={tot} /></Hero>
-        {winners.length > 0 && losers.length > 0 && <Read tone={winRate < need ? 'attention' : undefined}><b>{avgL > avgW ? `Your average loss (${inr(avgL)}) is ${(avgL / avgW).toFixed(1)}× your average win (${inr(avgW)}).` : `Your average win (${inr(avgW)}) is ${(avgW / avgL).toFixed(1)}× your average loss (${inr(avgL)}).`}</b> That needs a {(need * 100).toFixed(0)}% win rate to break even; you're at {(winRate * 100).toFixed(0)}%.{winRate < need && avgL > avgW ? ' Tighter stops would close the gap faster than more wins.' : ''}</Read>}
+        <InsightRead list={found} fallback={winners.length > 0 && losers.length > 0 && <Read tone={winRate < need ? 'attention' : undefined}><b>{avgL > avgW ? `Your average loss (${inr(avgL)}) is ${(avgL / avgW).toFixed(1)}× your average win (${inr(avgW)}).` : `Your average win (${inr(avgW)}) is ${(avgW / avgL).toFixed(1)}× your average loss (${inr(avgL)}).`}</b> That needs a {(need * 100).toFixed(0)}% win rate to break even; you're at {(winRate * 100).toFixed(0)}%.{winRate < need && avgL > avgW ? ' Tighter stops would close the gap faster than more wins.' : ''}</Read>} />
         {eq.length > 2 && <div className="rounded-2xl bg-sunken px-2 py-2">
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ height: H }} className="w-full" role="img" aria-label={`Equity curve over ${t.length} trades, ending at ${inr(tot)}`}>
             <defs><linearGradient id={id} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={tone} stopOpacity="0.22" /><stop offset="1" stopColor={tone} stopOpacity="0" /></linearGradient></defs>
@@ -954,6 +994,34 @@ export function FundsCard() {
   )
 }
 
+export function RulesCard() {
+  const rules = useStore((s) => s.rules); const trades = useStore((s) => s.trades); const cash = useStore((s) => s.cash)
+  const on = Object.keys(rules) as RuleId[]
+  const sugg = useMemo(() => insights(trades, rules, cash), [trades, rules, cash])
+  return (
+    <Shell pad={false} title="Your rules" meta={<span>{on.length} on</span>}>
+      <div className="px-5 pb-4">
+        {sugg[0] ? <InsightRead list={sugg} />
+          : <Read><b>{on.length ? 'Nothing new in your trades to add.' : 'No rules yet.'}</b> {on.length ? 'I check every draft and order against the rules below.' : 'Say one in plain words, like “always use a stop”, “no trades after 2 pm” or “risk 1% per trade”.'}</Read>}
+      </div>
+      {on.length > 0 && <ul className="divide-y divide-line border-t border-line">{on.map((id) => (
+        <li key={id} className="flex items-center gap-3 px-5 py-3">
+          <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-success-soft text-success-fg" aria-hidden><Check size={13} strokeWidth={2} /></span>
+          <span className="min-w-0 flex-1 text-[13px] text-fg">{ruleText(id, rules)}</span>
+          <Act onClick={() => useStore.getState().setRules({ [id]: undefined })}>Turn off</Act>
+        </li>))}</ul>}
+      {sugg.length > 1 && <div className="border-t border-line px-5 py-3">
+        <p className="text-[11px] text-fg-subtle">Also suggested by your trades</p>
+        <ul className="mt-1">{sugg.slice(1).map((it) => (
+          <li key={it.id} className="flex items-center gap-3 py-1.5">
+            <span className="min-w-0 flex-1 text-[13px] text-fg-muted"><span className="text-fg">{ruleText(it.id, it.rule)}</span> · {it.lead.replace(/^./, (c) => c.toLowerCase())}</span>
+            <Act onClick={() => useStore.getState().setRules(it.rule)}>Turn on</Act>
+          </li>))}</ul>
+      </div>}
+    </Shell>
+  )
+}
+
 /* ------------------------------------------------------------------ router */
 
 export function CardView({ c }: { c: Card }) {
@@ -969,6 +1037,7 @@ export function CardView({ c }: { c: Card }) {
     case 'alerts': return <AlertsCard />
     case 'journal': return <JournalCard />
     case 'risk': return <RiskCard />
+    case 'rules': return <RulesCard />
     case 'funds': return <FundsCard />
   }
 }

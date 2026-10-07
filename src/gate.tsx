@@ -2,14 +2,16 @@
 // module tells the interface the same thing up front, so no surface offers a Buy that is going to fail. Exits are
 // never gated: closing, stops and targets keep working in every state.
 import { useEffect, useState } from 'react'
-import { Lock, Timer } from 'lucide-react'
+import { Clock, Lock, Timer } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore } from './store'
 import { cn } from './ds'
 import type { Action } from './actions'
+import { secOfDay } from './market'
+import { hhmm } from './rules'
 
 export type Gate = {
-  kind: 'locked' | 'cooloff' | 'trades'
+  kind: 'locked' | 'cooloff' | 'trades' | 'rule'
   /** Short state for buttons and badges: "Locked today", "Paused · 12 min". */
   short: string
   /** One sentence on why, in the trader's terms. */
@@ -23,7 +25,7 @@ type S = ReturnType<typeof useStore.getState>
 const tradesToday = (s: Pick<S, 'orders'>) => s.orders.filter((o) => o.status === 'COMPLETE' && new Date(o.ts).toDateString() === new Date().toDateString() && o.via !== 'bracket' && o.via !== 'risk').length
 
 /** Why new positions can't be opened right now, or null when they can. Same order of checks as the store's. */
-export function entryGate(s: Pick<S, 'risk' | 'orders'>, now = Date.now()): Gate | null {
+export function entryGate(s: Pick<S, 'risk' | 'orders' | 'rules'>, now = Date.now()): Gate | null {
   const r = s.risk
   if (r.killed) return { kind: 'locked', short: 'Locked today', why: (r.reason ?? 'The kill switch is on').replace(/[.!]$/, '') + '.' }
   if (r.cooloffUntil && now < r.cooloffUntil) {
@@ -31,15 +33,18 @@ export function entryGate(s: Pick<S, 'risk' | 'orders'>, now = Date.now()): Gate
     return { kind: 'cooloff', short: `Paused · ${min} min`, why: `${r.cooloffAfter} losses in a row, so new entries pause for ${min} more minute${min === 1 ? '' : 's'}.`, until: r.cooloffUntil }
   }
   if (tradesToday(s) >= r.maxTrades) return { kind: 'trades', short: 'Trade limit reached', why: `You've used all ${r.maxTrades} trades for today.` }
+  const after = s.rules?.noEntryAfter
+  if (after && secOfDay() >= after) return { kind: 'rule', short: `No entries after ${hhmm(after)}`, why: `Your rule: no new entries after ${hhmm(after)}. You can turn it off in your rules.` }
   return null
 }
 
 /** The gate, kept current: re-checks when risk or orders change, and every 15 s while a cool-off counts down. */
 export function useEntryGate(): Gate | null {
-  const s = useStore(useShallow((st) => ({ risk: st.risk, orders: st.orders })))
+  const s = useStore(useShallow((st) => ({ risk: st.risk, orders: st.orders, rules: st.rules })))
   const [now, setNow] = useState(Date.now())
-  const cooling = !!s.risk.cooloffUntil && now < s.risk.cooloffUntil
-  useEffect(() => { if (!cooling) return; const t = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(t) }, [cooling])
+  // Time-based states need a clock: the cool-off counts down, and a "no entries after" rule switches on mid-session.
+  const timed = (!!s.risk.cooloffUntil && now < s.risk.cooloffUntil) || !!s.rules.noEntryAfter
+  useEffect(() => { if (!timed) return; const t = setInterval(() => setNow(Date.now()), 15000); return () => clearInterval(t) }, [timed])
   return entryGate(s, now)
 }
 
@@ -59,7 +64,7 @@ export function opensPosition(key: string, side: 'BUY' | 'SELL', qty: number, pr
   return !reduces && !holding
 }
 
-export const GateIcon = ({ g, size = 13 }: { g: Gate; size?: number }) => g.kind === 'cooloff' ? <Timer size={size} strokeWidth={1.75} aria-hidden /> : <Lock size={size} strokeWidth={1.75} aria-hidden />
+export const GateIcon = ({ g, size = 13 }: { g: Gate; size?: number }) => g.kind === 'cooloff' ? <Timer size={size} strokeWidth={1.75} aria-hidden /> : g.kind === 'rule' ? <Clock size={size} strokeWidth={1.75} aria-hidden /> : <Lock size={size} strokeWidth={1.75} aria-hidden />
 
 /**
  * Stands where Buy and Sell would be. Calm, not an error: it says the state, and that exits still work.
