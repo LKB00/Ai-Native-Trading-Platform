@@ -151,7 +151,7 @@ export default function Workspace() {
               </div>}
             </Popover>
           </div>
-          {(inst.seg === 'EQ' || !!k.strike) && <div className="ml-1 flex items-center gap-1">
+          {(inst.seg === 'EQ' || !!k.strike) && <div className="ml-1 flex items-center gap-1 max-md:hidden">
             {/* While entries are paused the pair stays, greyed, with a lock saying why; a side that only closes what you hold stays live. */}
             {gate && <span className="flex size-7 items-center justify-center text-fg-subtle @max-[500px]:hidden" title={`${gate.short}. ${gate.why} Exits still work.`} aria-label={gate.short}><GateIcon g={gate} /></span>}
             {(['SELL', 'BUY'] as const).map((side, i) => { const buy = side === 'BUY'; const px = buy ? offer : bid
@@ -164,7 +164,7 @@ export default function Workspace() {
                   aria-label={`${buy ? 'Buy' : 'Sell'} ${labelOf(pane.k)} at ${px.toFixed(2)}${ok ? '' : `: ${gate!.short}`}`}><span className="text-[10px]">{buy ? 'Buy' : 'Sell'}</span><span className="num text-[12px] font-bold">{px.toFixed(2)}</span></button>
               </Fragment> })}
           </div>}
-          {eq && <Popover label={`${k.und} market depth`} align="end" open={depthOpen} onOpenChange={setDepthOpen} trigger={({ toggle, triggerProps }) => (
+          {eq && <Popover className="max-md:hidden" label={`${k.und} market depth`} align="end" open={depthOpen} onOpenChange={setDepthOpen} trigger={({ toggle, triggerProps }) => (
             <button type="button" onClick={toggle} {...triggerProps} title="Market depth (D)" className={cn('ml-1 inline-flex h-7 @max-[500px]:ml-0 @max-[500px]:px-1.5 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium transition-colors hover:bg-hover hover:text-fg', depthOpen ? 'bg-hover text-fg' : 'text-fg-muted')}>Depth</button>)}>
             {({ close }) => <div className="w-[340px] p-3">
               <div className="mb-2.5 flex items-baseline justify-between"><p className="text-[13px] font-semibold text-fg">{k.und} · Market depth</p><span className="text-[11px] text-fg-subtle">Spread <span className="num">{book.spread.toFixed(2)}</span></span></div>
@@ -249,7 +249,7 @@ function BottomBar({ tf, setTf, active }: { tf: TF; setTf: (t: TF) => void; acti
   return (
     <div className="flex items-center gap-1 border-t border-line px-2 py-1 text-[12px]">
       <div role="group" aria-label="Date range" className="flex items-center gap-0.5 overflow-x-auto">{RANGES.map((r) => <button key={r.label} className={tbtn(false)} onClick={() => pick(r)} title={`${r.label} · ${TF_LABEL[r.tf]} bars`}>{r.label}</button>)}</div>
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2 max-md:hidden">
         <span className="num text-fg-muted" title="Exchange time (IST)">{fmtIST(simNow(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} (UTC+5:30)</span>
         <span className="flex items-center gap-1.5 text-[11px] text-fg-subtle"><span className={cn('size-1.5 rounded-full', live ? 'bg-success' : 'bg-[var(--border-strong)]')} aria-hidden />{live ? 'Live' : 'Simulated'}</span>
         <span aria-hidden className="h-4 w-px bg-line" />

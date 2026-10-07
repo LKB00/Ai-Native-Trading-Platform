@@ -33,7 +33,8 @@ export function Money({ v, className }: { v: number; className?: string }) {
 export function ViewHeader({ title, sub, children }: { title: string; sub?: string; children?: React.ReactNode }) {
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-2">
-      <h2 className="text-[16px] font-semibold tracking-tight text-fg">{title}</h2>{sub && <p className="truncate text-[12px] text-fg-subtle">{sub}</p>}
+      {/* On a phone the screen's own bar already names the page; the description and actions stay. */}
+      <h2 className="text-[16px] font-semibold tracking-tight text-fg max-md:sr-only">{title}</h2>{sub && <p className="truncate text-[12px] text-fg-subtle max-md:whitespace-normal">{sub}</p>}
       <div className="ml-auto flex flex-wrap items-center gap-1.5">{children}</div>
     </div>
   )
@@ -54,7 +55,7 @@ export function Section({ id, title, sub, summary, actions, children, defaultOpe
       <div className="flex min-h-10 items-center gap-2 px-3.5 py-1.5">
         <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => toggle(id, !open)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <ChevronIcon width={14} height={14} className={cn('shrink-0 text-fg-subtle transition-transform duration-[var(--dur-fast)]', open && 'rotate-90')} />
-          <span className="flex min-w-0 shrink-0 items-baseline gap-2"><span id={`${bodyId}-h`} className="whitespace-nowrap text-[13px] font-semibold leading-5 text-fg">{title}</span>{sub && open && <span className="truncate text-[12px] text-fg-subtle">{sub}</span>}</span>
+          <span className="flex min-w-0 items-baseline gap-2"><span id={`${bodyId}-h`} className="shrink-0 whitespace-nowrap text-[13px] font-semibold leading-5 text-fg">{title}</span>{sub && open && <span className="truncate text-[12px] text-fg-subtle">{sub}</span>}</span>
           {!open && summary && <span className="ml-auto min-w-0 truncate pl-3 text-[12px] text-fg-muted">{summary}</span>}
         </button>
         {open && actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

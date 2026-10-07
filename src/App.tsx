@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { useStore, resetBook, type View } from './store'
 import { usePendingCount, useEntryGate, entryGate, opensPosition, GateNote, GateIcon } from './gate'
@@ -20,7 +20,11 @@ import { ChatPanel, ChatTopActions } from './chat/Chat'
 import { DeskRail } from './agent/Desk'
 import { CostLine, LevelInput, TagPicker, priceBand, useOrderCost } from './ticket'
 import { DepthView } from './depth'
-import { tagLabel } from './rules'
+import { Drawer, PhonePositions, PositionActions, statusOf, type DrawerTarget } from './positions'
+import { DepthSheet, MoreSheet, PHONE_TABS, Screen, useBackStack, type PhoneTab } from './mobile'
+import { OrderPad, StockScreen } from './phone'
+import { useShallow } from 'zustand/react/shallow'
+import { isSetupTag, tagLabel } from './rules'
 import { Briefcase, GripVertical, Layers, Rows3, Trash2 } from 'lucide-react'
 
 export { inr, Chg, Money }
@@ -105,33 +109,82 @@ function Cockpit() {
   )
 }
 
-type PhoneTab = 'agent' | 'chart' | 'watch' | 'positions'
+type Layer = { t: 'stock'; sym: string } | { t: 'order'; sym: string; side: 'BUY' | 'SELL'; px?: number } | { t: 'chart' } | { t: 'page'; view: View }
+  | { t: 'pos'; target: DrawerTarget } | { t: 'depth'; sym: string } | { t: 'more' }
+const PAGE: Partial<Record<View, { label: string; el: () => ReactNode }>> = {
+  markets: { label: 'Markets', el: () => <Markets /> }, scanner: { label: 'Scanner', el: () => <Scanner /> }, chain: { label: 'Option chain', el: () => <Chain /> },
+  strategy: { label: 'Strategy builder', el: () => <Strategy /> }, journal: { label: 'Journal', el: () => <Journal /> }, portfolio: { label: 'Portfolio', el: () => <Portfolio /> },
+}
+
 /**
- * Phones get one pane at a time and a tab bar, opening on the agent: on a small screen you mostly talk and
- * approve, and look at the chart, list or positions when you need them.
+ * The phone, built for how phones are used: short sessions to check, react and adjust, mostly one-handed.
+ * - Five tabs at the bottom, navigation only. The agent sits in the middle as home.
+ * - A stock is a page you open (from the list, a position or the agent), with Sell and Buy fixed at the bottom edge.
+ * - Orders get a full-screen pad with a slide to confirm, so a mis-tap can't place a trade.
+ * - Every layer (page, pad, sheet) is a history entry, so the Back gesture closes it.
+ * - Sheets never stack; the tab bar steps aside while the keyboard is up.
  */
 function PhoneCockpit() {
   const [tab, setTab] = useState<PhoneTab>('agent')
+  const nav = useBackStack<Layer>(); const { push, pop, replace, top } = nav
+  const { sym, setView, setSym } = useStore(useShallow((s) => ({ sym: s.sym, setView: s.setView, setSym: s.setSym })))
+  const net = useStore((s) => s.pnl().net)
   const open = useStore((s) => Object.values(s.positions).filter((p) => p.qty).length); const pending = usePendingCount()
-  useEffect(() => { if (tab === 'positions' && !useStore.getState().panels.bottom) useStore.getState().setPanels({ bottom: true }) }, [tab])
-  const tabs: { id: PhoneTab; label: string; badge?: number }[] = [{ id: 'agent', label: 'Agent', badge: pending || undefined }, { id: 'chart', label: 'Chart' }, { id: 'watch', label: 'Watchlist' }, { id: 'positions', label: 'Positions', badge: open || undefined }]
+  // The keyboard takes half the screen; the tab bar steps aside while you type.
+  const [typing, setTyping] = useState(false)
+  useEffect(() => {
+    const on = (e: FocusEvent) => setTyping(!!(e.target as HTMLElement)?.matches?.('input:not([type=checkbox]):not([type=radio]),textarea'))
+    const off = () => setTimeout(() => setTyping(!!document.activeElement?.matches('input:not([type=checkbox]):not([type=radio]),textarea')), 0)
+    addEventListener('focusin', on); addEventListener('focusout', off); return () => { removeEventListener('focusin', on); removeEventListener('focusout', off) }
+  }, [])
+  // Agent cards and commands still move the desktop's view (open a chart, the chain, the journal). On the phone those
+  // become pages, so follow the store and push the matching one.
+  const view = useStore((s) => s.view); const seen = useRef(view)
+  useEffect(() => {
+    if (view === seen.current) return; seen.current = view
+    if (view === 'chart') push({ t: 'stock', sym: useStore.getState().sym })
+    else if (view === 'portfolio') setTab('portfolio')
+    else if (PAGE[view]) push({ t: 'page', view })
+  }, [view]) // eslint-disable-line react-hooks/exhaustive-deps
+  const go = (v: View) => { seen.current = v; setView(v) }
+  const openStock = (w: string) => { setSym(w); push({ t: 'stock', sym: w }) }
+  const order = (w: string, side: 'BUY' | 'SELL', px?: number) => { if (top?.t === 'depth' || top?.t === 'pos') replace({ t: 'order', sym: w, side, px }); else push({ t: 'order', sym: w, side, px }) }
+  const toAgent = (q: string) => { nav.clear(nav.stack.length); setTab('agent'); setTimeout(() => ask(q), 50) }
+  const title = PHONE_TABS.find((t) => t.id === tab)?.label ?? ''
+  const badge = (t: PhoneTab) => (t === 'agent' ? pending : t === 'positions' ? open : 0)
   return (
-    <div className="grid h-[100dvh] grid-cols-1 grid-rows-[56px_30px_minmax(0,1fr)_56px]">
-      <Top />
+    <div className="grid h-[100dvh] grid-cols-1 grid-rows-[auto_30px_minmax(0,1fr)_auto]">
+      <header className="flex h-12 min-w-0 items-center gap-2 border-b border-line bg-surface px-3 pt-[env(safe-area-inset-top)] box-content">
+        <span role="img" aria-label="Prompt Terminal" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
+        <h1 className="min-w-0 truncate text-[16px] font-semibold text-fg">{title}</h1>
+        <div className="ml-auto flex shrink-0 items-center gap-1">{tab === 'agent' && <ChatTopActions />}<RiskCenter net={net} /></div>
+      </header>
       <TickerTape />
       <div className="min-h-0 overflow-hidden">
         {tab === 'agent' && <div className="flex h-full flex-col [&>aside]:h-full [&>aside]:border-0"><ChatPanel overlay={false} /></div>}
-        {tab === 'chart' && <div className="grid h-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden"><SubBar /><Main /></div>}
-        {tab === 'watch' && <div className="flex h-full flex-col overflow-hidden bg-surface"><WatchBody header={null} onPicked={() => setTab('chart')} /></div>}
-        {tab === 'positions' && <div className="flex h-full flex-col overflow-hidden [&>section]:h-full"><Bottom /></div>}
+        {tab === 'watch' && <div className="flex h-full flex-col overflow-hidden bg-surface"><WatchBody header={null} onOpen={openStock} /></div>}
+        {tab === 'positions' && <PhonePositions onOpen={(t) => push({ t: 'pos', target: t })} onStock={openStock} onOrder={order} />}
+        {tab === 'portfolio' && <div className="scroll-thin h-full overflow-y-auto bg-surface"><Portfolio /></div>}
       </div>
-      <nav aria-label="Sections" className="grid grid-cols-4 border-t border-line bg-surface">
-        {tabs.map((t) => <button key={t.id} type="button" aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}
-          className={cn('relative flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium', tab === t.id ? 'text-fg' : 'text-fg-subtle')}>
-          <span className={cn('h-1 w-6 rounded-full', tab === t.id ? 'bg-[var(--accent)]' : 'bg-transparent')} aria-hidden />{t.label}
-          {t.badge ? <span className="num absolute right-[22%] top-1.5 rounded-full bg-attention px-1.5 text-[10px] font-bold text-[var(--ref-charcoal)]">{t.badge}</span> : null}
-        </button>)}
+      <nav aria-label="Sections" className={cn('grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]', typing ? 'hidden' : 'grid')}>
+        {PHONE_TABS.map((t) => { const on = t.id === tab || (t.id === 'more' && top?.t === 'more'); const n = badge(t.id)
+          return <button key={t.id} type="button" aria-current={on ? 'page' : undefined} onClick={() => { if (t.id === 'more') push({ t: 'more' }); else { nav.clear(nav.stack.length); setTab(t.id) } }}
+            className={cn('relative flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium', on ? 'text-fg' : 'text-fg-subtle')}>
+            <span className={cn('flex h-7 w-12 items-center justify-center rounded-full transition-colors', on && 'bg-sunken')}>{t.icon}</span>{t.label}
+            {n ? <span className="num absolute left-1/2 top-1 ml-2 min-w-4 rounded-full bg-attention px-1 text-center text-[10px] font-bold leading-4 text-[var(--ref-charcoal)]">{n}</span> : null}
+          </button> })}
       </nav>
+      {/* Pushed layers, newest on top. Pages and pads are screens; depth and More are single sheets. */}
+      {nav.stack.map((l, i) => <Fragment key={i}>
+        {l.t === 'stock' && <StockScreen sym={l.sym} onBack={pop} onOrder={(side) => order(l.sym, side)} onDepth={() => push({ t: 'depth', sym: l.sym })}
+          onOptions={() => { setSym(l.sym); go('chain'); push({ t: 'page', view: 'chain' }) }} onFullChart={() => { setSym(l.sym); go('chart'); push({ t: 'chart' }) }} onAsk={toAgent} />}
+        {l.t === 'chart' && <Screen title={sym} sub="Full chart" onBack={pop}><div className="grid h-full min-h-[70dvh] grid-rows-[minmax(0,1fr)]"><Chart /></div></Screen>}
+        {l.t === 'page' && <Screen title={PAGE[l.view]?.label ?? ''} onBack={pop}>{PAGE[l.view]?.el()}</Screen>}
+        {l.t === 'order' && <OrderPad key={l.sym + l.side + (l.px ?? '')} sym={l.sym} side={l.side} px={l.px} onBack={pop} onPlaced={pop} />}
+        {l.t === 'pos' && i === nav.stack.length - 1 && <Drawer target={l.target} onClose={pop} onOpen={(t) => replace({ t: 'pos', target: t })} onAdd={(k) => { const p = useStore.getState().positions[k]; if (p?.qty) order(k, p.qty > 0 ? 'BUY' : 'SELL') }} />}
+      </Fragment>)}
+      <DepthSheet sym={top?.t === 'depth' ? top.sym : null} onClose={pop} onPrice={(side, px) => top?.t === 'depth' && order(top.sym, side, px)} />
+      <MoreSheet open={top?.t === 'more'} onClose={pop} onPage={(v) => { go(v); replace({ t: 'page', view: v }) }} />
       <Toast /><Palette /><FnoDisclosure />
     </div>
   )
@@ -256,7 +309,7 @@ function RiskCenter({ net }: { net: number }) {
   const num = 'num h-8 w-28 rounded-md border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
   return (
     <Popover label="Risk limits" align="end" trigger={({ toggle, triggerProps }) => (
-      <button onClick={toggle} {...triggerProps} className="flex h-8 items-center gap-2 rounded-md border border-line bg-surface px-3 text-[12px] hover:border-line-strong">
+      <button onClick={toggle} {...triggerProps} className="flex h-8 items-center gap-2 whitespace-nowrap rounded-md border border-line bg-surface px-3 text-[12px] hover:border-line-strong max-md:px-2">
         {/* State shows as the icon's colour only, so a lock reads at a glance without the pill shouting over the bar. */}
         <ShieldIcon width={14} height={14} className={risk.killed ? 'text-danger-fg' : cooling ? 'text-attention-fg' : 'text-fg-subtle'} />
         <span className="text-fg-muted max-sm:hidden">{risk.killed ? 'Locked' : cooling ? 'Cool-off' : 'Day'}</span>
@@ -357,18 +410,18 @@ function WatchRow({ w, sel, active, first, depthOpen, onAct, drag }: {
   const showBar = active || depthOpen
   return (
     <li data-row={w} draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; drag.onDragStart() }} onDragOver={drag.onDragOver} onDragEnd={drag.onDragEnd}
-      className={cn('group relative flex h-8 items-center gap-1.5 border-l-2 pl-3 pr-3 text-[12px]', sel ? 'border-[var(--lime)] bg-sunken' : 'border-transparent', !sel && (showBar ? 'bg-hover' : 'hover:bg-hover'), drag.dragging && 'opacity-40')}>
+      className={cn('group relative flex h-8 items-center gap-1.5 border-l-2 pl-3 pr-3 text-[12px] max-md:h-12 max-md:text-[14px]', sel ? 'border-[var(--lime)] bg-sunken' : 'border-transparent', !sel && (showBar ? 'bg-hover' : 'hover:bg-hover'), drag.dragging && 'opacity-40')}>
       {/* Grip: drag to reorder. Shown on hover, in the gutter, so the symbol never moves. */}
-      <span aria-hidden className="absolute left-0 top-1/2 hidden -translate-y-1/2 cursor-grab text-fg-subtle group-hover:block"><GripVertical size={11} strokeWidth={1.5} /></span>
+      <span aria-hidden className="absolute left-0 top-1/2 hidden -translate-y-1/2 cursor-grab text-fg-subtle group-hover:block max-md:!hidden"><GripVertical size={11} strokeWidth={1.5} /></span>
       <button type="button" tabIndex={-1} className="flex min-w-0 flex-1 items-center gap-1 text-left" onClick={() => onAct('chart')} aria-current={sel || undefined} title={inst.name}>
         <span className="truncate font-medium text-fg">{w}</span>
         {pos?.qty ? <span className={cn('num shrink-0 rounded px-1 text-[10px] font-medium leading-4', pos.qty > 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')} title={`Open position: ${pos.qty > 0 ? 'long' : 'short'} ${Math.abs(pos.qty)}`}>{pos.qty > 0 ? '+' : ''}{pos.qty}</span> : null}
         {hold && <span className="flex shrink-0 text-fg-subtle" title={`In your holdings: ${hold.qty} shares`} aria-label={`Held: ${hold.qty} shares`}><Briefcase size={11} strokeWidth={1.75} aria-hidden /></span>}
       </button>
-      <FlashPrice v={p.ltp} className="w-[60px] shrink-0 text-right text-fg" />
-      <span className={cn('num w-11 shrink-0 text-right text-[11px]', up ? 'text-up' : 'text-down')}>{up ? '+' : '−'}{Math.abs(chg).toFixed(2)}%</span>
+      <FlashPrice v={p.ltp} className="w-[60px] shrink-0 text-right text-fg max-md:w-[84px]" />
+      <span className={cn('num w-11 shrink-0 text-right text-[11px] max-md:w-[68px] max-md:text-[12px]', up ? 'text-up' : 'text-down')}>{up ? '+' : '−'}{Math.abs(chg).toFixed(2)}%</span>
       {/* The bar covers the price while you act; the chart header shows it anyway. */}
-      <div className={cn('absolute inset-y-0 right-0 items-center gap-0.5 pl-4 pr-1.5', showBar ? 'flex' : 'hidden group-hover:flex')}
+      <div className={cn('absolute inset-y-0 right-0 items-center gap-0.5 pl-4 pr-1.5 max-md:!hidden', showBar ? 'flex' : 'hidden group-hover:flex')}
         // Solid row colour so the price underneath doesn't show through; fades in from the left.
         style={{ backgroundImage: `linear-gradient(to right, transparent, var(${sel ? '--surface-sunken' : '--surface-hover'}) 14px)` }}>
         {tradeBtn('BUY')}{tradeBtn('SELL')}
@@ -385,7 +438,7 @@ function WatchRow({ w, sel, active, first, depthOpen, onAct, drag }: {
  * Search, list, quick ticket and depth. Shared by the open panel and the peek from the folded rail.
  * Keyboard, once you click into the list: ↑ ↓ move, B / S trade, D depth, C option chain, Enter chart, Delete removes.
  */
-function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => void }) {
+function WatchBody({ header, onPicked, onOpen }: { header: ReactNode; onPicked?: () => void; onOpen?: (w: string) => void }) {
   const { watch, sym, setSym, watchOp, setWatch, setView, view } = useStore()
   const list = watch.filter((w) => !INDICES.includes(w))
   const pick = (w: string) => { setSym(w); if (!TRADING.includes(view)) setView('chart'); onPicked?.() }
@@ -401,7 +454,7 @@ function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => v
   const act = (w: string, a: RowAct) => {
     setCursor(w)
     if (a === 'BUY' || a === 'SELL') { if (!allowed(w, a)) return; setDepthFor(null); setTicket({ sym: w, side: a }) }
-    else if (a === 'chart') pick(w)
+    else if (a === 'chart') { if (onOpen) onOpen(w); else pick(w) }
     else if (a === 'depth') { setTicket(null); setDepthFor((d) => (d === w ? null : w)) }
     else if (a === 'chain') { if (bySym(w)?.fno) { setSym(w); setView('chain'); onPicked?.() } }
     else { if (depthFor === w) setDepthFor(null); const i = list.indexOf(w); watchOp('remove', w); setCursor(list[i + 1] ?? list[i - 1] ?? null) }
@@ -445,7 +498,7 @@ function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => v
       </ul>}
       {/* Indices live in the market strip above, so the list is only your names. Column labels line up with the rows. */}
       <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-line pl-3.5 pr-3 text-[11px] text-fg-subtle">
-        <span className="flex-1">Watchlist <span className="num">{list.length}</span></span><span className="w-[60px] text-right">Price</span><span className="w-11 text-right">Chg</span>
+        <span className="flex-1">Watchlist <span className="num">{list.length}</span></span><span className="w-[60px] text-right max-md:w-[84px]">Price</span><span className="w-11 text-right max-md:w-[68px]">Chg</span>
       </div>
       <ul ref={ul} tabIndex={0} aria-label="Watchlist. Arrow keys move; B buy, S sell, D depth, Enter chart" onKeyDown={onKey}
         onMouseLeave={() => setHover(null)} onMouseMove={() => kb && setKb(false)} onBlur={() => setKb(false)} className="scroll-thin min-h-0 flex-1 overflow-auto outline-none">
@@ -468,7 +521,7 @@ function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => v
   )
 }
 
-function Ticket({ sym, side: s0, px: px0, close }: { sym: string; side: 'BUY' | 'SELL'; px?: number; close: () => void }) {
+function Ticket({ sym, side: s0, px: px0, close, place: at = 'absolute z-30 left-full top-16 ml-2 w-[320px] max-md:left-3 max-md:ml-0' }: { sym: string; side: 'BUY' | 'SELL'; px?: number; close: () => void; place?: string }) {
   const { prices, place, setToast, setView, setSym } = useStore(); const inst = bySym(sym)!
   const ltp = prices[sym].ltp
   // Opened on the side that closes what you hold: start from that size and product, so an exit is one click.
@@ -482,7 +535,7 @@ function Ticket({ sym, side: s0, px: px0, close }: { sym: string; side: 'BUY' | 
   const [px, setPx] = useState(px0 ?? +ltp.toFixed(1)); const [prod, setProd] = useState<'MIS' | 'CNC'>(exit?.prod ?? 'MIS')
   const gate = useEntryGate(); const held = gate && opensPosition(sym, side, qty, prod)
   const [sl, setSl] = useState<number | null>(null); const [tg, setTg] = useState<number | null>(null); const [tag, setTag] = useState<string>()
-  const box = 'absolute left-full top-16 z-30 ml-2 w-[320px] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise max-md:left-3 max-md:ml-0'
+  const box = cn('rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise', at)
   const field = 'num h-8 w-full rounded-md border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
   const entry = ot === 'MARKET' ? ltp : px
   const cost = useOrderCost(sym, side, qty, entry, prod)
@@ -517,8 +570,8 @@ function Ticket({ sym, side: s0, px: px0, close }: { sym: string; side: 'BUY' | 
       <CostLine cost={cost} className="mt-3 border-t border-line pt-2.5" />
       {held && gate && <GateNote g={gate} className="mt-2" />}
       <div className="mt-2.5 flex gap-2">
-        <Button size="sm" variant={side === 'BUY' ? 'primary' : 'danger'} disabled={!!held || cost.short > 0 || outBand} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ?? undefined, tgt: tg ?? undefined, tag: exit ? undefined : tag })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
-        <Button size="sm" variant="ghost" onClick={close}>Cancel</Button>
+        <Button size="sm" className="max-md:h-11 max-md:flex-1 max-md:text-[14px]" variant={side === 'BUY' ? 'primary' : 'danger'} disabled={!!held || cost.short > 0 || outBand} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ?? undefined, tgt: tg ?? undefined, tag: exit ? undefined : tag })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
+        <Button size="sm" variant="ghost" className="max-md:h-11" onClick={close}>Cancel</Button>
       </div>
     </div>
   )
@@ -544,8 +597,8 @@ function SubBar() {
         <span className={cn('num text-[12px] font-medium', up ? 'text-up' : 'text-down')}>{up ? '+' : '−'}{Math.abs(ch).toFixed(2)} ({up ? '+' : '−'}{Math.abs(pct(p.ltp, p.prev)).toFixed(2)}%)</span>
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden text-[11px] max-lg:hidden">{stat('O', p.open)}{stat('H', p.high)}{stat('L', p.low)}<span className="max-xl:hidden">{stat('Prev', p.prev)}</span></div>
-      {view !== 'chart' && <SegmentedControl className="ml-auto" size="sm" label="Options view" value={view} onChange={setView} options={[{ value: 'chain', label: 'Option chain' }, { value: 'strategy', label: 'Strategy builder' }]} />}
-      {view === 'chart' && inst.fno && <button type="button" onClick={() => setView('chain')} className="ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg">Option chain<ArrowRightIcon width={12} height={12} /></button>}
+      {view !== 'chart' && <SegmentedControl className="ml-auto max-md:hidden" size="sm" label="Options view" value={view} onChange={setView} options={[{ value: 'chain', label: 'Option chain' }, { value: 'strategy', label: 'Strategy builder' }]} />}
+      {view === 'chart' && inst.fno && <button type="button" onClick={() => setView('chain')} className="ml-auto inline-flex max-md:hidden h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg">Option chain<ArrowRightIcon width={12} height={12} /></button>}
     </div>
   )
 }
@@ -590,6 +643,11 @@ function ExitPlan({ k }: { k: string }) {
 
 function Bottom() {
   const s = useStore(); const [tab, setTab0] = useState<'pos' | 'ord' | 'gtt' | 'log'>('pos')
+  const [drawer, setDrawer] = useState<DrawerTarget>(null); const [addTo, setAddTo0] = useState<string | null>(null)
+  // The quick ticket trades stocks; adding to an option leg happens in the option chain, where the strike and expiry are.
+  const setAddTo = (k: string | null) => { if (k && parseKey(k).strike) { s.setSym(parseKey(k).und); s.setView('chain'); s.setToast('Add to option legs from the option chain'); return } setAddTo0(k) }
+  // A click on a row opens its details; clicks on the row's own buttons and fields stay with them.
+  const rowClick = (e: React.MouseEvent, t: DrawerTarget) => { if (!(e.target as HTMLElement).closest('button,input,a,[role=dialog]')) setDrawer(t) }
   const open_ = s.panels.bottom
   // Picking a tab while folded opens the panel on that tab.
   const setTab = (t: typeof tab) => { setTab0(t); if (!open_) s.setPanels({ bottom: true, focus: false }) }
@@ -616,17 +674,17 @@ function Bottom() {
       </div>
       <div className="scroll-thin min-h-0 flex-1 overflow-auto" hidden={!open_}>
         {tab === 'pos' && <table className="tbl"><thead><tr><th>Instrument</th><th>Product</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&amp;L</th><th>Exit plan</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
-          {pos.map((x) => { const l = s.ltp(x.key); const pl = (l - x.avg) * x.qty + x.realized; return <tr key={x.key}>
-            <td className="!font-sans"><button className="hover:underline" onClick={() => { s.setSym(parseKey(x.key).und); s.setView(parseKey(x.key).strike ? 'chain' : 'chart') }}>{labelOf(x.key)}</button>{x.qty ? <TagPicker value={x.tag} onChange={(t) => s.tagPosition(x.key, t)} className="ml-2 align-middle [&>button]:h-6 [&>button]:text-[11px]" /> : x.tag && <span className="ml-2 text-[11px] text-fg-subtle">{tagLabel(x.tag)}</span>}</td><td className="text-fg-muted">{x.product}</td>
+          {pos.map((x) => { const l = s.ltp(x.key); const pl = (l - x.avg) * x.qty + x.realized; return <tr key={x.key} className={cn('group cursor-pointer', drawer?.kind === 'pos' && drawer.key === x.key && '[&>td]:!bg-[var(--surface-hover)]')} onClick={(e) => rowClick(e, { kind: 'pos', key: x.key })}>
+            <td className="!font-sans"><button className="hover:underline" onClick={() => { s.setSym(parseKey(x.key).und); s.setView(parseKey(x.key).strike ? 'chain' : 'chart') }}>{labelOf(x.key)}</button>{x.qty ? <TagPicker value={isSetupTag(x.tag) ? x.tag : undefined} onChange={(t) => s.tagPosition(x.key, t)} className="ml-2 align-middle [&>button]:h-6 [&>button]:text-[11px]" /> : isSetupTag(x.tag) && <span className="ml-2 text-[11px] text-fg-subtle">{tagLabel(x.tag!)}</span>}</td><td className="text-fg-muted">{x.product}</td>
             <td className={x.qty > 0 ? 'text-up' : x.qty < 0 ? 'text-down' : 'text-fg-subtle'}>{x.qty > 0 ? '+' : ''}{x.qty}</td>
             <td>{x.avg ? x.avg.toFixed(2) : '—'}</td><td>{l.toFixed(2)}</td><td><Money v={pl} /></td><td><ExitPlan k={x.key} /></td>
-            <td>{x.qty !== 0 && <button type="button" className="h-6 rounded-md border border-line px-2 font-sans text-[11px] font-medium text-fg transition-colors hover:border-line-strong hover:bg-hover" onClick={() => s.setToast(s.place(x.key, x.qty > 0 ? 'SELL' : 'BUY', Math.abs(x.qty), 'MARKET', 0, x.product))}>Exit</button>}</td></tr> })}
+            <td className="relative w-px">{x.qty !== 0 && <PositionActions k={x.key} onAdd={() => setAddTo(x.key)} onOpen={setDrawer} />}</td></tr> })}
           {!pos.length && empty(8, <>No positions yet. Press <KeyHint>B</KeyHint> on the chart, or ask the agent: <i>buy 50 sbin with sl 850</i>.</>)}
         </tbody></table>}
         {tab === 'ord' && <table className="tbl"><thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th>Qty</th><th>Type</th><th>Price</th><th>Status</th><th>Source</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
-          {s.orders.map((o) => <tr key={o.id}><td>{o.time}</td><td className="!font-sans">{labelOf(o.key)}{o.tag && <span className="ml-2 text-[11px] text-fg-subtle">{o.tag}</span>}</td><td className={o.side === 'BUY' ? 'text-up' : 'text-down'}>{o.side}</td><td>{o.qty}</td><td>{o.otype} · {o.product}</td>
+          {s.orders.map((o) => <tr key={o.id} className={cn('cursor-pointer', drawer?.kind === 'order' && drawer.id === o.id && '[&>td]:!bg-[var(--surface-hover)]')} onClick={(e) => rowClick(e, { kind: 'order', id: o.id })} title="Open order details"><td>{o.time}</td><td className="!font-sans">{labelOf(o.key)}{o.tag && <span className="ml-2 text-[11px] text-fg-subtle">{o.tag}</span>}</td><td className={o.side === 'BUY' ? 'text-up' : 'text-down'}>{o.side}</td><td>{o.qty}</td><td>{o.otype} · {o.product}</td>
             <td>{o.status === 'TRIGGER_PENDING' ? `trg ${o.trigger?.toFixed(2)}` : (o.fill ?? o.price).toFixed(2)}</td>
-            <td><Badge tone={o.status === 'COMPLETE' ? 'success' : o.status === 'REJECTED' ? 'danger' : 'neutral'} title={o.note}>{o.status === 'COMPLETE' ? 'Filled' : o.status === 'REJECTED' ? 'Rejected' : o.status === 'OPEN' ? 'Working' : o.status === 'TRIGGER_PENDING' ? 'Waiting for trigger' : 'Cancelled'}</Badge>{o.note && <span className="ml-2 font-sans text-[11px] text-down">{o.note}</span>}</td>
+            <td><Badge tone={o.status === 'COMPLETE' ? 'success' : o.status === 'REJECTED' ? 'danger' : 'neutral'} title={o.note}>{statusOf(o)}</Badge>{o.note && <span className="ml-2 font-sans text-[11px] text-down">{o.note}</span>}</td>
             <td className="!font-sans text-fg-subtle">{o.via === 'ai' ? <span className="inline-flex items-center gap-1"><AIMark size={16} />AI</span> : o.via}</td>
             <td>{(o.status === 'OPEN' || o.status === 'TRIGGER_PENDING') && <Button size="sm" variant="ghost" onClick={() => s.cancel(o.id)}>Cancel</Button>}</td></tr>)}
           {!s.orders.length && empty(9, 'No orders today.')}
@@ -641,6 +699,8 @@ function Bottom() {
           {!s.audit.length && empty(3, 'Every AI suggestion, approval and order is logged here.')}
         </tbody></table>}
       </div>
+      {addTo && s.positions[addTo]?.qty ? <Ticket key={addTo} sym={addTo} side={s.positions[addTo].qty > 0 ? 'BUY' : 'SELL'} close={() => setAddTo(null)} place="absolute z-30 bottom-full right-4 mb-2 w-[320px]" /> : null}
+      <Drawer target={drawer} onClose={() => setDrawer(null)} onOpen={setDrawer} onAdd={(k) => { setDrawer(null); setAddTo(k) }} />
     </section>
   )
 }
@@ -733,7 +793,7 @@ export function FnoDisclosure() {
 export function Toast() {
   const t = useStore((s) => s.toast); const chat = useStore((s) => s.mode === 'chat')
   // In chat the composer owns the bottom edge, so notices drop in under the top bar instead.
-  return <div role="status" aria-live="polite" className={cn('pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4', chat ? 'top-16' : 'bottom-5')}>
+  return <div role="status" aria-live="polite" className={cn('pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4', chat ? 'top-16' : 'bottom-5', 'max-md:bottom-auto max-md:top-14')}>
     {t && <div className="pointer-events-auto max-w-xl whitespace-pre-line rounded-[10px] border border-line bg-code px-4 py-3 text-[13px] text-code-fg shadow-lg animate-sheet">{t}</div>}
   </div>
 }

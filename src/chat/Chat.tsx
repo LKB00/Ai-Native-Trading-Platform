@@ -41,7 +41,7 @@ export function ChatPanel({ overlay, resize, full = false }: { overlay: boolean;
       {resize}
       {/* In the Chat layout the top bar already says where you are, so the panel drops its header; New chat and the
           drafts badge move up there (ChatTopActions). The docked panel keeps it, to name the column. */}
-      {!full && <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface pl-4 pr-2">
+      {!full && <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface pl-4 pr-2 max-md:hidden">
         <span className="inline-flex size-7 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
         <h2 className="font-sans text-[13px] font-semibold text-fg">AI agent</h2>
         {pending > 0 && <button type="button" onClick={() => document.querySelector('[data-pending]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}><Badge tone="warning">{pending} waiting for you</Badge></button>}
@@ -98,7 +98,7 @@ function Thread({ full = false }: { full?: boolean }) {
         </div>
       </div>
       <ChatComposer full={full} chips={lastAi?.follow && lastAi.follow.length > 0 && !busy
-        ? <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Suggested next">{lastAi.follow.map((f) => <button key={f} type="button" onClick={() => say(f)} className="group inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-surface pl-2 pr-2.5 text-[12px] text-fg-muted transition-colors hover:border-line-strong hover:bg-hover hover:text-fg active:translate-y-px"><CornerDownRight size={12} strokeWidth={1.75} className="text-fg-subtle group-hover:text-fg-muted" />{f}</button>)}</div>
+        ? <div className="mb-2 flex flex-wrap gap-1.5 max-md:-mx-3 max-md:flex-nowrap max-md:overflow-x-auto max-md:px-3 max-md:[scrollbar-width:none]" aria-label="Suggested next">{lastAi.follow.map((f) => <button key={f} type="button" onClick={() => say(f)} className="group inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-line bg-surface max-md:h-10 max-md:px-3.5 max-md:text-[14px] pl-2 pr-2.5 text-[12px] text-fg-muted transition-colors hover:border-line-strong hover:bg-hover hover:text-fg active:translate-y-px"><CornerDownRight size={12} strokeWidth={1.75} className="text-fg-subtle group-hover:text-fg-muted" />{f}</button>)}</div>
         : null} />
     </div>
   )
@@ -263,7 +263,7 @@ const COMMANDS: { cmd: string; text: string; desc: string }[] = [
 type Menu = { kind: '@' | '/'; q: string; start: number; sel: number; focus?: boolean } | null
 
 function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boolean }) {
-  const tool = 'inline-flex size-7 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-hover hover:text-fg active:translate-y-px'
+  const tool = 'inline-flex size-7 max-md:size-10 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-hover hover:text-fg active:translate-y-px'
   const [text, setText] = useState(''); const [menu, setMenu] = useState<Menu>(null); const [listening, setListening] = useState(false)
   const ta = useRef<HTMLTextAreaElement>(null)
   const busy = useStore((s) => s.busy); const sym = useStore((s) => s.sym); const prices = useStore((s) => s.prices)
@@ -356,7 +356,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
               <span className="flex-1" />
               <button type="button" aria-label={listening ? 'Listening' : 'Speak'} aria-pressed={listening} title={listening ? 'Listening…' : 'Speak'} onClick={voice}
                 className={cn(tool, listening && 'bg-accent text-on-accent hover:bg-accent hover:text-on-accent animate-pulse')}><Mic size={16} strokeWidth={1.5} /></button>
-              <button type="button" aria-label={busy ? 'Working' : 'Send'} disabled={!text.trim() && !busy} onClick={() => send()} className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-fg text-bg transition-opacity disabled:opacity-30">
+              <button type="button" aria-label={busy ? 'Working' : 'Send'} disabled={!text.trim() && !busy} onClick={() => send()} className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-fg max-md:size-10 max-md:rounded-full text-bg transition-opacity disabled:opacity-30">
                 {busy ? <Square size={12} fill="currentColor" strokeWidth={0} /> : <ArrowUp size={16} strokeWidth={2} />}</button>
             </div>
           </div>

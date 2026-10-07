@@ -77,7 +77,7 @@ export default function Markets() {
       </ViewHeader>
       <div className="space-y-4 p-4">
         {/* Index strip */}
-        <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @4xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 @4xl:grid-cols-4">
           {IDX.map((s) => { const q = prices[s]; const span = q.high - q.low || 1; const at = Math.min(Math.max((q.ltp - q.low) / span, 0), 1); return (
             <button key={s} onClick={() => open(s)} className={cn(card, 'text-left transition-colors hover:border-line-strong hover:bg-hover')} title={`${bySym(s)!.name}: open chart`}>
               <div className="flex items-baseline justify-between gap-2"><span className="font-bold">{s}</span><Chg v={pct(q.ltp, q.prev)} className="text-[12px]" /></div>

@@ -52,6 +52,7 @@ export default function Portfolio() {
 
   const open = Object.values(positions).filter((x) => x.qty)
   const go = (sym: string) => { setSym(sym); setView('chart') }
+  const [openRow, setOpenRow] = useState<string | null>(null)
   const submit = () => {
     if (!ticket) return
     const msg = place(ticket.sym, ticket.side, ticket.qty, 'MARKET', 0, 'CNC', { via: 'manual' })
@@ -59,6 +60,20 @@ export default function Portfolio() {
   }
   const taxStcg = Math.max(0, t.stcg) * STCG, taxLtcg = Math.max(0, t.ltcg - LTCG_EXEMPT) * LTCG
 
+  /** Buy more or sell from a holding, inline under its row: the table on wide screens, the list on phones. */
+  const inlineTicket = (r: (typeof rows)[number], t: NonNullable<typeof ticket>) => (
+    <div role="group" aria-label={`${t.side === 'BUY' ? 'Buy' : 'Sell'} ${r.sym}`} className="flex flex-wrap items-center gap-2 text-left">
+                        <span className="text-[12px]">{t.side === 'BUY' ? 'Buy more' : 'Sell'} <b>{r.sym}</b> at market, delivery</span>
+                        <label className="text-[12px] text-fg-subtle">Qty <input type="number" min={1} max={t.side === 'SELL' ? r.qty : undefined} value={t.qty} autoFocus
+                          onChange={(e) => setTicket({ ...t, qty: Math.max(1, Math.min(t.side === 'SELL' ? r.qty : 1e6, Math.floor(+e.target.value) || 1)) })} className={cn(field, 'ml-1 w-24')} /></label>
+                        <span className="text-[12px] text-fg-subtle">≈ <span className="num text-fg">{inr(t.qty * r.ltp)}</span>
+                          {t.side === 'SELL' && <> · P&amp;L <Money v={(r.ltp - r.avg) * t.qty} /> · {r.long ? 'long-term' : 'short-term'}</>}</span>
+                        <div className="ml-auto flex gap-2">
+                          <Button size="sm" variant={t.side === 'SELL' ? 'danger' : 'primary'} onClick={submit}>{t.side === 'SELL' ? 'Sell' : 'Buy'} {t.qty}</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setTicket(null)}>Cancel</Button>
+                        </div>
+                      </div>
+  )
   return (
     <div>
       <ViewHeader title="Portfolio" sub="Long-term holdings, SIPs and your trading account. Paper money, simulated prices.">
@@ -80,7 +95,21 @@ export default function Portfolio() {
         <Section id="portfolio.holdings" title="Holdings" sub="Delivery (CNC). Held over 12 months counts as long-term." bodyClassName={rows.length ? '!px-0 !pb-0' : undefined}
           summary={`${rows.length} holding${rows.length === 1 ? '' : 's'} · ${inrShort(t.value)}`}>
           {rows.length === 0 ? <EmptyState compact variant="cleared" title="No holdings" headingLevel={4}>Buy with the Delivery product to build long-term holdings.</EmptyState> : (
-            <div className="scroll-thin overflow-x-auto rounded-b-[10px]">
+            <>
+            {/* Phones: one line per holding, value and P&L on the right; tap for Chart, Add and Sell. */}
+            <ul className="divide-y divide-[var(--border)] md:hidden">{rows.map((r) => <li key={r.sym}>
+              <button type="button" onClick={() => setOpenRow(openRow === r.sym ? null : r.sym)} aria-expanded={openRow === r.sym} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-hover">
+                <span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold text-fg">{r.sym}</span><span className="num block text-[12px] text-fg-subtle">{r.qty} × {r.avg.toFixed(2)} · {r.text} {r.long ? 'LTCG' : 'STCG'}</span></span>
+                <span className="shrink-0 text-right"><span className="num block text-[14px] text-fg">{inr(r.value)}</span><span className="block text-[12px]"><Money v={r.pl} /> <Chg v={r.plPct} /></span></span>
+              </button>
+              {openRow === r.sym && <div className="flex gap-2 px-4 pb-3">
+                <Button size="sm" variant="ghost" onClick={() => go(r.sym)}>Chart</Button>
+                <Button size="sm" variant="secondary" className="flex-1" disabled={!!gate} onClick={() => setTicket({ sym: r.sym, side: 'BUY', qty: 1 })}>Add</Button>
+                <Button size="sm" variant="secondary" className="flex-1" onClick={() => setTicket({ sym: r.sym, side: 'SELL', qty: r.qty })}>Sell</Button>
+              </div>}
+              {ticket?.sym === r.sym && <div className="bg-sunken px-4 py-3">{inlineTicket(r, ticket)}</div>}
+            </li>)}</ul>
+            <div className="scroll-thin overflow-x-auto rounded-b-[10px] max-md:hidden">
               <table className="tbl">
                 <thead><tr><th>Instrument</th><th>Qty</th><th>Avg</th><th>LTP</th><th>Value</th><th>P&amp;L</th><th>Day</th><th>Held</th><th><span className="sr-only">Actions</span></th></tr></thead>
                 <tbody>{rows.map((r) => (<Fragment key={r.sym}>
@@ -95,25 +124,13 @@ export default function Portfolio() {
                     </div></td>
                   </tr>
                   {ticket?.sym === r.sym && (
-                    <tr><td colSpan={9} className="!bg-sunken !font-sans">
-                      <div role="group" aria-label={`${ticket.side === 'BUY' ? 'Buy' : 'Sell'} ${r.sym}`} className="flex flex-wrap items-center gap-2 text-left">
-                        <span className="text-[12px]">{ticket.side === 'BUY' ? 'Buy more' : 'Sell'} <b>{r.sym}</b> at market, delivery</span>
-                        <label className="text-[12px] text-fg-subtle">Qty <input type="number" min={1} max={ticket.side === 'SELL' ? r.qty : undefined} value={ticket.qty} autoFocus
-                          onChange={(e) => setTicket({ ...ticket, qty: Math.max(1, Math.min(ticket.side === 'SELL' ? r.qty : 1e6, Math.floor(+e.target.value) || 1)) })} className={cn(field, 'ml-1 w-24')} /></label>
-                        <span className="text-[12px] text-fg-subtle">≈ <span className="num text-fg">{inr(ticket.qty * r.ltp)}</span>
-                          {ticket.side === 'SELL' && <> · P&amp;L <Money v={(r.ltp - r.avg) * ticket.qty} /> · {r.long ? 'long-term' : 'short-term'}</>}</span>
-                        <div className="ml-auto flex gap-2">
-                          <Button size="sm" variant={ticket.side === 'SELL' ? 'danger' : 'primary'} onClick={submit}>{ticket.side === 'SELL' ? 'Sell' : 'Buy'} {ticket.qty}</Button>
-                          <Button size="sm" variant="ghost" onClick={() => setTicket(null)}>Cancel</Button>
-                        </div>
-                      </div>
-                    </td></tr>)}
+                    <tr><td colSpan={9} className="!bg-sunken !font-sans">{inlineTicket(r, ticket)}</td></tr>)}
                 </Fragment>))}</tbody>
               </table>
-            </div>)}
+            </div></>)}
         </Section>
 
-        <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-2">
           <Section id="portfolio.allocation" title="Allocation by sector" bodyClassName="space-y-3"
             summary={t.alloc[0] ? `Top: ${t.alloc[0].k} ${((t.alloc[0].v / (t.value || 1)) * 100).toFixed(0)}%` : undefined}>
             <div role="img" aria-label={`Sector allocation: ${t.alloc.map((a) => `${a.k} ${((a.v / (t.value || 1)) * 100).toFixed(0)}%`).join(', ')}`} className="flex h-4 overflow-hidden rounded-md bg-sunken">
@@ -151,7 +168,7 @@ export default function Portfolio() {
           </Section>
         </div>
 
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <Sips sips={sips} />
           <Section id="portfolio.positions" title="Trading positions" bodyClassName="space-y-3"
             summary={<>{open.length} open · net <Money v={p.net} /></>}>

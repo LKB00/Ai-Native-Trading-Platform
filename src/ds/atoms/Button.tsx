@@ -12,8 +12,8 @@ const variants: Record<ButtonVariant, string> = {
   danger: "bg-danger text-on-danger hover:opacity-90",
 };
 const sizes: Record<ButtonSize, string> = {
-  sm: "h-8 px-3 text-xs gap-1.5",
-  md: "h-9 px-4 text-[13px] gap-2",
+  sm: "h-8 px-3 text-xs gap-1.5 max-md:h-10 max-md:px-3.5 max-md:text-[13px]",
+  md: "h-9 px-4 text-[13px] gap-2 max-md:h-11 max-md:text-[14px]",
   lg: "h-11 px-6 text-sm gap-2",
 };
 
@@ -59,7 +59,7 @@ export function IconButton({ label, variant = "ghost", size = "md", active, clas
       className={cn(
         "inline-flex items-center justify-center rounded-md cursor-pointer transition-colors duration-[var(--dur-fast)] disabled:pointer-events-none",
         variant !== "lime" && "disabled:opacity-50",
-        size === "sm" ? "size-7" : "size-9", v, active && "bg-hover text-fg", className,
+        size === "sm" ? "size-7 max-md:size-10" : "size-9 max-md:size-11", v, active && "bg-hover text-fg", className,
       )}
       {...rest}
     >

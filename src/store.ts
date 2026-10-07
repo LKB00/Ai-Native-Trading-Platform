@@ -10,6 +10,8 @@ export type Order = {
   id: number; time: string; ts: number; key: string; side: 'BUY' | 'SELL'; qty: number; otype: OType
   price: number; trigger?: number; product: string; status: 'OPEN' | 'TRIGGER_PENDING' | 'COMPLETE' | 'CANCELLED' | 'REJECTED'
   fill?: number; note?: string; tag?: string; via: Via; sl?: number; tgt?: number; trail?: number
+  /** When it filled, for the order's timeline. */
+  filledAt?: number
   /** Simulated exchange time of the order, for chart fill markers. */
   st?: number
 }
@@ -106,6 +108,8 @@ type S = {
   place: (key: string, side: 'BUY' | 'SELL', qty: number, otype: OType, price: number, product: string, opts?: { trigger?: number; sl?: number; tgt?: number; trail?: number; tag?: string; via?: Via }) => string
   modify: (id: number, p: { price?: number; trigger?: number }) => void
   cancel: (id: number) => void
+  /** Move an open equity position between Intraday (MIS) and Delivery (CNC). Returns what happened, for a toast. */
+  convert: (key: string) => string
   squareoff: (key?: string, reason?: string) => number
   setBracket: (key: string, b: Partial<Bracket> | null) => void
   addMsg: (m: Omit<Msg, 'id'>) => number
@@ -471,6 +475,15 @@ export const useStore = create<S>((set, get) => ({
     return `${side} ${qty} ${labelOf(key)} limit order at ₹${price} is working (now ${l.toFixed(2)})`
   },
   modify: (id, p) => set({ orders: get().orders.map((o) => (o.id === id && (o.status === 'OPEN' || o.status === 'TRIGGER_PENDING') ? { ...o, ...(p.price != null ? { price: +p.price.toFixed(2) } : {}), ...(p.trigger != null ? { trigger: +p.trigger.toFixed(2) } : {}) } : o)) }),
+  convert: (key) => {
+    const s = get(); const p = s.positions[key]
+    if (!p?.qty || parseKey(key).strike) return 'Only open stock positions can be converted'
+    const to = p.product === 'CNC' ? 'MIS' : 'CNC'
+    if (to === 'MIS' && (secOfDay() >= SQUARE_OFF || s.misClosed === sessionDay())) return 'Intraday closes at 3:20 pm, so this stays Delivery'
+    set({ positions: { ...s.positions, [key]: { ...p, product: to } } })
+    get().log('user', `Converted ${labelOf(key)} to ${to === 'CNC' ? 'Delivery' : 'Intraday'}`)
+    return `${labelOf(key)} is now ${to === 'CNC' ? 'Delivery: it carries overnight' : 'Intraday: it squares off at 3:20 pm'}`
+  },
   cancel: (id) => set({ orders: get().orders.map((o) => (o.id === id && (o.status === 'OPEN' || o.status === 'TRIGGER_PENDING') ? { ...o, status: 'CANCELLED' } : o)) }),
   squareoff: (key, reason) => {
     let n = 0
@@ -610,7 +623,7 @@ function fill(id: number, price: number) {
     const h = s.holdings[holdingIdx]; const holdings = [...s.holdings]
     holdings[holdingIdx] = { ...h, qty: h.qty - o.qty }
     const trade: Trade = { id: trid++, key: o.key, side: 'LONG', qty: o.qty, entry: h.avg, exit: price, pnl: (price - h.avg) * o.qty, charges: ch, open: new Date(h.since).getTime(), close: Date.now(), product: 'CNC', via: o.via, tag: o.tag ?? 'investment', exitReason: 'manual' }
-    useStore.setState({ holdings: holdings.filter((x) => x.qty > 0), cash: s.cash + price * o.qty - ch, trades: [trade, ...s.trades], orders: s.orders.map((x) => (x.id === id ? { ...x, status: 'COMPLETE', fill: price } : x)) })
+    useStore.setState({ holdings: holdings.filter((x) => x.qty > 0), cash: s.cash + price * o.qty - ch, trades: [trade, ...s.trades], orders: s.orders.map((x) => (x.id === id ? { ...x, status: 'COMPLETE', fill: price, filledAt: Date.now() } : x)) })
     return
   }
   const pos = s.positions[o.key] ?? { key: o.key, qty: 0, avg: 0, realized: 0, product: o.product, charges: 0, openedAt: Date.now() }
@@ -643,7 +656,7 @@ function fill(id: number, price: number) {
   useStore.setState({
     cash, risk, trades, brackets,
     positions: { ...s.positions, [o.key]: { ...pos, qty, avg, realized, openedAt, charges: pos.charges + ch, tag: tag ?? (qty ? entryTag : undefined) } },
-    orders: s.orders.map((x) => (x.id === id ? { ...x, status: 'COMPLETE', fill: price } : x)),
+    orders: s.orders.map((x) => (x.id === id ? { ...x, status: 'COMPLETE', fill: price, filledAt: Date.now() } : x)),
   })
 }
 

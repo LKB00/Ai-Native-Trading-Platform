@@ -52,7 +52,7 @@ function Shell({ title, meta, children, foot, className, pad = true }: { title?:
   )
 }
 const Act = ({ children, onClick, icon, title }: { children: ReactNode; onClick: () => void; icon?: ReactNode; title?: string }) => (
-  <button type="button" title={title} onClick={onClick} className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 text-[12px] font-medium text-fg transition-colors hover:border-line-strong hover:bg-hover active:translate-y-px [&>svg]:text-fg-muted">{icon}{children}</button>
+  <button type="button" title={title} onClick={onClick} className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 text-[12px] font-medium text-fg max-md:h-10 max-md:px-3.5 max-md:text-[13px] transition-colors hover:border-line-strong hover:bg-hover active:translate-y-px [&>svg]:text-fg-muted">{icon}{children}</button>
 )
 const Stat = ({ label, children, className }: { label: string; children: ReactNode; className?: string }) => (
   <div className={cn('min-w-0', className)}><p className="text-[11px] text-fg-subtle">{label}</p><p className="num mt-0.5 truncate text-[14px] font-medium text-fg">{children}</p></div>
@@ -286,7 +286,7 @@ function RangeBar({ label, lo, hi, v, digits = 2 }: { label: string; lo: number;
 }
 
 /** Ranges as people read them, each with a timeframe and bar count that cover exactly that span. 1D is today's session so far. */
-const RANGES = [
+export const RANGES = [
   { l: '1D', tf: '5m' as TF, bars: () => Math.max(12, Math.ceil((secOfDay() - (9 * 3600 + 15 * 60)) / 300)) },
   { l: '5D', tf: '15m' as TF, bars: () => 125 }, { l: '1M', tf: '1h' as TF, bars: () => 147 }, { l: '6M', tf: '1D' as TF, bars: () => 126 },
 ]
@@ -302,6 +302,13 @@ function readOf(chg: number, m: NonNullable<ReturnType<typeof metricsFor>>, ltp:
   const trend = m.above50 > 0 && m.above200 > 0 ? 'In an uptrend, above its 50 and 200-day averages' : m.above50 < 0 && m.above200 < 0 ? 'In a downtrend, below its 50 and 200-day averages' : 'Trend is mixed around its 50 and 200-day averages'
   const mom = m.rsi >= 70 ? <>. RSI {m.rsi.toFixed(0)} is <b className="!text-[var(--attention-fg)]">overbought</b>, so chasing here risks a pullback</> : m.rsi <= 30 ? <>. RSI {m.rsi.toFixed(0)} is <b className="!text-[var(--attention-fg)]">oversold</b></> : null
   return <><b>{move}{vol}{lvl}.</b> {trend}{mom}.</>
+}
+
+/** The agent's read of a stock on its own, for the phone's stock page. */
+export function StockRead({ sym }: { sym: string }) {
+  const q = useQuote(sym); const m = useMemo(() => metricsFor(sym), [sym])
+  if (!m) return null
+  return <Read>{readOf((q.ltp / q.prev - 1) * 100, m, q.ltp, Math.max(m.hi52, q.high), Math.min(m.lo52, q.low))}</Read>
 }
 
 export function QuoteCard({ sym }: { sym: string }) {

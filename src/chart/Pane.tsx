@@ -592,7 +592,7 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
     st.setToast(msg); if (!msg.startsWith('Rejected')) onClose()
   }
   return (
-    <div data-overlay role="dialog" aria-label={`${t.side === 'BUY' ? 'Buy' : 'Sell'} ${labelOf(k)} from the chart`} className="absolute bottom-3 left-3 z-30 w-[328px] max-w-[calc(100%-24px)] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise">
+    <div data-overlay role="dialog" aria-label={`${t.side === 'BUY' ? 'Buy' : 'Sell'} ${labelOf(k)} from the chart`} className="absolute bottom-3 left-3 z-30 w-[328px] max-w-[calc(100%-24px)] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:left-0 max-md:z-50 max-md:max-h-[85dvh] max-md:w-auto max-md:max-w-none max-md:overflow-y-auto max-md:rounded-b-none max-md:pb-[calc(12px+env(safe-area-inset-bottom))]">
       <div className="flex items-center gap-2">
         <SegmentedControl size="sm" label="Side" value={t.side} onChange={(side) => { const a = Math.abs(entry - t.sl) || ltp * 0.01; const d = side === 'BUY' ? 1 : -1; onChange({ ...t, side, sl: +Math.max(0.05, entry - d * a).toFixed(2), tgt: +Math.max(0.05, entry + d * 2 * a).toFixed(2) }) }} options={[{ value: 'BUY', label: 'Buy' }, { value: 'SELL', label: 'Sell' }]} />
         {!opt && <SegmentedControl size="sm" label="Product" value={product} onChange={setProduct} options={[{ value: 'MIS', label: 'Intraday' }, { value: 'CNC', label: 'Delivery' }]} />}

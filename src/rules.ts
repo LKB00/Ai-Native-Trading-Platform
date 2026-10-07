@@ -18,7 +18,7 @@ export type Rules = {
 export const SETUP_TAGS = ['breakout', 'pullback', 'bounce', 'momentum', 'reversal', 'scalp', 'gap', 'news']
 export const tagLabel = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
 /** Tags that describe how a trade ended or was managed, not why it was taken. Never offered as setups. */
-const NOT_SETUPS = /^(stop|target|trailing stop|investment|auto square-off|risk|slice|daily loss|kill)/
+const NOT_SETUPS = /^(stop|target|trailing stop|investment|auto square-off|risk|slice|daily loss|kill|max loss|max profit|loss limit|profit|cool-?off)/i
 export const isSetupTag = (t?: string) => !!t && !NOT_SETUPS.test(t)
 const list = (xs: string[]) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
 export const DEFAULT_RULES: Rules = {}
