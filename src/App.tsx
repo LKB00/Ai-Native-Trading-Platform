@@ -205,13 +205,15 @@ export function TopBar({ left, extras }: { left?: ReactNode; extras?: ReactNode 
   const net = useStore((s) => s.pnl().net); const chatFull = useStore((s) => s.panels.chatFull)
   const apiKey = useStore((s) => s.apiKey); const setApiKey = useStore((s) => s.setApiKey); const theme = useStore((s) => s.theme)
   return (
-    <header className="relative z-40 col-span-full flex h-14 min-w-0 items-center gap-3 border-b border-line bg-surface px-3 [view-transition-name:topbar] sm:px-4">
-      {/* The mark alone; the name stays for screen readers and the tooltip. */}
-      <span role="img" aria-label="Prompt Terminal" title="Prompt Terminal" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
-      <SegmentedControl size="sm" label="Layout" className="max-md:hidden" value={chatFull ? 'chat' : 'terminal'} onChange={(v) => switchLayout(v === 'chat')} options={[{ value: 'chat', label: 'Agent' }, { value: 'terminal', label: 'Terminal' }]} />
-      <span aria-hidden className="h-5 w-px shrink-0 bg-line max-md:hidden" />
-      <div className="flex min-w-0 shrink-0 items-center gap-2 max-md:hidden">{left}</div>
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+    // Three columns: identity and view on the left, workspace tabs at the true centre, account controls on the right.
+    <header className="relative z-40 col-span-full grid h-14 min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-line bg-surface px-3 [view-transition-name:topbar] sm:px-4">
+      <div className="flex min-w-0 items-center gap-3">
+        {/* The mark alone; the name stays for screen readers and the tooltip. */}
+        <span role="img" aria-label="Prompt Terminal" title="Prompt Terminal" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
+        <SegmentedControl size="sm" label="Layout" className="max-md:hidden" value={chatFull ? 'chat' : 'terminal'} onChange={(v) => switchLayout(v === 'chat')} options={[{ value: 'chat', label: 'Agent' }, { value: 'terminal', label: 'Terminal' }]} />
+      </div>
+      <div className="flex min-w-0 items-center justify-center max-md:hidden">{left}</div>
+      <div className="col-start-3 flex min-w-0 items-center justify-end gap-2">
         {chatFull && <ChatTopActions />}
         {extras}
         <RiskCenter net={net} />

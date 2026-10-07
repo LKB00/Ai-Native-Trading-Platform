@@ -594,11 +594,12 @@ export function ScanCard({ filters, name }: { filters: Filter[]; name?: string }
           sub={<span className="mt-1 flex flex-wrap gap-1.5">{filters.map((f, i) => <span key={i} className="rounded-md bg-sunken px-2.5 py-0.5 text-[12px] text-fg-muted">{describeFilter(f)}</span>)}</span>}>{rows.length}</Hero>
         {top && <Read><b>{top.sym} leads, {sgn(top.chg, 1)}% today on {top.volx.toFixed(1)}× volume.</b>{bySector && rows.length >= 4 && bySector[1] / rows.length >= 0.4 ? ` Most matches are ${bySector[0]} (${bySector[1]} of ${rows.length}), so this is a sector move as much as a stock one.` : ` Matches span ${new Set(rows.map((r) => r.sector)).size} sectors.`}</Read>}
       </div>
-      {rows.length > 0 && <div className="border-t border-line"><table className="tbl-card"><thead><tr><th>Stock</th><th>Price</th><th>Today</th><th>Volume</th><th>RSI</th><th><span className="sr-only">Trade</span></th></tr></thead>
+      {/* In a narrow panel the table keeps what decides a trade (stock, price, today) and drops volume and RSI. */}
+      {rows.length > 0 && <div className="scroll-thin overflow-x-auto border-t border-line"><table className="tbl-card"><thead><tr><th>Stock</th><th>Price</th><th>Today</th><th className="@max-lg:hidden">Volume</th><th className="@max-lg:hidden">RSI</th><th><span className="sr-only">Trade</span></th></tr></thead>
         <tbody>{rows.slice(0, n).map((r) => <tr key={r.sym} className="cursor-pointer" onClick={() => say(`analyse ${lower(r.sym)}`)} title={`Analyse ${r.sym}`}>
-          <td><span className="flex items-center gap-2.5"><Tile sym={r.sym} size={30} /><span className="min-w-0"><span className="block text-[13px] font-semibold">{r.sym}</span><span className="block text-[11px] text-fg-subtle">{r.sector}</span></span></span></td>
-          <td className="font-medium">₹{fmt(r.ltp)}</td><td><ChangePill pct={r.chg} /></td><td className="text-fg-muted">{r.volx.toFixed(1)}×</td>
-          <td><span className="inline-flex items-center gap-2"><span className="relative h-1 w-10 rounded-full bg-sunken" aria-hidden><span className="absolute inset-y-0 left-0 rounded-full bg-[var(--fg-subtle)]" style={{ width: `${r.rsi}%` }} /></span><span className="w-5 text-right text-fg-muted">{r.rsi.toFixed(0)}</span></span></td>
+          <td><span className="flex items-center gap-2.5"><span className="contents @max-lg:hidden"><Tile sym={r.sym} size={30} /></span><span className="min-w-0"><span className="block text-[13px] font-semibold">{r.sym}</span><span className="block text-[11px] text-fg-subtle">{r.sector}</span></span></span></td>
+          <td className="font-medium">₹{fmt(r.ltp)}</td><td><ChangePill pct={r.chg} /></td><td className="text-fg-muted @max-lg:hidden">{r.volx.toFixed(1)}×</td>
+          <td className="@max-lg:hidden"><span className="inline-flex items-center gap-2"><span className="relative h-1 w-10 rounded-full bg-sunken" aria-hidden><span className="absolute inset-y-0 left-0 rounded-full bg-[var(--fg-subtle)]" style={{ width: `${r.rsi}%` }} /></span><span className="w-5 text-right text-fg-muted">{r.rsi.toFixed(0)}</span></span></td>
           <td>{gate ? <span className="inline-flex size-7 items-center justify-center text-fg-subtle" title={`${gate.short}. ${gate.why}`}><GateIcon g={gate} /><span className="sr-only">{gate.short}</span></span>
             : <button type="button" className="h-7 rounded-md bg-success-soft px-3 text-[12px] font-semibold text-success-fg transition-colors hover:bg-success hover:text-white" onClick={(e) => { e.stopPropagation(); draftEquity(r.sym, 'BUY') }}>Buy</button>}</td>
         </tr>)}</tbody></table></div>}
@@ -652,17 +653,20 @@ export function ChainCard({ und, expiryIdx: e0 }: { und: string; expiryIdx: numb
           <div role="radiogroup" aria-label="Side" className="flex h-8 gap-0.5 rounded-lg bg-sunken p-0.5">{(['BUY', 'SELL'] as const).map((s) => <button key={s} type="button" role="radio" aria-checked={side === s} onClick={() => setSide(s)} className={pill(side === s, s === 'BUY' ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')}>{s === 'BUY' ? 'Buy' : 'Sell'}</button>)}</div>
         </div>}
       </div>
+      <div className="scroll-thin overflow-x-auto">
       <table className="tbl-card chain">
-        <thead><tr><th className="!text-left">Call OI</th><th>Call</th><th className="!text-center">Strike</th><th className="!text-left">Put</th><th>Put OI</th></tr></thead>
+        {/* Narrow panel: the prices you tap and the strike; open interest returns when there is room. */}
+        <thead><tr><th className="!text-left @max-sm:hidden">Call OI</th><th>Call</th><th className="!text-center">Strike</th><th className="!text-left">Put</th><th className="@max-sm:hidden">Put OI</th></tr></thead>
         {/* Seven strikes around the money answer most questions; the rest are a tap away. */}
         <tbody>{rows.filter((_, i) => allStrikes || Math.abs(i - Math.max(0, rows.findIndex((x) => x.atm))) <= 3).map((r) => <tr key={r.strike} className={r.atm ? 'atm' : undefined}>
-          <td className={cn('ce !text-left', r.strike < spot && 'itm')}><span className="flex items-center gap-2"><span className="h-1.5 rounded-full bg-danger/50" style={{ width: `${Math.max(3, (r.ce.oi / maxOi) * 44)}px` }} /><span className="text-[12px] text-fg-subtle">{inrShort(r.ce.oi).replace('₹', '')}</span></span></td>
+          <td className={cn('ce !text-left @max-sm:hidden', r.strike < spot && 'itm')}><span className="flex items-center gap-2"><span className="h-1.5 rounded-full bg-danger/50 @max-lg:hidden" style={{ width: `${Math.max(3, (r.ce.oi / maxOi) * 44)}px` }} /><span className="text-[12px] text-fg-subtle">{inrShort(r.ce.oi).replace('₹', '')}</span></span></td>
           <td className={cn('ce', r.strike < spot && 'itm')}>{cell(r, 'CE')}</td>
           <td className="k">{r.strike}{r.atm && <span className="ml-1.5 align-middle text-[10px] font-medium uppercase tracking-wide text-fg-muted">ATM</span>}</td>
           <td className={cn('pe !text-left', r.strike > spot && 'itm')}>{cell(r, 'PE')}</td>
-          <td className={cn('pe', r.strike > spot && 'itm')}><span className="flex items-center justify-end gap-2"><span className="text-[12px] text-fg-subtle">{inrShort(r.pe.oi).replace('₹', '')}</span><span className="h-1.5 rounded-full bg-success/50" style={{ width: `${Math.max(3, (r.pe.oi / maxOi) * 44)}px` }} /></span></td>
+          <td className={cn('pe @max-sm:hidden', r.strike > spot && 'itm')}><span className="flex items-center justify-end gap-2"><span className="text-[12px] text-fg-subtle">{inrShort(r.pe.oi).replace('₹', '')}</span><span className="h-1.5 rounded-full bg-success/50 @max-lg:hidden" style={{ width: `${Math.max(3, (r.pe.oi / maxOi) * 44)}px` }} /></span></td>
         </tr>)}</tbody>
       </table>
+      </div>
       <button type="button" onClick={() => setAllStrikes(!allStrikes)} className="flex h-10 w-full items-center justify-center gap-1.5 border-t border-line text-[12px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg">{allStrikes ? 'Fewer strikes' : `All ${rows.length} strikes`}<ChevronDown size={14} strokeWidth={1.75} className={cn('transition-transform', allStrikes && 'rotate-180')} /></button>
     </Shell>
   )

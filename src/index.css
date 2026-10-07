@@ -76,6 +76,12 @@ body { margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); fon
 .tbl-card tbody tr:hover td { background: var(--surface-hover); }
 /* Option chain inside cards: the at-the-money row is marked in the theme's soft accent, not heavy rules. */
 .tbl-card.chain td { padding-top: 8px; padding-bottom: 8px; }
+/* In a narrow chat panel, tables keep their columns but give up padding before anything has to scroll. */
+@container (max-width: 32rem) {
+  .tbl-card th, .tbl-card td { padding-left: 6px; padding-right: 6px; }
+  .tbl-card th:first-child, .tbl-card td:first-child { padding-left: 10px; }
+  .tbl-card th:last-child, .tbl-card td:last-child { padding-right: 10px; }
+}
 .tbl-card.chain td.k { text-align: center; font-weight: 600; background: var(--surface-sunken); }
 .tbl-card.chain tr.atm td { box-shadow: none; background: var(--accent-soft); }
 .tbl-card.chain tr.atm td.k { background: var(--accent-soft); color: var(--fg); }

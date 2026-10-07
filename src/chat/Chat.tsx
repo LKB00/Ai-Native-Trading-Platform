@@ -87,7 +87,7 @@ function Thread({ full = false }: { full?: boolean }) {
   const lastAi = [...real].reverse().find((m) => m.role === 'ai')
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Conversation">
-      <div ref={scroller} onScroll={(e) => { const el = e.currentTarget; pinned.current = saved.pinned = el.scrollHeight - el.scrollTop - el.clientHeight < 120; saved.top = el.scrollTop }} className="scroll-thin min-h-0 flex-1 overflow-auto">
+      <div ref={scroller} onScroll={(e) => { const el = e.currentTarget; pinned.current = saved.pinned = el.scrollHeight - el.scrollTop - el.clientHeight < 120; saved.top = el.scrollTop }} className="scroll-thin min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         <div className={cn('@container mx-auto w-full max-w-[800px] px-4 pb-8', full ? 'pt-8' : 'pt-5')}>
           {real.length === 0 ? <Hero /> : <div>{real.map((m, i) => <Fragment key={m.id}>
               <div className={i === 0 ? undefined : gap(real[i - 1], m)}><MsgView m={m} /></div>
