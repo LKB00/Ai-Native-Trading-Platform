@@ -447,6 +447,12 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
           </div>
           {cfg.inds.filter((ins) => indDef(ins.type)?.overlay).map((ins) => <IndRow key={ins.id} ins={ins} values={[0, 1, 2].map((i) => legendFor(ins.id, i)).filter((x) => x !== undefined).map((v) => fmtV(v, !!indDef(ins.type)?.ownScale || ins.type === 'obv'))} editing={editInd === ins.id} setEditing={(v) => setEditInd(v ? ins.id : null)} />)}
           {toolHint && active && <Badge tone="info">{toolHint} · Esc to cancel</Badge>}
+          {/* A switch that changes what you see should say so on the chart, with the way back one click away. */}
+          {active && (cfg.hideAll || cfg.lockAll) && ((s.shapes[key]?.length ?? 0) + (s.drawings[key]?.length ?? 0)) > 0 && (
+            <span className="pointer-events-auto inline-flex items-center gap-2 rounded border border-line bg-raised px-2 py-0.5 text-[11px] text-fg-muted">
+              {cfg.hideAll ? 'Drawings hidden' : 'Drawings locked'}
+              <button type="button" className="font-medium text-fg hover:underline" onClick={() => s.setChart(cfg.hideAll ? { hideAll: false } : { lockAll: false })}>{cfg.hideAll ? 'Show' : 'Unlock'}</button>
+            </span>)}
           {interval && <span className="pointer-events-auto inline-flex items-center gap-2 rounded-lg border border-line bg-raised px-3 py-2 text-[13px] shadow-md"><b className="num">{interval}</b><span className="text-fg-subtle">Enter to change interval</span></span>}
         </div>
         {/* Legends for indicator panes */}

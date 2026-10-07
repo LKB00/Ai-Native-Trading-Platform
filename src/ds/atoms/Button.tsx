@@ -59,7 +59,7 @@ export function IconButton({ label, variant = "ghost", size = "md", active, clas
       className={cn(
         "inline-flex items-center justify-center rounded-md cursor-pointer transition-colors duration-[var(--dur-fast)] disabled:pointer-events-none",
         variant !== "lime" && "disabled:opacity-50",
-        size === "sm" ? "size-7" : "size-9", v, active && "bg-accent-soft text-accent-fg", className,
+        size === "sm" ? "size-7" : "size-9", v, active && "bg-hover text-fg", className,
       )}
       {...rest}
     >

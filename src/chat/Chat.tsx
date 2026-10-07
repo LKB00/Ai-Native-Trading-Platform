@@ -91,7 +91,8 @@ function Thread({ full = false }: { full?: boolean }) {
         <div className={cn('@container mx-auto w-full max-w-[800px] px-4 pb-8', full ? 'pt-8' : 'pt-5')}>
           {real.length === 0 ? <Hero /> : <div>{real.map((m, i) => <Fragment key={m.id}>
               <div className={i === 0 ? undefined : gap(real[i - 1], m)}><MsgView m={m} /></div>
-              {m.restored && !real[i + 1]?.restored && <SessionDivider ts={m.ts} />}
+              {/* Marks where this session starts, so only when something new follows the restored history. */}
+              {m.restored && real[i + 1] && !real[i + 1].restored && <SessionDivider ts={m.ts} />}
             </Fragment>)}
             {busy && <div className="mt-4 flex h-6 items-center gap-2 text-fg-subtle"><AIMark size={16} className="animate-pulse text-fg" /><TypingIndicator /></div>}</div>}
         </div>
@@ -187,8 +188,8 @@ function Hero() {
       {/* First visit: set up the desk before anything else; the starters come after, in the agent's reply. */}
       {fresh ? <div className="mt-5 @2xl:mt-7"><SetupCard first /></div> : <>
       <div className="mt-5 grid gap-4 @2xl:mt-7 @2xl:grid-cols-2 @2xl:gap-3">
-        {STARTERS.map((g) => <div key={g.group} className="@2xl:rounded-2xl @2xl:border @2xl:border-line @2xl:bg-surface @2xl:p-3">
-          <p className="px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-fg-subtle">{g.group}</p>
+        {STARTERS.map((g) => <div key={g.group} className="@2xl:rounded-[10px] @2xl:border @2xl:border-line @2xl:bg-surface @2xl:p-3">
+          <p className="px-1 text-[11px] font-medium text-fg-subtle">{g.group}</p>
           <ul className="mt-1">{g.items.map((it) => <li key={it}><button type="button" onClick={() => say(it)} className="w-full rounded-lg px-2 py-1.5 text-left text-[13px] text-fg hover:bg-hover">{it}</button></li>)}</ul>
         </div>)}
       </div>
@@ -210,7 +211,7 @@ function PositionStrip() {
   if (!open.length) return null
   const total = open.reduce((a, p) => a + (ltp(p.key) - p.avg) * p.qty, 0)
   return (
-    <div role="region" aria-label="Open positions" className="mb-2 flex items-center gap-2 overflow-hidden rounded-xl border border-line bg-surface py-1.5 pl-3 pr-1.5">
+    <div role="region" aria-label="Open positions" className="mb-2 flex items-center gap-2 overflow-hidden rounded-[10px] border border-line bg-surface py-1.5 pl-3 pr-1.5">
       <div className="shrink-0 pr-1">
         <p className="flex items-center gap-1.5 text-[11px] text-fg-subtle"><span className="size-1.5 animate-pulse rounded-full bg-success" aria-hidden />{open.length} open</p>
         <Money v={total} className="text-[13px] font-semibold" />
@@ -310,7 +311,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
         {/* The agent view's desk rail already shows positions and the lock, so these strips are for the docked panel only. */}
         {!full && <PositionStrip />}
         {/* Locked mode: the state of the day sits where you're about to type, with the way forward next to it. */}
-        {gate && !full && <div role="status" className="mb-2 flex min-h-10 items-center gap-2.5 rounded-xl border border-line bg-sunken py-[5px] pl-3 pr-1.5 text-[12px] leading-5 text-fg-muted">
+        {gate && !full && <div role="status" className="mb-2 flex min-h-10 items-center gap-2.5 rounded-[10px] border border-line bg-sunken py-[5px] pl-3 pr-1.5 text-[12px] leading-5 text-fg-muted">
           <span className="shrink-0 text-fg"><GateIcon g={gate} size={14} /></span>
           <p className="min-w-0 flex-1"><b className="font-medium text-fg">{gate.kind === 'locked' ? 'Locked for today.' : gate.kind === 'cooloff' ? `Paused for ${gate.short.split('· ')[1]}.` : gate.kind === 'rule' ? `${gate.short}.` : 'Trade limit reached.'}</b> <span className="@max-md:hidden">{gate.why} </span>Exits and stops still work.</p>
           <button type="button" onClick={() => say('review today')} className="inline-flex h-7 shrink-0 items-center rounded-md border border-line-strong bg-surface px-3 text-[12px] font-medium text-fg shadow-xs transition-colors hover:bg-hover">Review today</button>
@@ -321,7 +322,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
             {menu.focus && <li role="presentation" className="px-3 pb-1 pt-1.5 text-[11px] text-fg-subtle">Switch focus. “it” and “buy 10” will mean this symbol</li>}
             {items.map((it, i) => { const p = it.sym ? prices[it.sym] : undefined; return (
               <li key={it.id} role="option" aria-selected={i === menu.sel}>
-                <button type="button" onMouseDown={(e) => { e.preventDefault(); pick(i) }} onMouseEnter={() => setMenu({ ...menu, sel: i })} className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px]', i === menu.sel && 'bg-sunken')}>
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); pick(i) }} onMouseEnter={() => setMenu({ ...menu, sel: i })} className={cn('flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-[13px]', i === menu.sel && 'bg-sunken')}>
                   <span className="num w-24 shrink-0 font-medium text-fg">{it.label}</span><span className="min-w-0 flex-1 truncate text-fg-muted">{it.hint}</span>
                   {p && <><span className="num text-fg">{p.ltp.toFixed(2)}</span><Chg v={pct(p.ltp, p.prev)} className="w-16 text-right text-[11px]" /></>}
                   {menu.focus && <Check size={14} strokeWidth={2} aria-label={it.sym === sym ? 'Current focus' : undefined} className={cn('shrink-0 text-fg', it.sym !== sym && 'invisible')} />}

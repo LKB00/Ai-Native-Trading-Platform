@@ -83,7 +83,7 @@ export default function Workspace() {
   useEffect(() => { const f = () => setFull(!!document.fullscreenElement); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f) }, [])
   const shot = () => { const api = paneApi[active]; if (!api) return; const c = api.chart.takeScreenshot(); const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `${labelOf(pane.k).replace(/\s+/g, '_')}_${pane.tf}.png`; a.click() }
   const typeDef = TYPES.find((t) => t.v === cfg.type)!
-  const tb = 'flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] text-fg-muted hover:bg-hover hover:text-fg'
+  const tb = 'flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] text-fg-muted hover:bg-hover hover:text-fg'
   const sep = <span aria-hidden className="mx-0.5 h-5 w-px bg-line" />
 
   return (
@@ -91,7 +91,7 @@ export default function Workspace() {
       {/* Top toolbar */}
       {/* One line at any width. As the chart narrows, the least-used controls fold into More, in this order:
             Indicators label, undo/redo, layout/settings/snapshot/full screen, spread, then alert and AI levels. */}
-      <div role="toolbar" aria-label="Chart toolbar" className="@container flex flex-nowrap items-center gap-0.5 border-b border-line px-2 py-1">
+      <div role="toolbar" aria-label="Chart toolbar" className="@container flex h-10 shrink-0 flex-nowrap items-center gap-0.5 border-b border-line px-2">
         <button className={cn(tb, 'font-bold text-fg')} onClick={() => setSearch('')} aria-label={`Symbol: ${labelOf(pane.k)}. Change symbol`}><SearchIcon width={14} height={14} />{labelOf(pane.k)}</button>
         {sep}
         <Popover label="Interval" trigger={({ toggle, triggerProps }) => <button className={tb} onClick={toggle} {...triggerProps} aria-label={`Interval: ${TF_LABEL[pane.tf]}`}>{pane.tf}<I.ChevronDownIcon width={12} height={12} /></button>}>
@@ -104,7 +104,7 @@ export default function Workspace() {
         </Popover>
         <button className={tb} onClick={() => setIndOpen(true)}><I.IndicatorsIcon width={18} height={18} /><span className="@max-[760px]:hidden">Indicators</span></button>
         <button className={cn(tb, '@max-[560px]:hidden')} onClick={() => setTool(tool === 'alert' ? 'cross' : 'alert')} aria-pressed={tool === 'alert'} title="Add alert (Alt+A)"><I.BellIcon width={18} height={18} /><span className="max-xl:hidden">Alert</span></button>
-        {!k.strike && <button className={cn(tb, '@max-[560px]:hidden', aiOn && 'bg-sunken text-fg')} aria-pressed={aiOn} onClick={() => useStore.getState().set({ aiLevels: { ...aiLevels, [pane.k]: !aiOn } })} title="AI support and resistance, and candlestick patterns"><Sparkles size={18} strokeWidth={1.5} aria-hidden /><span className="max-xl:hidden">AI levels</span></button>}
+        {!k.strike && <button className={cn(tb, '@max-[560px]:hidden', aiOn && 'bg-hover text-fg')} aria-pressed={aiOn} onClick={() => useStore.getState().set({ aiLevels: { ...aiLevels, [pane.k]: !aiOn } })} title="AI support and resistance, and candlestick patterns"><Sparkles size={18} strokeWidth={1.5} aria-hidden /><span className="max-xl:hidden">AI levels</span></button>}
         <span className="contents @max-[700px]:hidden">{sep}
         <IconButton size="sm" label="Undo (⌘Z)" disabled={!h?.undo.length} onClick={() => useStore.getState().undo(pane.k)}><I.UndoIcon /></IconButton>
         <IconButton size="sm" label="Redo (⇧⌘Z)" disabled={!h?.redo.length} onClick={() => useStore.getState().redo(pane.k)}><I.RedoIcon /></IconButton></span>
@@ -160,7 +160,7 @@ export default function Workspace() {
                 {i === 1 && <span className="num text-[10px] text-fg-subtle @max-[600px]:hidden" title="Spread">{(offer - bid).toFixed(2)}</span>}
                 <button onClick={() => ok && setReq({ side, n: Date.now() })} aria-disabled={!ok || undefined}
                   title={ok ? (gate ? (useStore.getState().positions[pane.k]?.qty ? `Close your ${labelOf(pane.k)} position` : `Sell from your ${labelOf(pane.k)} holding`) : undefined) : `${gate!.short}. ${gate!.why} Exits still work.`}
-                  className={cn('flex h-8 flex-col items-center justify-center rounded-lg px-3 leading-none @max-[500px]:px-2', ok ? (buy ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg') : 'cursor-not-allowed bg-sunken text-fg-subtle')}
+                  className={cn('flex h-8 flex-col items-center justify-center rounded-md px-3 leading-none @max-[500px]:px-2', ok ? (buy ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg') : 'cursor-not-allowed bg-sunken text-fg-subtle')}
                   aria-label={`${buy ? 'Buy' : 'Sell'} ${labelOf(pane.k)} at ${px.toFixed(2)}${ok ? '' : `: ${gate!.short}`}`}><span className="text-[10px]">{buy ? 'Buy' : 'Sell'}</span><span className="num text-[12px] font-bold">{px.toFixed(2)}</span></button>
               </Fragment> })}
           </div>}
@@ -180,10 +180,14 @@ export default function Workspace() {
         <div role="toolbar" aria-label="Drawing tools" aria-orientation="vertical" className="flex w-11 shrink-0 flex-col items-center gap-0.5 border-r border-line py-1.5 max-sm:hidden">
           {GROUPS.map((g) => <ToolGroup key={g.id} g={g} tool={tool} setTool={setTool} />)}
           <span aria-hidden className="my-1 h-px w-6 bg-line" />
-          <RailBtn label="Magnet: snap to open, high, low or close" pressed={cfg.magnet} onClick={() => setChart({ magnet: !cfg.magnet })}><I.MagnetIcon /></RailBtn>
-          <RailBtn label="Stay in drawing mode" pressed={cfg.keepDrawing} onClick={() => setChart({ keepDrawing: !cfg.keepDrawing })}><I.KeepDrawingIcon /></RailBtn>
-          <RailBtn label={cfg.lockAll ? 'Unlock all drawings' : 'Lock all drawings'} pressed={cfg.lockAll} onClick={() => setChart({ lockAll: !cfg.lockAll })}>{cfg.lockAll ? <I.LockIcon /> : <I.UnlockIcon />}</RailBtn>
-          <RailBtn label={cfg.hideAll ? 'Show all drawings' : 'Hide all drawings'} pressed={cfg.hideAll} onClick={() => setChart({ hideAll: !cfg.hideAll })}>{cfg.hideAll ? <I.EyeOffIcon /> : <I.EyeIcon />}</RailBtn>
+          {/* Helpers for drawing, then switches that apply to every drawing. A filled button is on; the tooltip says
+              the current state first, then what a click does. */}
+          <RailBtn label={cfg.magnet ? 'Magnet on: snaps to open, high, low or close. Click to turn off' : 'Magnet: snap to open, high, low or close'} pressed={cfg.magnet} onClick={() => setChart({ magnet: !cfg.magnet })}><I.MagnetIcon /></RailBtn>
+          <RailBtn label={cfg.keepDrawing ? 'Stays in drawing mode after each drawing. Click to turn off' : 'Stay in drawing mode'} pressed={cfg.keepDrawing} onClick={() => setChart({ keepDrawing: !cfg.keepDrawing })}><I.KeepDrawingIcon /></RailBtn>
+          <span aria-hidden className="my-1 h-px w-6 bg-line" />
+          <RailBtn label={cfg.lockAll ? 'Drawings locked. Click to unlock' : 'Lock all drawings'} pressed={cfg.lockAll} onClick={() => setChart({ lockAll: !cfg.lockAll })}><I.LockIcon /></RailBtn>
+          <RailBtn label={cfg.hideAll ? 'Drawings hidden. Click to show' : 'Hide all drawings'} pressed={cfg.hideAll} onClick={() => setChart({ hideAll: !cfg.hideAll })}><I.EyeOffIcon /></RailBtn>
+          <span className="flex-1" aria-hidden />
           <Popover label="Remove drawings" trigger={({ toggle, triggerProps }) => <RailBtn label="Remove drawings" onClick={toggle} {...triggerProps}><I.TrashIcon /></RailBtn>}>
             {({ close }) => <div className="w-60 space-y-2 p-3 text-[12px]"><p>Remove every drawing on {labelOf(pane.k)}? You can undo this.</p>
               <Button size="sm" variant="danger" onClick={() => { const st = useStore.getState(); st.removeShape(pane.k); st.set({ drawings: { ...st.drawings, [pane.k]: [] } }); close() }}>Remove drawings on {labelOf(pane.k)}</Button></div>}
@@ -205,7 +209,7 @@ export default function Workspace() {
 }
 
 function RailBtn({ label, pressed, children, ...rest }: { label: string; pressed?: boolean; children: ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" aria-label={label} title={label} aria-pressed={pressed} {...rest} className={cn('flex size-8 items-center justify-center rounded-lg text-fg-muted hover:bg-hover hover:text-fg', pressed && 'bg-sunken text-fg')}>{children}</button>
+  return <button type="button" aria-label={label} title={label} aria-pressed={pressed} {...rest} className={cn('flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg', pressed && 'bg-hover text-fg')}>{children}</button>
 }
 
 /** A tool group on the left rail: the button uses the group's last tool, the corner arrow opens the full list. */
@@ -217,12 +221,12 @@ function ToolGroup({ g, tool, setTool }: { g: (typeof GROUPS)[number]; tool: Too
   return (
     <div data-group={g.id} className="group relative">
       <button type="button" aria-label={`${shown.label}${shown.key ? ` (${shown.key})` : ''}`} title={`${shown.label}${shown.key ? ` (${shown.key})` : ''}`} aria-pressed={on}
-        onClick={() => setTool(on && g.id !== 'cursor' ? 'cross' : shown.v)} className={cn('flex size-8 items-center justify-center rounded-lg text-fg-muted hover:bg-hover hover:text-fg', on && 'bg-accent text-on-accent hover:bg-accent hover:text-on-accent')}>{shown.icon({ width: 18, height: 18 })}</button>
+        onClick={() => setTool(on && g.id !== 'cursor' ? 'cross' : shown.v)} className={cn('flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg', on && 'bg-hover text-fg')}>{shown.icon({ width: 18, height: 18 })}</button>
       {g.tools.length > 1 && <button type="button" aria-label={`More ${g.label.toLowerCase()}`} aria-expanded={open} onClick={() => setOpen(!open)}
         className="absolute -right-1 bottom-0 flex h-4 w-3 items-center justify-center text-fg-subtle opacity-0 group-hover:opacity-100 focus:opacity-100"><ChevronRight size={10} strokeWidth={2} aria-hidden /></button>}
       {open && <div role="menu" aria-label={g.label} className="absolute left-full top-0 z-40 ml-1 w-56 rounded-[10px] border border-line bg-raised p-1.5 shadow-lg animate-rise">
-        <p className="px-2 py-1 text-[11px] uppercase tracking-[0.08em] text-fg-subtle">{g.label}</p>
-        {g.tools.map((t) => <button key={t.v} role="menuitemradio" aria-checked={tool === t.v} onClick={() => { setTool(t.v); setOpen(false) }} className={cn('flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-hover', tool === t.v && 'bg-sunken')}>
+        <p className="px-2 py-1 text-[11px] font-medium text-fg-subtle">{g.label}</p>
+        {g.tools.map((t) => <button key={t.v} role="menuitemradio" aria-checked={tool === t.v} onClick={() => { setTool(t.v); setOpen(false) }} className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-hover', tool === t.v && 'bg-sunken')}>
           {t.icon({ width: 18, height: 18 })}<span className="flex-1">{t.label}</span>{t.key && <span className="text-[11px] text-fg-subtle">{t.key}</span>}</button>)}
       </div>}
     </div>
@@ -302,7 +306,7 @@ function IndicatorDialog({ onClose }: { onClose: () => void }) {
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-scrim px-4 pt-[8vh]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div role="dialog" aria-modal="true" aria-label="Indicators" className="flex max-h-[76vh] w-full max-w-2xl flex-col overflow-hidden rounded-[10px] border border-line bg-raised shadow-lg animate-rise">
-        <div className="flex items-center gap-3 border-b border-line px-4 py-3"><h2 className="flex-1 text-lg">Indicators</h2><IconButton size="sm" label="Close" onClick={onClose}><XIcon width={12} height={12} /></IconButton></div>
+        <div className="flex items-center gap-3 border-b border-line px-4 py-3"><h2 className="flex-1 text-[15px] font-semibold text-fg">Indicators</h2><IconButton size="sm" label="Close" onClick={onClose}><XIcon width={12} height={12} /></IconButton></div>
         <label className="mx-4 mt-3 flex h-9 items-center gap-2 rounded-md border border-line bg-sunken px-3"><SearchIcon width={14} height={14} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search, e.g. RSI or moving average" aria-label="Search indicators" className="w-full bg-transparent text-[13px] outline-none" /></label>
         <div className="flex min-h-0 flex-1">
           <div role="tablist" aria-orientation="vertical" aria-label="Category" className="flex w-36 shrink-0 flex-col gap-0.5 p-3">{(['All', 'Trend', 'Momentum', 'Volatility', 'Volume'] as const).map((c) => <button key={c} role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={cn('rounded-lg px-3 py-1.5 text-left text-[13px]', cat === c ? 'bg-sunken font-bold' : 'text-fg-muted hover:bg-hover')}>{c}</button>)}</div>

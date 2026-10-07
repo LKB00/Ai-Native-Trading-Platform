@@ -68,12 +68,12 @@ export function EmptyState({
   return (
     <div
       role={isLive ? "status" : undefined}
-      className={cn("flex flex-col gap-4 rounded-3xl border border-line bg-surface p-6", center ? "items-center text-center" : "items-start text-left", compact && "gap-3 p-4", className)}
+      className={cn("flex flex-col gap-4 rounded-[10px] border border-line bg-surface p-6", center ? "items-center text-center" : "items-start text-left", compact && "gap-3 p-4", className)}
     >
       {artNode && <div aria-hidden={art === undefined ? true : undefined} className="shrink-0">{artNode}</div>}
       <div className={cn("min-w-0 max-w-[44ch]", center && "mx-auto")}>
         {p.attention && (
-          <p className={cn("mb-2 inline-flex items-center gap-1.5 rounded-full bg-attention-soft px-2.5 py-0.5 text-[11px] font-medium text-attention-fg")}>
+          <p className={cn("mb-2 inline-flex items-center gap-1.5 rounded bg-attention-soft px-2.5 py-0.5 text-[11px] font-medium text-attention-fg")}>
             <AlertIcon width={12} height={12} />{attentionLabel}
           </p>
         )}

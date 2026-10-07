@@ -5,7 +5,8 @@ import { allMetrics, applyFilters, describeFilter, FIELDS, PRESETS, type Metrics
 import type { Filter } from './actions'
 import { Chg, Section, SortMark, ViewHeader, inrShort } from './ui'
 import { Button, EmptyState, IconButton, Popover, SegmentedControl, cn } from './ds'
-import { ArrowRightIcon, BookmarkIcon, CheckIcon, AlertIcon, PlusIcon, XIcon } from './ds/lib/icons'
+import { ArrowRightIcon, BookmarkIcon, CheckIcon, PlusIcon, XIcon } from './ds/lib/icons'
+import { BellIcon } from './chart/icons'
 
 /* Sections: presets (scanner.presets) and results (scanner.results) both open by default; active conditions stay always visible.
    Folding presets lets the results table take the full width. */
@@ -95,7 +96,7 @@ export default function Scanner() {
                 </button>
               </li>) })}
           </ul>
-          <p className="text-[12px] text-fg-subtle">Tip: ask the copilot <i>“stocks near 52-week high with volume 2x in IT”</i> and the scan appears here.</p>
+          <p className="text-[12px] text-fg-subtle">Tip: ask the agent <i>“stocks near 52-week high with volume 2x in IT”</i> and the scan appears here.</p>
         </Section>
 
         <div className="min-w-0 space-y-3">
@@ -130,7 +131,7 @@ export default function Scanner() {
                 action={scan.filters.length > 1 ? <Button size="sm" variant="secondary" onClick={() => setFilters(scan.filters.slice(0, -1))}>Remove the last condition</Button> : undefined}>
                 Loosen one condition, for example widen a percentage or drop the sector filter.
               </EmptyState>
-            : <div className="scroll-thin overflow-x-auto rounded-b-2xl">
+            : <div className="scroll-thin overflow-x-auto rounded-b-[10px]">
                 <table className="tbl">
                   <thead><tr>
                     {th('sym', 'Symbol', true)}{th('ltp', 'LTP')}{th('chg', 'Change')}
@@ -154,7 +155,7 @@ export default function Scanner() {
                               onClick={() => { watchOp(inWatch ? 'remove' : 'add', r.sym); setToast(`${inWatch ? 'Removed' : 'Added'} ${r.sym} ${inWatch ? 'from' : 'to'} watchlist`) }}>
                               {inWatch ? <CheckIcon width={14} height={14} /> : <BookmarkIcon width={14} height={14} />}
                             </IconButton>
-                            <IconButton size="sm" label={`Set price alert on ${r.sym}`} active={alertFor === r.sym} aria-expanded={alertFor === r.sym} onClick={() => setAlertFor(alertFor === r.sym ? null : r.sym)}><AlertIcon width={14} height={14} /></IconButton>
+                            <IconButton size="sm" label={`Set price alert on ${r.sym}`} active={alertFor === r.sym} aria-expanded={alertFor === r.sym} onClick={() => setAlertFor(alertFor === r.sym ? null : r.sym)}><BellIcon width={14} height={14} /></IconButton>
                           </div>
                         </td>
                       </tr>,
@@ -181,7 +182,7 @@ function AddCondition({ onAdd }: { onAdd: (f: Filter) => void }) {
       <Button size="sm" variant="secondary" onClick={toggle} {...triggerProps} leading={<PlusIcon width={14} height={14} />}>Add condition</Button>)}>
       {({ close }) => (
         <form className="w-72 space-y-2 p-3" onSubmit={(e) => { e.preventDefault(); if (!bool && v.trim() === '') return; onAdd(bool ? { field: f, op: '=', value: Number(v) ? 1 : 0 } : { field: f, op, value: Number(v) }); close() }}>
-          <p className="font-semibold text-base">Add condition</p>
+          <p className="text-[13px] font-semibold text-fg">Add condition</p>
           <label className="block text-[12px] text-fg-subtle">Field
             <select value={f} onChange={(e) => { setF(e.target.value); if (FIELDS[e.target.value].kind === 'bool') setV('1') }} className={cn(field, 'mt-1 w-full')}>
               {keys.map((k) => <option key={k} value={k}>{FIELDS[k].label}{FIELDS[k].unit && FIELDS[k].unit !== '₹' ? ` (${FIELDS[k].unit})` : ''}</option>)}

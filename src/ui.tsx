@@ -54,8 +54,8 @@ export function Section({ id, title, sub, summary, actions, children, defaultOpe
       <div className="flex min-h-10 items-center gap-2 px-3.5 py-1.5">
         <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => toggle(id, !open)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <ChevronIcon width={14} height={14} className={cn('shrink-0 text-fg-subtle transition-transform duration-[var(--dur-fast)]', open && 'rotate-90')} />
-          <span className="flex min-w-0 items-baseline gap-2"><span id={`${bodyId}-h`} className="text-[13px] font-semibold leading-5 text-fg">{title}</span>{sub && open && <span className="truncate text-[12px] text-fg-subtle">{sub}</span>}</span>
-          {!open && summary && <span className="ml-auto truncate pl-3 text-[12px] text-fg-muted">{summary}</span>}
+          <span className="flex min-w-0 shrink-0 items-baseline gap-2"><span id={`${bodyId}-h`} className="whitespace-nowrap text-[13px] font-semibold leading-5 text-fg">{title}</span>{sub && open && <span className="truncate text-[12px] text-fg-subtle">{sub}</span>}</span>
+          {!open && summary && <span className="ml-auto min-w-0 truncate pl-3 text-[12px] text-fg-muted">{summary}</span>}
         </button>
         {open && actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>

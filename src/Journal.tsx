@@ -70,7 +70,12 @@ function insights(ts: T[], s: ReturnType<typeof stats>): string[] {
   const hw = hold(s.wins), hl = hold(s.losses)
   if (hw > 0 && hl > hw * 1.3) out.push(`You hold losing trades ${(hl / hw).toFixed(1)}× longer than winners (${Math.round(hl / 60000)} vs ${Math.round(hw / 60000)} min). Cutting losers sooner is the usual fix.`)
   const tags = group(ts.filter((t) => isSetupTag(t.tag)), (t) => tagLabel(t.tag!)).filter((g) => g.n >= 3)
-  if (tags.length >= 2 && tags[tags.length - 1].net < 0) out.push(`Best setup: "${tags[0].k}" (${sign(tags[0].net)} over ${tags[0].n} trades). Weakest: "${tags[tags.length - 1].k}" (${sign(tags[tags.length - 1].net)} over ${tags[tags.length - 1].n}).`)
+  if (tags.length >= 2 && tags[tags.length - 1].net < 0) {
+    const best = tags[0], worst = tags[tags.length - 1]
+    out.push(best.net > 0
+      ? `Best setup: ${best.k} (${sign(best.net)} over ${best.n} trades). Weakest: ${worst.k} (${sign(worst.net)} over ${worst.n}).`
+      : `No setup made money in this period. ${best.k} lost least (${sign(best.net)} over ${best.n} trades), ${worst.k} most (${sign(worst.net)} over ${worst.n}).`)
+  }
   return out
 }
 
@@ -113,22 +118,21 @@ export default function Journal() {
         <SegmentedControl size="sm" label="Sample history" value={sample} onChange={(v) => { setSample(v); setLimit(100) }} options={[{ value: 'incl', label: 'With sample' }, { value: 'excl', label: 'My trades only' }]} />
         <SegmentedControl size="sm" label="Period" value={period} onChange={(v) => { setPeriod(v); setLimit(100) }} options={[{ value: '7d', label: '7 days' }, { value: '30d', label: '30 days' }, { value: 'all', label: 'All' }]} />
       </ViewHeader>
-      <div className="space-y-4 p-4">
+      <div className="@container space-y-4 p-4">
         {ts.length === 0 ? (
           <EmptyState variant="no-results" title="No closed trades in this view" headingLevel={3}
             action={sample === 'excl' && hasSample ? <Button size="sm" variant="secondary" onClick={() => setSample('incl')}>Include sample history</Button> : undefined}>
             Trades appear here as soon as a position is closed. Try a longer period{sample === 'excl' ? ' or include the sample history' : ''}.
           </EmptyState>
         ) : (<>
-          <div className="dense-stats grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
+          <div className="dense-stats grid grid-cols-2 gap-3 @2xl:grid-cols-3 @6xl:grid-cols-6">
             <StatTile label="Net P&L" serif value={sign(s.net)} detail={`Gross ${sign(s.gross)}`} />
-            <StatTile label="Win rate" serif value={pc(s.winRate)} detail={`${s.wins.length} won · ${s.losses.length} lost`} />
+            <StatTile label="Win rate" serif value={pc(s.winRate)} detail={`${s.wins.length} won · ${s.losses.length} lost · ${new Set(ts.map((t) => t.day)).size} days`} />
             <StatTile label="Profit factor" serif value={Number.isFinite(s.pf) ? s.pf.toFixed(2) : 'No losses'} detail="Won ÷ lost, above 1 is profitable" />
             <StatTile label="Expectancy" serif value={sign(s.exp)} detail="Average net per trade" />
             <StatTile label="Avg win / avg loss" serif value={`${inrShort(s.avgWin)} / ${inrShort(s.avgLoss)}`} detail={s.avgLoss ? `Reward to risk ${(s.avgWin / s.avgLoss).toFixed(2)}` : undefined} />
             <StatTile label="Charges paid" serif value={inr(s.charges)} needsAction={chPct >= 0.25} actionText="Look at this"
               detail={chPct ? `${pc(chPct)} of gross ${s.gross > 0 ? 'P&L' : 'profit'}` : undefined} />
-            <StatTile label="Trades" serif value={String(s.n)} detail={`${new Set(ts.map((t) => t.day)).size} trading days`} />
           </div>
 
           <Section id="journal.insights" title="What your trades say" bodyClassName="space-y-3"
@@ -234,7 +238,7 @@ function Weekdays({ rows }: { rows: Group[] }) {
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.net)))
   return (
     <section className="rounded-[10px] border border-line bg-surface p-4">
-      <h3 className="mb-2 text-base">By weekday</h3>
+      <h3 className="mb-2 text-[13px] font-semibold text-fg">By weekday</h3>
       <ul className="space-y-2">{rows.map((r) => (
         <li key={r.k} className={cn('grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-1.5 py-1 text-[12px]', r.k === 'Tue' && 'bg-sunken')}>
           <span className="flex items-center gap-1">{r.k}{r.k === 'Tue' && <span className="sr-only"> (expiry day)</span>}</span>
@@ -254,7 +258,7 @@ function Weekdays({ rows }: { rows: Group[] }) {
 function Breakdown({ title, head, rows }: { title: string; head: string; rows: Group[] }) {
   return (
     <section className="rounded-[10px] border border-line bg-surface">
-      <h3 className="px-4 pt-3 text-base">{title}</h3>
+      <h3 className="px-4 pt-3 text-[13px] font-semibold text-fg">{title}</h3>
       <div className="scroll-thin mt-1 overflow-x-auto">
         <table className="tbl">
           <thead><tr><th>{head}</th><th>Trades</th><th>Win rate</th><th>Net P&amp;L</th></tr></thead>

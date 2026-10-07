@@ -13,7 +13,7 @@ const IDX = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX']
 /** ETFs are not a sector; keep them out of breadth and sector maths. */
 const SECT = SECTORS.filter((s) => s !== 'ETF')
 const card = 'rounded-[10px] border border-line bg-surface p-4'
-const label = 'text-[11px] uppercase tracking-[0.08em] text-fg-subtle'
+const label = 'text-[11px] font-medium text-fg-subtle'
 
 function rng(seed: number) { return () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296 } }
 const dayKey = (d = new Date()) => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()

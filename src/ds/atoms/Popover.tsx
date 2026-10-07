@@ -158,7 +158,7 @@ export function Popover({
       {trigger({ open, toggle: () => set(!open), triggerProps: { "aria-expanded": open, "aria-haspopup": role, "aria-controls": id } })}
       {open && (
         <div id={id} ref={panel} role={role} aria-label={label} tabIndex={-1} style={style} onKeyDown={onPanelKey}
-          className={cn("absolute z-30 min-w-56 rounded-2xl border border-line bg-raised p-1.5 shadow-lg outline-none animate-rise",
+          className={cn("absolute z-30 min-w-56 rounded-[10px] border border-line bg-raised p-1.5 shadow-lg outline-none animate-rise",
             eff === "bottom" ? "top-full mt-2" : "bottom-full mb-2", align === "end" ? "right-0" : "left-0", panelClassName)}>
           {typeof children === "function" ? children({ close: () => set(false) }) : children}
         </div>

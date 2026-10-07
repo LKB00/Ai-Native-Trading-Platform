@@ -219,10 +219,10 @@ export function TopBar({ left, extras }: { left?: ReactNode; extras?: ReactNode 
           <IconButton label={apiKey ? 'AI engine: Claude' : 'AI engine: built-in'} onClick={toggle} {...triggerProps}><SettingsIcon /></IconButton>)}>
           {({ close }) => (
             <div className="w-80 space-y-3 p-3">
-              <p className="font-serif text-base">AI engine</p>
+              <p className="text-[13px] font-semibold text-fg">AI engine</p>
               <p className="text-[13px] text-fg-muted">The built-in engine understands trading commands offline. Add an Anthropic API key and Claude reads free-form requests. Every number still comes from the terminal's own data, and every trade still needs your approval. The key stays in this browser.</p>
               <input type="password" aria-label="Anthropic API key" placeholder="sk-ant-…" defaultValue={apiKey} onBlur={(e) => setApiKey(e.target.value.trim())}
-                className="h-9 w-full rounded-full border border-line bg-surface px-4 text-[13px] outline-none focus:border-fg-subtle" />
+                className="h-8 w-full rounded-md border border-line bg-surface px-3 text-[13px] outline-none focus:border-fg-subtle" />
               <div className="flex gap-2"><Button size="sm" onClick={close}>Done</Button>{apiKey && <Button size="sm" variant="ghost" onClick={() => setApiKey('')}>Remove key</Button>}</div>
             </div>)}
         </Popover>
@@ -239,7 +239,7 @@ function Top() {
     <TopBar
       left={<nav aria-label="Workspaces"><SegmentedControl size="sm" label="Workspace" value={nav} onChange={(v) => { setView(v as View); switchLayout(false) }} options={NAV.map((n) => ({ value: n.value, label: n.label }))} /></nav>}
       extras={<>
-        <button onClick={() => useStore.setState({ palette: true })} className="flex h-8 items-center gap-2 rounded-full border border-line bg-sunken px-3 text-[12px] text-fg-subtle hover:border-line-strong max-2xl:hidden" aria-label="Open command palette">
+        <button onClick={() => useStore.setState({ palette: true })} className="flex h-8 items-center gap-2 rounded-md border border-line bg-sunken px-3 text-[12px] text-fg-subtle hover:border-line-strong max-2xl:hidden" aria-label="Open command palette">
           <SearchIcon width={13} height={13} />Search<KeyHint>⌘K</KeyHint></button>
       </>} />
   )
@@ -251,19 +251,19 @@ function RiskCenter({ net }: { net: number }) {
   const trades = orders.filter((o) => o.status === 'COMPLETE' && new Date(o.ts).toDateString() === new Date().toDateString() && o.via !== 'bracket' && o.via !== 'risk').length
   const cooling = risk.cooloffUntil && Date.now() < risk.cooloffUntil
   const lossUsed = Math.max(0, -net)
-  const num = 'num h-8 w-28 rounded-full border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
+  const num = 'num h-8 w-28 rounded-md border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
   return (
     <Popover label="Risk limits" align="end" trigger={({ toggle, triggerProps }) => (
-      <button onClick={toggle} {...triggerProps} className="flex h-8 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[12px] hover:border-line-strong">
+      <button onClick={toggle} {...triggerProps} className="flex h-8 items-center gap-2 rounded-md border border-line bg-surface px-3 text-[12px] hover:border-line-strong">
         {/* State shows as the icon's colour only, so a lock reads at a glance without the pill shouting over the bar. */}
         <ShieldIcon width={14} height={14} className={risk.killed ? 'text-danger-fg' : cooling ? 'text-attention-fg' : 'text-fg-subtle'} />
         <span className="text-fg-muted max-sm:hidden">{risk.killed ? 'Locked' : cooling ? 'Cool-off' : 'Day'}</span>
         <Money v={net} className="font-medium" />
       </button>)}>
       <div className="w-[320px] space-y-4 p-3">
-        <div><p className="font-serif text-base">Risk limits for today</p><p className="text-[12px] text-fg-subtle">Checked every second. When a limit is hit, positions close and new entries lock until tomorrow. Exits always work.</p></div>
-        {risk.killed && <div className="rounded-xl bg-danger-soft p-3 text-[12px] text-danger-fg"><b>Trading locked.</b> {risk.reason}. <button className="underline" onClick={() => setRisk({ killed: false, reason: undefined })}>Unlock (paper mode)</button></div>}
-        {cooling && <div className="rounded-xl bg-attention-soft p-3 text-[12px] text-attention-fg"><b>Cool-off.</b> {risk.cooloffAfter} losses in a row. New entries resume in {Math.ceil((risk.cooloffUntil! - Date.now()) / 60000)} min. <button className="underline" onClick={() => setRisk({ cooloffUntil: undefined })}>End now</button></div>}
+        <div><p className="text-[13px] font-semibold text-fg">Risk limits for today</p><p className="text-[12px] text-fg-subtle">Checked every second. When a limit is hit, positions close and new entries lock until tomorrow. Exits always work.</p></div>
+        {risk.killed && <div className="rounded-lg bg-danger-soft p-3 text-[12px] text-danger-fg"><b>Trading locked.</b> {risk.reason}. <button className="underline" onClick={() => setRisk({ killed: false, reason: undefined })}>Unlock (paper mode)</button></div>}
+        {cooling && <div className="rounded-lg bg-attention-soft p-3 text-[12px] text-attention-fg"><b>Cool-off.</b> {risk.cooloffAfter} losses in a row. New entries resume in {Math.ceil((risk.cooloffUntil! - Date.now()) / 60000)} min. <button className="underline" onClick={() => setRisk({ cooloffUntil: undefined })}>End now</button></div>}
         <div>
           <div className="mb-1 flex justify-between text-[12px]"><span className="text-fg-muted">Loss used today</span><span className="num">{inr(lossUsed)} of {inr(risk.maxLoss)}</span></div>
           <MeterBar label="Daily loss used" value={lossUsed} max={risk.maxLoss} warnAt={0.7} valueText={`${inr(lossUsed)} of ${inr(risk.maxLoss)}`} />
@@ -296,7 +296,7 @@ function Watchlist() {
       <IconButton size="sm" label="Show watchlist ( [ )" onClick={() => togglePanel('watch')}><ChevronIcon width={14} height={14} /></IconButton>
       <button onClick={() => open(!peek)} aria-expanded={peek} aria-controls="watch-peek"
         className="flex items-center gap-2 rounded-full px-1.5 py-3 text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:bg-hover hover:text-fg md:[writing-mode:vertical-rl] md:rotate-180 max-md:px-3 max-md:py-1">
-        Watchlist<span className="num rounded-full bg-sunken px-1.5 py-0.5 text-[10px] tracking-normal text-fg-muted">{watch.length}</span>
+        Watchlist<span className="num rounded-full bg-sunken px-1.5 py-0.5 text-[10px] tracking-normal text-fg-muted">{watch.filter((w) => !INDICES.includes(w)).length}</span>
       </button>
       {peek && (
         <div id="watch-peek" role="dialog" aria-label="Watchlist" className="absolute left-full top-0 bottom-0 flex w-[260px] flex-col border-r border-line bg-surface shadow-lg animate-fade max-md:top-full max-md:left-0 max-md:bottom-auto max-md:h-[60vh]">
@@ -442,7 +442,7 @@ function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => v
           <span className="min-w-0 truncate"><b>{i.sym}</b> <span className="text-fg-subtle">{i.name}</span></span><PlusIcon width={14} height={14} /></button></li>)}
       </ul>}
       {/* Indices live in the market strip above, so the list is only your names. Column labels line up with the rows. */}
-      <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-line pl-3.5 pr-3 text-[11px] text-fg-subtle">
+      <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-line pl-3.5 pr-3 text-[11px] text-fg-subtle">
         <span className="flex-1">Watchlist <span className="num">{list.length}</span></span><span className="w-[60px] text-right">Price</span><span className="w-11 text-right">Chg</span>
       </div>
       <ul ref={ul} tabIndex={0} aria-label="Watchlist. Arrow keys move; B buy, S sell, D depth, Enter chart" onKeyDown={onKey}
@@ -570,11 +570,11 @@ function ExitPlan({ k }: { k: string }) {
   const [open, setOpen] = useState(false); const [sl, setSl] = useState(''); const [tg, setTg] = useState(''); const [tr, setTr] = useState('')
   if (!pos?.qty) return <span className="text-fg-subtle">—</span>
   if (!open) return (
-    <button onClick={() => { setSl(b?.sl?.toFixed(2) ?? ''); setTg(b?.tgt?.toFixed(2) ?? ''); setTr(b?.trail?.toString() ?? ''); setOpen(true) }} className="rounded-full px-2 py-0.5 text-left hover:bg-hover">
+    <button onClick={() => { setSl(b?.sl?.toFixed(2) ?? ''); setTg(b?.tgt?.toFixed(2) ?? ''); setTr(b?.trail?.toString() ?? ''); setOpen(true) }} className="rounded-md px-2 py-0.5 text-left hover:bg-hover">
       {b?.sl || b?.tgt ? <span className="num text-[11px]"><span className="text-down">{b.sl ? `SL ${b.sl.toFixed(1)}` : ''}</span>{b.sl && b.tgt ? ' · ' : ''}<span className="text-up">{b.tgt ? `T ${b.tgt.toFixed(1)}` : ''}</span>{b.trail ? ' · trail' : ''}</span>
         : parseKey(k).strike ? <span className="text-[11px] text-fg-muted">Add exit plan</span> : <Badge tone="warning">No stop · add</Badge>}
     </button>)
-  const f = 'num h-7 w-20 rounded-full border border-line bg-surface px-2 text-right text-[11px] outline-none'
+  const f = 'num h-7 w-20 rounded-md border border-line bg-surface px-2 text-right text-[11px] outline-none'
   return (
     <span className="inline-flex items-center gap-1 font-sans">
       <input aria-label="Stop" placeholder="Stop" className={f} value={sl} onChange={(e) => setSl(e.target.value)} />
@@ -619,7 +619,7 @@ function Bottom() {
             <td className={x.qty > 0 ? 'text-up' : x.qty < 0 ? 'text-down' : 'text-fg-subtle'}>{x.qty > 0 ? '+' : ''}{x.qty}</td>
             <td>{x.avg ? x.avg.toFixed(2) : '—'}</td><td>{l.toFixed(2)}</td><td><Money v={pl} /></td><td><ExitPlan k={x.key} /></td>
             <td>{x.qty !== 0 && <button type="button" className="h-6 rounded-md border border-line px-2 font-sans text-[11px] font-medium text-fg transition-colors hover:border-line-strong hover:bg-hover" onClick={() => s.setToast(s.place(x.key, x.qty > 0 ? 'SELL' : 'BUY', Math.abs(x.qty), 'MARKET', 0, x.product))}>Exit</button>}</td></tr> })}
-          {!pos.length && empty(8, <>No positions yet. Press <KeyHint>B</KeyHint> on the chart, or ask the copilot: <i>buy 50 sbi with sl 850</i>.</>)}
+          {!pos.length && empty(8, <>No positions yet. Press <KeyHint>B</KeyHint> on the chart, or ask the agent: <i>buy 50 sbin with sl 850</i>.</>)}
         </tbody></table>}
         {tab === 'ord' && <table className="tbl"><thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th>Qty</th><th>Type</th><th>Price</th><th>Status</th><th>Source</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
           {s.orders.map((o) => <tr key={o.id}><td>{o.time}</td><td className="!font-sans">{labelOf(o.key)}{o.tag && <span className="ml-2 text-[11px] text-fg-subtle">{o.tag}</span>}</td><td className={o.side === 'BUY' ? 'text-up' : 'text-down'}>{o.side}</td><td>{o.qty}</td><td>{o.otype} · {o.product}</td>
@@ -685,21 +685,21 @@ export function Palette() {
     const syms = INSTS.filter((i) => !t || i.sym.toLowerCase().includes(t) || i.name.toLowerCase().includes(t)).slice(0, 6).map((i) => ({ label: `${i.sym}  ·  ${i.name}`, hint: 'Chart', run: () => { st.setSym(i.sym); st.setView('chart') } }))
     const matched = cmds.filter((c) => !t || c.label.toLowerCase().includes(t))
     const out = [...syms, ...matched]
-    if (t) out.unshift({ label: `Ask the copilot: “${q}”`, hint: 'AI', run: () => ask(q) })
+    if (t) out.unshift({ label: `Ask the agent: “${q}”`, hint: 'AI', run: () => ask(q) })
     return out.slice(0, 12)
   }, [q])
   useEffect(() => { if (open) setTimeout(() => input.current?.focus(), 0) }, [open])
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-scrim px-4 pt-[12vh]" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div role="dialog" aria-label="Command palette" className="w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-raised shadow-lg animate-rise">
+      <div role="dialog" aria-label="Command palette" className="w-full max-w-xl overflow-hidden rounded-[10px] border border-line bg-raised shadow-lg animate-rise">
         <label className="flex items-center gap-3 border-b border-line px-4"><SearchIcon width={16} height={16} className="text-fg-subtle" />
           <input ref={input} value={q} onChange={(e) => { setQ(e.target.value); setSel(0) }} placeholder="Symbol, command or question…" aria-label="Command"
             onKeyDown={(e) => { if (e.key === 'Escape') close(); if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => Math.min(s + 1, items.length - 1)) } if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)) } if (e.key === 'Enter' && items[sel]) { items[sel].run(); close() } }}
             className="h-12 flex-1 bg-transparent text-[15px] outline-none" /><KeyHint>Esc</KeyHint></label>
         <ul role="listbox" aria-label="Results" className="max-h-[50vh] overflow-auto p-1.5">
           {items.map((it, i) => <li key={it.label} role="option" aria-selected={i === sel}>
-            <button onMouseEnter={() => setSel(i)} onClick={() => { it.run(); close() }} className={cn('flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-[13px]', i === sel && 'bg-sunken')}>
+            <button onMouseEnter={() => setSel(i)} onClick={() => { it.run(); close() }} className={cn('flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-[13px]', i === sel && 'bg-sunken')}>
               <span className="truncate">{it.label}</span><span className="shrink-0 text-[11px] text-fg-subtle">{it.hint}</span></button></li>)}
         </ul>
       </div>
@@ -714,8 +714,8 @@ export function FnoDisclosure() {
   const accept = () => { try { localStorage.setItem('fnoAck', 'true') } catch { /* storage unavailable */ } useStore.setState({ fnoAck: true, needAck: false }); useStore.getState().setToast('Disclosure accepted. Place the order again.') }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim px-4">
-      <div role="alertdialog" aria-label="Risk disclosure on derivatives" className="w-full max-w-lg rounded-2xl border border-line bg-raised p-6 shadow-lg animate-rise">
-        <h2 className="text-xl">Risk disclosure on derivatives</h2>
+      <div role="alertdialog" aria-label="Risk disclosure on derivatives" className="w-full max-w-lg rounded-[10px] border border-line bg-raised p-6 shadow-lg animate-rise">
+        <h2 className="text-[16px] font-semibold text-fg">Risk disclosure on derivatives</h2>
         <ul className="mt-3 list-disc space-y-2 pl-5 text-[14px] text-fg-muted">
           <li><b className="text-fg">9 out of 10 individual traders in equity F&amp;O lost money</b> in FY25, according to SEBI's study. The average net loss was about ₹1.1 lakh per person.</li>
           <li>Loss-makers also paid transaction costs on top of their losses. Option STT is 0.15% of premium on the sell side.</li>
@@ -732,6 +732,6 @@ export function Toast() {
   const t = useStore((s) => s.toast); const chat = useStore((s) => s.mode === 'chat')
   // In chat the composer owns the bottom edge, so notices drop in under the top bar instead.
   return <div role="status" aria-live="polite" className={cn('pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4', chat ? 'top-16' : 'bottom-5')}>
-    {t && <div className="pointer-events-auto max-w-xl whitespace-pre-line rounded-2xl border border-line bg-code px-4 py-3 text-[13px] text-code-fg shadow-lg animate-sheet">{t}</div>}
+    {t && <div className="pointer-events-auto max-w-xl whitespace-pre-line rounded-[10px] border border-line bg-code px-4 py-3 text-[13px] text-code-fg shadow-lg animate-sheet">{t}</div>}
   </div>
 }

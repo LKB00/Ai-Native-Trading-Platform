@@ -64,8 +64,9 @@ export default function Portfolio() {
       <ViewHeader title="Portfolio" sub="Long-term holdings, SIPs and your trading account. Paper money, simulated prices.">
         <Badge tone="neutral">{rows.length} holdings</Badge>
       </ViewHeader>
-      <div className="space-y-4 p-4">
-        <div className="dense-stats grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
+      <div className="@container space-y-4 p-4">
+        {/* Six tiles in even rows (2, 3 or 6 across), never five and an orphan. */}
+        <div className="dense-stats grid grid-cols-2 gap-3 @2xl:grid-cols-3 @6xl:grid-cols-6">
           <StatTile label="Current value" serif value={inrShort(t.value)} detail={`${rows.length} holdings`} />
           <StatTile label="Invested" serif value={inrShort(t.cost)} />
           <StatTile label="Total P&L" serif value={sign(t.value - t.cost)} goodDirection="up"
@@ -79,24 +80,22 @@ export default function Portfolio() {
         <Section id="portfolio.holdings" title="Holdings" sub="Delivery (CNC). Held over 12 months counts as long-term." bodyClassName={rows.length ? '!px-0 !pb-0' : undefined}
           summary={`${rows.length} holding${rows.length === 1 ? '' : 's'} · ${inrShort(t.value)}`}>
           {rows.length === 0 ? <EmptyState compact variant="cleared" title="No holdings" headingLevel={4}>Buy with the Delivery product to build long-term holdings.</EmptyState> : (
-            <div className="scroll-thin overflow-x-auto rounded-b-2xl">
+            <div className="scroll-thin overflow-x-auto rounded-b-[10px]">
               <table className="tbl">
-                <thead><tr><th>Instrument</th><th>Qty</th><th>Avg</th><th>LTP</th><th>Value</th><th>P&amp;L</th><th>P&amp;L %</th><th>Day</th><th>Held</th><th>Tax</th><th><span className="sr-only">Actions</span></th></tr></thead>
+                <thead><tr><th>Instrument</th><th>Qty</th><th>Avg</th><th>LTP</th><th>Value</th><th>P&amp;L</th><th>Day</th><th>Held</th><th><span className="sr-only">Actions</span></th></tr></thead>
                 <tbody>{rows.map((r) => (<Fragment key={r.sym}>
                   <tr>
                     <td className="!font-sans"><button onClick={() => go(r.sym)} className="text-left hover:underline"><b>{r.sym}</b><div className="max-w-44 truncate text-[11px] text-fg-subtle">{r.name}</div></button></td>
                     <td>{r.qty}</td><td>{r.avg.toFixed(2)}</td><td>{r.ltp.toFixed(2)}</td><td>{inr(r.value)}</td>
-                    <td><Money v={r.pl} /></td><td><Chg v={r.plPct} /></td><td><Chg v={r.dayPct} /></td>
-                    <td title={`Since ${fmtDate(new Date(r.since))}`}>{r.text}</td>
-                    <td className="!font-sans">{r.long ? <Badge tone="info">LTCG</Badge> : <Badge tone="neutral" title={`Long-term from ${fmtDate(r.lt)}`}>STCG</Badge>}</td>
+                    <td className="whitespace-nowrap"><Money v={r.pl} /> <span className="text-[11px]"><Chg v={r.plPct} /></span></td><td><Chg v={r.dayPct} /></td>
+                    <td className="whitespace-nowrap" title={`Since ${fmtDate(new Date(r.since))}`}>{r.text} <span className="ml-1 font-sans">{r.long ? <Badge tone="info">LTCG</Badge> : <Badge tone="neutral" title={`Long-term from ${fmtDate(r.lt)}`}>STCG</Badge>}</span></td>
                     <td className="!font-sans"><div className="flex justify-end gap-1">
-                      <Button size="sm" variant="ghost" aria-label={`Chart ${r.sym}`} onClick={() => go(r.sym)}>Chart</Button>
                       <Button size="sm" variant="secondary" aria-label={`Add more ${r.sym}`} disabled={!!gate} title={gate ? `${gate.short}. ${gate.why}` : undefined} onClick={() => setTicket({ sym: r.sym, side: 'BUY', qty: 1 })}>Add</Button>
                       <Button size="sm" variant="secondary" aria-label={`Sell ${r.sym}`} onClick={() => setTicket({ sym: r.sym, side: 'SELL', qty: r.qty })}>Sell</Button>
                     </div></td>
                   </tr>
                   {ticket?.sym === r.sym && (
-                    <tr><td colSpan={11} className="!bg-sunken !font-sans">
+                    <tr><td colSpan={9} className="!bg-sunken !font-sans">
                       <div role="group" aria-label={`${ticket.side === 'BUY' ? 'Buy' : 'Sell'} ${r.sym}`} className="flex flex-wrap items-center gap-2 text-left">
                         <span className="text-[12px]">{ticket.side === 'BUY' ? 'Buy more' : 'Sell'} <b>{r.sym}</b> at market, delivery</span>
                         <label className="text-[12px] text-fg-subtle">Qty <input type="number" min={1} max={ticket.side === 'SELL' ? r.qty : undefined} value={ticket.qty} autoFocus
@@ -157,8 +156,8 @@ export default function Portfolio() {
           <Section id="portfolio.positions" title="Trading positions" bodyClassName="space-y-3"
             summary={<>{open.length} open · net <Money v={p.net} /></>}>
             <div className="flex gap-6">
-              <div><p className="text-[11px] text-fg-subtle">Open</p><p className="num text-xl">{open.length}</p></div>
-              <div><p className="text-[11px] text-fg-subtle">Net P&amp;L today</p><Money v={p.net} className="text-xl" /></div>
+              <div><p className="text-[11px] text-fg-subtle">Open</p><p className="num text-[18px] font-semibold">{open.length}</p></div>
+              <div><p className="text-[11px] text-fg-subtle">Net P&amp;L today</p><Money v={p.net} className="text-[18px] font-semibold" /></div>
             </div>
             <p className="text-[12px] text-fg-muted">Intraday and F&amp;O positions, after charges of {inr(p.charges)}.</p>
             <Button size="sm" variant="secondary" onClick={() => setView('chart')}>View positions</Button>

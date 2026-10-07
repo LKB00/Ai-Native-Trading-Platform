@@ -57,10 +57,10 @@ export default function Strategy() {
         {stratName && legs.length > 0 && <h2 className="ml-auto text-[13px] font-semibold capitalize text-fg">{stratName}</h2>}
       </div>
       {!legs.length ? <EmptyState compact title="No legs yet" action={<Button size="sm" onClick={() => setLegs(STRATEGIES['iron condor'].build(atm, inst.step, 1), 'iron condor')}>Try an iron condor</Button>}>
-          Pick a template, hover a price in the option chain, or ask the copilot: “bull call spread on nifty 2 lots”.</EmptyState> : <>
+          Pick a template, hover a price in the option chain, or ask the agent: “bull call spread on nifty, 2 lots”.</EmptyState> : <>
         <Section id="strategy.legs" title="Legs" bodyClassName="!px-0 !pb-0"
           summary={`${legs.length} leg${legs.length === 1 ? '' : 's'} · net ${prem >= 0 ? 'credit' : 'debit'} ${inr(Math.abs(prem))}`}>
-        <div className="overflow-x-auto rounded-b-2xl">
+        <div className="overflow-x-auto rounded-b-[10px]">
           <table className="tbl"><thead><tr><th>Side</th><th>Type</th><th>Strike</th><th>Lots</th><th>LTP</th><th>IV</th><th>Delta</th><th><span className="sr-only">Remove</span></th></tr></thead>
             <tbody>{legs.map((l, i) => { const k = q(l); return (
               <tr key={i}>

@@ -5,7 +5,7 @@ import { useState, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Bell, Shield, X, Clock, Pause, Play, Zap, ChevronDown } from 'lucide-react'
 import { useStore } from '../store'
-import { labelOf, parseKey } from '../market'
+import { bySym, labelOf, parseKey } from '../market'
 import { progress } from '../watch'
 import { useEntryGate, GateIcon } from '../gate'
 import { ruleText, type RuleId } from '../rules'
@@ -59,7 +59,9 @@ export function DeskRail() {
   const brackets = useStore((s) => s.brackets); const ltp = useStore((s) => s.ltp); const prices = useStore((s) => s.prices)
   const triggers = useStore(useShallow((s) => s.triggers.filter((t) => !t.done)))
   const working = useStore(useShallow((s) => s.orders.filter((o) => o.status === 'OPEN' || o.status === 'TRIGGER_PENDING')))
-  const rules = useStore((s) => s.rules); const watch = useStore((s) => s.watch)
+  const rules = useStore((s) => s.rules)
+  // Indices sit in the market strip above, so the list is only your names, the same as the terminal watchlist.
+  const watch = useStore(useShallow((s) => s.watch.filter((w) => bySym(w)?.seg !== 'IDX')))
   const ruleIds = Object.keys(rules) as RuleId[]
   const watching = triggers.length + working.length + ruleIds.length
   return (

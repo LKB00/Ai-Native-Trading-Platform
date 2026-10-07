@@ -323,7 +323,7 @@ export function QuoteCard({ sym }: { sym: string }) {
     ] : []),
   ]
   return (
-    <section className="premium card-shadow overflow-hidden rounded-[20px] border border-line bg-surface" aria-label={`${sym} quote`}>
+    <section className="premium overflow-hidden rounded-[10px] border border-line bg-surface" aria-label={`${sym} quote`}>
       {/* 1 · The answer: what it is, what it costs, how it moved. Biggest type on the card. */}
       <div className="px-3.5 pt-3">
         <div className="flex items-baseline gap-2">
@@ -360,7 +360,7 @@ export function QuoteCard({ sym }: { sym: string }) {
       </More>
 
       {/* Your stake, when you have one */}
-      {pos?.qty ? <button type="button" onClick={() => say(`${lower(sym)} position`)} className="mx-3.5 mb-3 flex w-[calc(100%-28px)] items-center gap-3 rounded-xl bg-sunken px-3.5 py-2.5 text-left transition-colors hover:bg-hover">
+      {pos?.qty ? <button type="button" onClick={() => say(`${lower(sym)} position`)} className="mx-3.5 mb-3 flex w-[calc(100%-28px)] items-center gap-3 rounded-lg bg-sunken px-3.5 py-2.5 text-left transition-colors hover:bg-hover">
         <span className="text-[12px] text-fg-muted">Your position</span>
         <span className="text-[13px] font-medium tabular-nums text-fg">{pos.qty > 0 ? 'Long' : 'Short'} {Math.abs(pos.qty)} @ ₹{fmt(pos.avg)}</span>
         <Money v={pl} className="ml-auto text-[13px] font-semibold" />
@@ -455,7 +455,7 @@ function ExitPlanEditor({ k, onDone }: { k: string; onDone: () => void }) {
   const bad = sl && (long ? +sl >= ltp : +sl <= ltp)
   const risk = sl ? Math.abs(pos.avg - +sl) * Math.abs(pos.qty) : 0
   return (
-    <div className="mt-3 rounded-2xl bg-sunken p-4">
+    <div className="mt-3 rounded-lg bg-sunken p-4">
       <div className="grid grid-cols-3 gap-3">
         <Field label="Stop" value={sl} onChange={setSl} step={step} />
         <Field label="Target" value={tg} onChange={setTg} step={step} />
@@ -475,7 +475,7 @@ export const hedgedLeg = (k: string, tag?: string) => !!parseKey(k).strike && !!
 
 /** Symbol tile: a quiet monogram that gives each row an anchor, like a broker's app. */
 const Tile = ({ sym, size = 36 }: { sym: string; size?: number }) => (
-  <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-xl bg-sunken font-semibold tracking-tight text-fg" style={{ width: size, height: size, fontSize: size * 0.34 }}>{sym.slice(0, 2)}</span>
+  <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-lg bg-sunken font-semibold tracking-tight text-fg" style={{ width: size, height: size, fontSize: size * 0.34 }}>{sym.slice(0, 2)}</span>
 )
 
 /** Stop to target as one bar: where the price is now, and where you got in. */
@@ -630,7 +630,7 @@ export function ChainCard({ und, expiryIdx: e0 }: { und: string; expiryIdx: numb
     return <button type="button" title={`${side === 'BUY' ? 'Buy' : 'Sell'} ${und} ${r.strike} ${t}`} onClick={() => draftOption(und, r.strike, t, side, ei)}
       className={cn('num w-full rounded-lg px-2 py-1 font-medium transition-colors', t === 'CE' ? 'text-right' : 'text-left', side === 'BUY' ? 'hover:bg-success-soft hover:text-success-fg' : 'hover:bg-danger-soft hover:text-danger-fg')}>{fmt(v.ltp)}</button>
   }
-  const pill = (on: boolean, tone?: string) => cn('rounded-lg px-3 text-[12px] font-medium transition-colors', on ? tone ?? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg')
+  const pill = (on: boolean, tone?: string) => cn('rounded-md px-3 text-[12px] font-medium transition-colors', on ? tone ?? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:text-fg')
   return (
     <Shell pad={false} title={`${und} options`} meta={<span>{ex.label} expiry</span>}
       foot={<><Act onClick={() => say(`iron condor on ${lower(und)}`)}>Iron condor</Act><Act onClick={() => say(`bull call spread on ${lower(und)}`)}>Bull call spread</Act><Act onClick={() => say(`bear put spread on ${lower(und)}`)}>Bear put spread</Act><span className="ml-auto" /><Act icon={<ArrowUpRight size={13} strokeWidth={1.75} />} onClick={() => { useStore.getState().setExpiry(ei); openCanvas('chain', und) }}>Full chain</Act></>}>
@@ -647,9 +647,9 @@ export function ChainCard({ und, expiryIdx: e0 }: { und: string; expiryIdx: numb
       ]} />
       </More>
       <div className="flex flex-wrap items-center gap-2 border-t border-line px-3.5 py-3">
-        <div role="radiogroup" aria-label="Expiry" className="flex h-8 gap-0.5 rounded-xl bg-sunken p-0.5">{exps.map((x, i) => <button key={x.label} type="button" role="radio" aria-checked={i === ei} onClick={() => setEi(i)} className={pill(i === ei)}>{x.label}</button>)}</div>
+        <div role="radiogroup" aria-label="Expiry" className="flex h-8 gap-0.5 rounded-lg bg-sunken p-0.5">{exps.map((x, i) => <button key={x.label} type="button" role="radio" aria-checked={i === ei} onClick={() => setEi(i)} className={pill(i === ei)}>{x.label}</button>)}</div>
         {gate ? <span className="ml-auto flex items-center gap-1.5 text-[12px] text-fg-subtle" title={gate.why}><GateIcon g={gate} size={12} />View only · {gate.short.toLowerCase()}</span> : <div className="ml-auto flex items-center gap-2 text-[12px] text-fg-subtle">Tap a price to
-          <div role="radiogroup" aria-label="Side" className="flex h-8 gap-0.5 rounded-xl bg-sunken p-0.5">{(['BUY', 'SELL'] as const).map((s) => <button key={s} type="button" role="radio" aria-checked={side === s} onClick={() => setSide(s)} className={pill(side === s, s === 'BUY' ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')}>{s === 'BUY' ? 'Buy' : 'Sell'}</button>)}</div>
+          <div role="radiogroup" aria-label="Side" className="flex h-8 gap-0.5 rounded-lg bg-sunken p-0.5">{(['BUY', 'SELL'] as const).map((s) => <button key={s} type="button" role="radio" aria-checked={side === s} onClick={() => setSide(s)} className={pill(side === s, s === 'BUY' ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')}>{s === 'BUY' ? 'Buy' : 'Sell'}</button>)}</div>
         </div>}
       </div>
       <table className="tbl-card chain">
@@ -729,7 +729,7 @@ export function IdeasCard({ und, expiryIdx, view, maxLoss, picks }: { und: strin
           <div><p className="text-[12px] text-fg-subtle">Max profit</p><p className="num text-[18px] font-semibold leading-7 text-up">{it.c.unlP ? 'Unlimited' : inr(it.c.maxP)}</p></div>
         </div>
         <p className="mt-1.5 px-3.5 text-[12px] leading-5 text-fg-muted">{STRATEGIES[it.name].desc}</p>
-        <div className="mx-3.5 mt-3 rounded-2xl bg-sunken px-2 py-2"><Payoff c={it.c} spot={spot} h={84} /></div>
+        <div className="mx-3.5 mt-3 rounded-lg bg-sunken px-2 py-2"><Payoff c={it.c} spot={spot} h={84} /></div>
         <div className="flex flex-wrap gap-1.5 px-3.5 pb-3 pt-3">{it.legs.map((l, j) => <LegChip key={j} l={l} />)}</div>
         <Facts cols={3} items={[
           { k: 'Margin', v: inrShort(it.margin || it.c.net < 0 ? Math.max(it.margin, -it.c.net) : it.margin) },
@@ -756,13 +756,13 @@ function Field({ label, value, onChange, step, placeholder, disabled }: { label:
   return (
     <label className="block"><span className="text-[11px] text-fg-subtle">{label}</span>
       <input type="number" step={step} value={value} placeholder={placeholder} disabled={disabled} onChange={(e) => onChange(e.target.value)}
-        className="num mt-1 h-10 w-full rounded-xl border border-line bg-surface px-3 text-[14px] font-medium outline-none transition-colors placeholder:font-normal placeholder:text-fg-subtle focus:border-fg-subtle disabled:bg-sunken disabled:opacity-70" /></label>
+        className="num mt-1 h-8 w-full rounded-md border border-line bg-surface px-2.5 text-[13px] font-medium outline-none transition-colors placeholder:font-normal placeholder:text-fg-subtle focus:border-fg-subtle disabled:bg-sunken disabled:opacity-70" /></label>
   )
 }
 function Seg<T extends string>({ value, options, onChange, label }: { value: T; options: { v: T; l: string; tone?: string }[]; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex h-10 rounded-xl bg-sunken p-1">
-      {options.map((o) => <button key={o.v} type="button" role="radio" aria-checked={value === o.v} onClick={() => onChange(o.v)} className={cn('flex-1 rounded-lg px-3 text-[13px] font-medium text-fg-muted transition-colors hover:text-fg', value === o.v && (o.tone ?? 'bg-surface text-fg shadow-sm'))}>{o.l}</button>)}
+    <div role="radiogroup" aria-label={label} className="flex h-8 rounded-lg bg-sunken p-0.5">
+      {options.map((o) => <button key={o.v} type="button" role="radio" aria-checked={value === o.v} onClick={() => onChange(o.v)} className={cn('flex-1 rounded-md px-3 text-[12px] font-medium text-fg-muted transition-colors hover:text-fg', value === o.v && (o.tone ?? 'bg-surface text-fg shadow-sm'))}>{o.l}</button>)}
     </div>
   )
 }
@@ -831,7 +831,7 @@ function OrderDraft({ msgId, i, a, live }: { msgId: number; i: number; a: OrderA
           Adjust<ChevronDown size={13} strokeWidth={1.75} className={cn('transition-transform', open && 'rotate-180')} /></button>
       </div>
 
-      {open && <div className="space-y-3 rounded-2xl border border-line p-4 animate-rise">
+      {open && <div className="space-y-3 rounded-lg border border-line p-3.5 animate-rise">
         <div className="grid grid-cols-2 gap-3 @lg:grid-cols-3">
           <div className="@max-lg:col-span-2"><p className="text-[11px] text-fg-subtle">Side</p><div className="mt-1"><Seg label="Side" value={a.side} onChange={(side) => set({ side, sl: undefined, tgt: undefined })} options={[{ v: 'BUY', l: 'Buy', tone }, { v: 'SELL', l: 'Sell', tone }]} /></div></div>
           {opt ? <Stat label="Product">F&O carry (NRML)</Stat>
@@ -874,12 +874,12 @@ function StrategyDraft({ msgId, i, a }: { msgId: number; i: number; a: Extract<A
         <button type="button" aria-expanded={legs} onClick={() => setLegs(!legs)} className="ml-auto inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg">
           Legs<ChevronDown size={13} strokeWidth={1.75} className={cn('transition-transform', legs && 'rotate-180')} /></button>
       </div>
-      {legs && <div className="overflow-hidden rounded-2xl border border-line animate-rise">
+      {legs && <div className="overflow-hidden rounded-lg border border-line animate-rise">
         <table className="tbl-card"><thead><tr><th>Leg</th><th>Strike</th><th>Type</th><th>Lots</th><th>Price</th></tr></thead>
           <tbody>{a.legs.map((l, j) => <tr key={j}><td><span className={cn('rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase', l.side === 'BUY' ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')}>{l.side === 'BUY' ? 'Buy' : 'Sell'}</span></td><td className="font-medium">{l.strike}</td><td>{l.type}</td><td>{l.lots}</td><td>₹{fmt(c.entries[j])}</td></tr>)}</tbody></table>
         <p className="border-t border-line px-4 py-2 text-[11px] text-fg-subtle">{a.und} {ex.label} expiry · {lots * inst.lot} qty per leg · buy legs are placed first, so hedges cut the margin</p>
       </div>}
-      <div className="rounded-2xl bg-sunken px-2 py-2"><Payoff c={c} spot={spot} /></div>
+      <div className="rounded-lg bg-sunken px-2 py-2"><Payoff c={c} spot={spot} /></div>
       <p className="text-[12px] tabular-nums text-fg-muted">{c.net >= 0 ? 'Net credit' : 'Net debit'} <span className="font-medium text-fg">{inr(Math.abs(c.net))}</span> · margin <span className={cn('font-medium text-fg', margin > avail && '!text-danger-fg')}>{inr(Math.max(margin, c.net < 0 ? -c.net : 0))}</span> of {inrShort(avail)} free · spot ₹{fmt(spot)}</p>
     </div>
   )
@@ -910,11 +910,11 @@ function StrategyLive({ keys }: { keys: string[] }) {
   const total = keys.reduce((a, k) => { const p = positions[k]; return a + (p.qty ? (ltp(k) - p.avg) * p.qty : 0) + p.realized }, 0)
   const exit = () => { const s = useStore.getState(); const shorts = [...open].sort((a, b) => s.positions[a].qty - s.positions[b].qty); shorts.forEach((k) => s.squareoff(k)); setSure(false); s.addMsg({ role: 'user', text: `Exit ${positions[keys[0]].tag ?? 'strategy'}` }); s.addMsg({ role: 'ai', text: `Closed all ${open.length} legs at market, shorts first.`, follow: ['review my trades', 'explain my pnl'] }) }
   return (
-    <div className="overflow-hidden rounded-2xl border border-line">
+    <div className="overflow-hidden rounded-lg border border-line">
       <table className="tbl-card"><thead><tr><th>Leg</th><th>Qty</th><th>Avg</th><th>Now</th><th>P&L</th></tr></thead>
         <tbody>{keys.map((k) => { const p = positions[k]; const l = ltp(k); return <tr key={k}><td className="font-medium">{labelOf(k).replace(/^\w+ \d+ \w+ /, '')}</td><td className={p.qty > 0 ? 'text-up' : p.qty < 0 ? 'text-down' : ''}>{p.qty ? (p.qty > 0 ? '+' : '') + p.qty : 'closed'}</td><td>{p.avg ? `₹${fmt(p.avg)}` : '–'}</td><td>₹{fmt(l)}</td><td><Money v={p.qty ? (l - p.avg) * p.qty : p.realized} /></td></tr> })}</tbody></table>
       <div className="flex items-center gap-3 border-t border-line bg-sunken px-3.5 py-3">
-        <span className="text-[12px] text-fg-muted">Strategy P&L</span><Money v={total} className="text-[17px] font-semibold" />
+        <span className="text-[12px] text-fg-muted">Strategy P&L</span><Money v={total} className="text-[18px] font-semibold" />
         <span className="ml-auto flex gap-1">{open.length > 0 && (sure ? <><Button size="sm" variant="danger" onClick={exit}>Exit {open.length} legs at market</Button><Button size="sm" variant="ghost" onClick={() => setSure(false)}>Keep</Button></> : <Act onClick={() => setSure(true)}>Exit strategy</Act>)}</span>
       </div>
     </div>
@@ -955,7 +955,7 @@ export function DraftCard({ msgId }: { msgId: number }) {
   const broken = live && m.pending.some((a) => !!ruleBreak(a))
   // Discarded: nothing happened, so it shrinks to a single quiet line instead of a full card.
   if (m.state === 'dismissed') return (
-    <div className="flex h-10 items-center gap-2 rounded-2xl border border-dashed border-line px-4 text-[12px] text-fg-subtle">
+    <div className="flex h-10 items-center gap-2 rounded-lg border border-dashed border-line px-4 text-[12px] text-fg-subtle">
       <X size={13} strokeWidth={1.75} aria-hidden /><span className="min-w-0 truncate"><span className="text-fg-muted">Discarded</span> · {m.pending.length === 1 ? plainTitle(m.pending[0]) : `${m.pending.length} actions`}</span><span className="ml-auto shrink-0">nothing was sent</span>
     </div>
   )
@@ -1027,7 +1027,7 @@ export function JournalCard() {
       <div className="space-y-3 px-3.5 pb-3">
         <Hero label="Net after charges" aside={<span className="rounded-md bg-sunken px-2.5 py-1 text-[12px] font-medium text-fg-muted">{(winRate * 100).toFixed(0)}% of trades won</span>}><Money v={tot} /></Hero>
         <InsightRead list={found} fallback={winners.length > 0 && losers.length > 0 && <Read tone={winRate < need ? 'attention' : undefined}><b>{avgL > avgW ? `Your average loss (${inr(avgL)}) is ${(avgL / avgW).toFixed(1)}× your average win (${inr(avgW)}).` : `Your average win (${inr(avgW)}) is ${(avgW / avgL).toFixed(1)}× your average loss (${inr(avgL)}).`}</b> That needs a {(need * 100).toFixed(0)}% win rate to break even; you're at {(winRate * 100).toFixed(0)}%.{winRate < need && avgL > avgW ? ' Tighter stops would close the gap faster than more wins.' : ''}</Read>} />
-        {eq.length > 2 && <div className="rounded-2xl bg-sunken px-2 py-2">
+        {eq.length > 2 && <div className="rounded-lg bg-sunken px-2 py-2">
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ height: H }} className="w-full" role="img" aria-label={`Equity curve over ${t.length} trades, ending at ${inr(tot)}`}>
             <defs><linearGradient id={id} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={tone} stopOpacity="0.22" /><stop offset="1" stopColor={tone} stopOpacity="0" /></linearGradient></defs>
             <line x1="0" x2={W} y1={y(0)} y2={y(0)} stroke="var(--border-strong)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />

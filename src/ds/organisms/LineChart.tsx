@@ -202,7 +202,7 @@ export function LineChart({ series: all, x, formatValue = formatNumber, unit = "
             onPointerLeave={(e) => { if (e.pointerType === "mouse" && document.activeElement !== wrapRef.current) setActive(null); }} />
         </svg>
         {ai >= 0 && (
-          <div aria-hidden className="pointer-events-none absolute z-10 min-w-36 max-w-64 rounded-xl border border-line bg-surface px-3 py-2 text-xs shadow-md"
+          <div aria-hidden className="pointer-events-none absolute z-10 min-w-36 max-w-64 rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-md"
             style={{ top: plotTop, left: px(ai), transform: `translateX(${tipRight ? "calc(-100% - 12px)" : "12px"})` }}>
             <p className="mb-1 text-fg-muted">{x[ai]}</p>
             {series.map((s, si) => {
