@@ -88,6 +88,8 @@ type S = {
   chart: ChartCfg; drawings: Record<string, number[]>; aiLevels: Record<string, boolean>
   scan: { filters: Filter[]; name: string; sort: string }
   palette: boolean
+  /** The keyboard shortcuts sheet. */
+  shortcuts: boolean
   panels: Panels; setPanels: (p: Partial<Panels>) => void; togglePanel: (k: 'watch' | 'copilot' | 'bottom' | 'focus' | 'chips') => void
   sections: Record<string, boolean>; toggleSection: (id: string, open?: boolean) => void
   charts: { layout: ChartLayout; panes: Pane[]; active: number }
@@ -313,7 +315,7 @@ export const useStore = create<S>((set, get) => ({
   chart: { ...DEFAULT_CHART, ...loadJSON('chart2', {}) },
   drawings: loadJSON('drawings', {}), aiLevels: {},
   scan: { filters: [], name: '', sort: 'chg' },
-  palette: false,
+  palette: false, shortcuts: false,
   // 'cockpit-panels': a new key, so the cockpit opens with every panel showing instead of the old Terminal's folds.
   // A first visit (no desk set up, no saved layout) opens in Chat with the empty positions panel folded, so setup has
   // room; the Terminal is one tap away.

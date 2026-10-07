@@ -26,6 +26,7 @@ import { AskButton, NotificationsSheet, PhoneHome, PhoneProfile, PhoneTools, Pho
 import { House, LayoutGrid, List as ListIcon, UserRound, Wallet } from 'lucide-react'
 import { OrderPad, StockScreen } from './phone'
 import { useShallow } from 'zustand/react/shallow'
+import { ShortcutsSheet } from './shortcuts'
 import { isSetupTag, tagLabel } from './rules'
 import { Briefcase, GripVertical, Layers, Rows3, Trash2 } from 'lucide-react'
 
@@ -68,6 +69,7 @@ function Cockpit() {
       const t = document.activeElement?.tagName; if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return
       const st = useStore.getState()
       if (e.key === '/') { e.preventDefault(); if (!st.panels.copilot) st.setPanels({ copilot: true, focus: false }); setTimeout(() => document.querySelector<HTMLTextAreaElement>('#chat-input')?.focus(), 50) }
+      else if (e.key === '?') { e.preventDefault(); useStore.setState({ shortcuts: !st.shortcuts }) }
       else if (e.key === '[') { e.preventDefault(); st.togglePanel('watch') }
       else if (e.key === ']') { e.preventDefault(); st.togglePanel('copilot') }
       else if (e.key === '\\') { e.preventDefault(); st.togglePanel('bottom') }
@@ -90,7 +92,7 @@ function Cockpit() {
       <Top /><TickerTape />
       <div className="hidden min-h-0 min-[960px]:flex [&>aside]:flex-1"><DeskRail /></div>
       <ChatPanel overlay={false} full />
-      <Toast /><Palette /><FnoDisclosure />
+      <Toast /><Palette /><ShortcutsSheet /><FnoDisclosure />
     </div>
   )
   return (
@@ -106,7 +108,7 @@ function Cockpit() {
       {(panels.copilot && (!narrow || mobile)) ? <ChatPanel overlay={false} resize={!mobile && <Splitter dir="x" sign={-1} value={panels.copilotW} min={340} max={640} label="Agent panel width" onSize={(copilotW) => useStore.getState().setPanels({ copilotW })} onToggle={() => useStore.getState().togglePanel('copilot')} className="-left-1" />} /> : null}
       {panels.copilot && narrow && !mobile && <ChatPanel overlay />}
       {(!panels.copilot || (narrow && !mobile)) && <CopilotRail />}
-      <Toast /><Palette /><FnoDisclosure />
+      <Toast /><Palette /><ShortcutsSheet /><FnoDisclosure />
     </div>
   )
 }
@@ -196,7 +198,7 @@ function PhoneCockpit() {
       </Fragment>)}
       <DepthSheet sym={top?.t === 'depth' ? top.sym : null} onClose={pop} onPrice={(side, px) => top?.t === 'depth' && order(top.sym, side, px)} />
       <NotificationsSheet open={top?.t === 'bell'} onClose={pop} onOpen={() => openAgent()} />
-      <Toast /><Palette /><FnoDisclosure />
+      <Toast /><Palette /><ShortcutsSheet /><FnoDisclosure />
     </div>
   )
 }
@@ -744,6 +746,7 @@ export function Palette() {
       { label: 'Exit all positions', hint: 'Command', run: () => ask('square off all') },
       { label: 'Kill switch', hint: 'Command', run: () => ask('kill switch') },
       { label: 'Toggle dark theme', hint: 'Command', run: () => st.toggleTheme() },
+      { label: 'Keyboard shortcuts', hint: '?', run: () => useStore.setState({ shortcuts: true }) },
       { label: 'Reset paper account (cash, positions, orders)', hint: 'Account', run: () => { if (window.confirm('Reset the paper account? Positions, orders, alerts and trade history go back to the starting state. Chat and settings stay.')) resetBook() } },
       { label: 'New conversation (clear chat history)', hint: 'Chat', run: () => { if (window.confirm('Clear the conversation? Positions and orders are not affected.')) st.clearChat() } },
       { label: st.panels.watch ? 'Hide watchlist' : 'Show watchlist', hint: '[', run: () => st.togglePanel('watch') },
