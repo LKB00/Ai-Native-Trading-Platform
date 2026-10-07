@@ -6,7 +6,7 @@ import {
 import { bySym, history, optionHistory, atr, pivots, levels, TF_SEC, TF_LABEL, labelOf, parseKey, barStart, simNow, fmtIST, intraday, type Candle, type TF } from '../market'
 import { useStore, type OType, type Drawing } from '../store'
 import { useEntryGate, opensPosition, GateNote } from '../gate'
-import { AIMark, Badge, Button, IconButton, SegmentedControl, cn } from '../ds'
+import { Badge, Button, IconButton, SegmentedControl, cn } from '../ds'
 import { PlusIcon, XIcon } from '../ds/lib/icons'
 import { inr, LabeledSwitch } from '../ui'
 import { indDef, instanceTitle, type IndInstance } from './indicators'
@@ -32,6 +32,9 @@ function heikin(c: Candle[]): Candle[] {
 }
 
 /** Candlestick patterns on the last bars, shown as chart markers. Deterministic, so the AI can cite them. */
+/** Short codes for pattern markers: they sit beside one candle without covering its neighbours. */
+export const PATTERN_CODE: Record<string, string> = { 'Bullish engulfing': 'E', 'Bearish engulfing': 'E', Hammer: 'H', 'Inside bar': 'IB' }
+
 export function patterns(c: Candle[]) {
   const out: { time: number; name: string; bull: boolean }[] = []
   for (let i = Math.max(1, c.length - 60); i < c.length; i++) {
@@ -181,7 +184,9 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
       if (bar.time !== lastBar || ++n % 3 === 0) { lastBar = bar.time; setIndicators() }
       const fills = s.orders.filter((o) => o.key === key && o.status === 'COMPLETE')
       const m: SeriesMarker<Time>[] = fills.map((o) => ({ time: T(barStart(tf, o.st ?? o.ts / 1000)), position: o.side === 'BUY' ? 'belowBar' : 'aboveBar', color: o.side === 'BUY' ? c.up : c.dn, shape: o.side === 'BUY' ? 'arrowUp' : 'arrowDown', text: `${o.side === 'BUY' ? 'B' : 'S'} ${o.qty}` }))
-      if (s.aiLevels[key] && !opt) for (const p of patterns(d)) m.push({ time: T(p.time), position: p.bull ? 'belowBar' : 'aboveBar', color: css('--chart-5'), shape: 'circle', text: p.name })
+      // Patterns as a short code beside the bar (full name in the legend when that bar is hovered), not a sentence
+      // printed across the candles next to it.
+      if (s.aiLevels[key] && !opt) for (const p of patterns(d)) m.push({ time: T(p.time), position: p.bull ? 'belowBar' : 'aboveBar', color: css('--chart-5'), shape: p.bull ? 'arrowUp' : 'arrowDown', size: 0.6, text: PATTERN_CODE[p.name] ?? '' })
       markers.setMarkers(m.sort((a, b) => (a.time as number) - (b.time as number)))
       rerender()
     })
@@ -222,7 +227,7 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
   for (const o of s.orders) if (o.key === key && (o.status === 'OPEN' || o.status === 'TRIGGER_PENDING')) specs.push({ id: 'o' + o.id, price: o.status === 'TRIGGER_PENDING' ? o.trigger! : o.price, kind: 'order', label: `${o.side === 'BUY' ? 'Buy' : 'Sell'} ${o.qty} ${o.otype === 'LIMIT' ? 'limit' : 'stop'}`, color: col.info, style: 0, drag: true, ref: o.id })
   if (!opt) for (const t of s.triggers) if (t.sym === key && !t.done) specs.push({ id: 't' + t.id, price: t.price, kind: 'alert', label: t.then ? `GTT ${t.then.side.toLowerCase()} ${t.then.qty}` : 'Alert', color: col.info, style: 1, drag: true, ref: t.id })
   if (!cfg.hideAll) for (const p of s.drawings[key] ?? []) specs.push({ id: 'd' + p, price: p, kind: 'draw', label: 'Line', color: col.draw, style: 0, drag: !cfg.lockAll, ref: p })
-  for (const l of lvl) specs.push({ id: 'ai' + l.price.toFixed(1), price: l.price, kind: 'ai', label: `AI ${l.kind} · ${l.touches} touches`, color: col.ai, style: 2, drag: false })
+  for (const l of lvl) specs.push({ id: 'ai' + l.price.toFixed(1), price: l.price, kind: 'ai', label: `${l.kind === 'resistance' ? 'R' : 'S'} ${l.touches}×`, color: col.ai, style: 2, drag: false })
   if (cfg.pivots && !opt) for (const [k2, v] of Object.entries(piv)) specs.push({ id: 'pv' + k2, price: v, kind: 'pivot', label: k2 === 'P' ? 'Pivot' : k2, color: col.sub, style: 3, drag: false })
   if (ticket) {
     specs.push({ id: 'g-entry', price: ticket.market ? ltp : ticket.entry, kind: 'g-entry', label: 'Entry', color: col.info, style: 0, drag: !ticket.market })
@@ -239,7 +244,7 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
     for (const sp of specs) {
       seen.add(sp.id)
       const price = dragRef.current?.spec.id === sp.id ? dragRef.current.price : sp.price
-      const opts = { price, color: sp.color, lineStyle: sp.style, lineWidth: (sp.kind === 'position' ? 2 : 1) as 1 | 2, axisLabelVisible: sp.kind !== 'pivot', title: sp.kind === 'pivot' ? sp.label : '', axisLabelColor: sp.color, axisLabelTextColor: css('--surface') }
+      const opts = { price, color: sp.color, lineStyle: sp.style, lineWidth: (sp.kind === 'position' ? 2 : 1) as 1 | 2, axisLabelVisible: sp.kind !== 'pivot', title: sp.kind === 'pivot' || sp.kind === 'ai' ? sp.label : '', axisLabelColor: sp.color, axisLabelTextColor: css('--surface') }
       const ex = lines.current.get(sp.id)
       if (ex) ex.applyOptions(opts); else lines.current.set(sp.id, main.createPriceLine(opts))
     }
@@ -402,6 +407,7 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
   const bar = hover?.idx != null && hover.idx >= 0 && hover.idx < d.length ? d[hover.idx] : d.at(-1)
   const prevBar = bar ? d[d.indexOf(bar) - 1] : undefined
   const barChg = bar && prevBar ? bar.close - prevBar.close : 0
+  const barPattern = aiOn && bar ? patterns(d).find((p) => p.time === bar.time) : undefined
   const sel = myShapes.find((x) => x.id === selected)
   const preview: Drawing | null = draft && hover && mp ? (() => {
     const a = draft.pts[0]; const b = draft.pts[1] ?? { t: hover.time ?? mp.t(hover.x) ?? a.t, p: hover.price }; const kind = tool as Drawing['kind']
@@ -436,6 +442,7 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
             <span>· {tf} · {exch}</span>
             {bar && <span className="num flex flex-wrap gap-x-2"><span>O<span className={barChg >= 0 ? 'text-up' : 'text-down'}>{bar.open.toFixed(2)}</span></span><span>H<span className={barChg >= 0 ? 'text-up' : 'text-down'}>{bar.high.toFixed(2)}</span></span><span>L<span className={barChg >= 0 ? 'text-up' : 'text-down'}>{bar.low.toFixed(2)}</span></span><span>C<span className={barChg >= 0 ? 'text-up' : 'text-down'}>{bar.close.toFixed(2)}</span></span>
               <span className={barChg >= 0 ? 'text-up' : 'text-down'}>{barChg >= 0 ? '+' : '−'}{Math.abs(barChg).toFixed(2)} ({barChg >= 0 ? '+' : '−'}{prevBar ? Math.abs(barChg / prevBar.close * 100).toFixed(2) : '0.00'}%)</span></span>}
+            {barPattern && <span className="font-sans" style={{ color: 'var(--chart-5)' }}>· {barPattern.name}</span>}
           </div>
           {cfg.inds.filter((ins) => indDef(ins.type)?.overlay).map((ins) => <IndRow key={ins.id} ins={ins} values={[0, 1, 2].map((i) => legendFor(ins.id, i)).filter((x) => x !== undefined).map((v) => fmtV(v, !!indDef(ins.type)?.ownScale || ins.type === 'obv'))} editing={editInd === ins.id} setEditing={(v) => setEditInd(v ? ins.id : null)} />)}
           {toolHint && active && <Badge tone="info">{toolHint} · Esc to cancel</Badge>}
@@ -448,11 +455,10 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
           </div>) })}
 
         {/* Price-line labels with inline actions */}
-        {specs.filter((sp) => sp.kind !== 'pivot' && !sp.kind.startsWith('g-') && (!multi || sp.kind !== 'ai')).map((sp) => {
+        {specs.filter((sp) => sp.kind !== 'pivot' && sp.kind !== 'ai' && !sp.kind.startsWith('g-')).map((sp) => {
           const y = yFor(dragRef.current?.spec.id === sp.id ? dragRef.current.price : sp.price); if (y == null || y < 4) return null
           return (
             <div key={sp.id} data-overlay className="absolute right-[70px] z-10 flex -translate-y-1/2 items-center gap-1 rounded-md border bg-surface py-0.5 pl-2.5 pr-1 text-[11px]" style={{ top: y, borderColor: sp.color }}>
-              {sp.kind === 'ai' && <AIMark size={16} />}
               <span className="num whitespace-nowrap" style={{ color: sp.kind === 'position' ? undefined : sp.color }}>{sp.label}</span>
               {sp.kind === 'position' && !s.brackets[key]?.sl && !multi && <button className="rounded-md px-1.5 text-fg-muted hover:bg-hover" onClick={() => { const a = atr(d).at(-1)! * 1.5; s.setBracket(key, { sl: +(pos!.avg - Math.sign(pos!.qty) * a).toFixed(2), tgt: +(pos!.avg + Math.sign(pos!.qty) * 2 * a).toFixed(2) }) }}>Add stop and target</button>}
               {sp.kind === 'sl' && !multi && <button className="rounded-md px-1.5 text-fg-muted hover:bg-hover" onClick={() => s.setBracket(key, { trail: Math.abs(ltp - sp.price), peak: ltp })}>{s.brackets[key]?.trail ? 'Trailing' : 'Trail'}</button>}
