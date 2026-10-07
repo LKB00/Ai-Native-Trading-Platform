@@ -1,0 +1,448 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Design tokens
+   Layer 1: raw scales (--ref-*)      never used directly in components
+   Layer 2: semantic roles (--*)      what components consume
+   Layer 3: Tailwind theme mapping    utilities like bg-surface, text-fg-muted
+   Dark mode: add class "dark" (or data-theme="dark") on <html>.
+------------------------------------------------------------------- */
+
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
+:root, [data-theme="light"] {
+  /* ---- Raw palette: warm paper, charcoal ink, one lime, one amber ---- */
+  --ref-charcoal: #24282c;
+  --ref-charcoal-soft: #5b5e61;
+  --ref-charcoal-mute: #686c6f;      /* 4.55:1 or better on paper, sand, white and hover surfaces */
+  /* ---- Type families. Components use these through font-sans and font-mono. ---- */
+  --ds-font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ds-font-mono: "Geist Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  /* The display voice: headings and the assistant's own words. Sans by default; set data-voice="serif" on the root for a literary serif. */
+  --ds-font-display: var(--ds-font-sans);
+  --ds-display-weight: 600;      /* h1 to h3 */
+  --ds-display-tracking: -0.02em;
+  --ds-voice-weight: 500;        /* the .font-serif class (kept as a name; it is the display voice) */
+  --ds-voice-tracking: -0.01em;
+  --ref-paper: #fafaf9;
+  --ref-sand: #f4f4f2;
+  --ref-sand-deep: #ececea;
+  --ref-line: #e6e5e2;
+  --ref-line-strong: #c9c8c3;
+  --ref-lime: #c2ef72;
+  --ref-lime-deep: #b2e255;
+  --ref-lime-wash: #eaf5cc;
+  --ref-amber: #c97b4a;
+  --ref-amber-wash: #f8ebe1;
+  --ref-amber-ink: #8f4f26;
+
+  /* ---- Semantic roles (light) ---- */
+  --bg: var(--ref-paper);
+  --surface: #ffffff;
+  --surface-sunken: var(--ref-sand);
+  --surface-raised: #ffffff;
+  --surface-hover: var(--ref-sand-deep);
+  --border: var(--ref-line);
+  --border-strong: var(--ref-line-strong);
+
+  --fg: var(--ref-charcoal);
+  --fg-muted: var(--ref-charcoal-soft);
+  --fg-subtle: var(--ref-charcoal-mute);
+  --fg-on-accent: #ffffff;
+  --on-danger: #ffffff;
+
+  /* Accent = ink. Primary actions are charcoal; lime is a highlight, never a text color. */
+  --accent: var(--ref-charcoal);
+  --accent-hover: #3a3f44;
+  --accent-soft: var(--ref-lime-wash);
+  --accent-soft-border: #cfe79a;
+  --accent-fg: var(--ref-charcoal);
+
+  --lime: var(--ref-lime);
+  /* Wireframe drawings in the parts index */
+  --wf-ink: #3a3f44; --wf-line: #d2d1cc; --wf-fill: #e4e3df; --wf-soft: #efefec; --wf-paper: #ffffff; --wf-ai: var(--ref-lime);
+  --lime-hover: var(--ref-lime-deep);
+  --lime-soft: var(--ref-lime-wash);
+  --on-lime: var(--ref-charcoal);
+
+  /* Amber is reserved for "this needs a person". Same slot as warning. */
+  --attention: var(--ref-amber);
+  --attention-soft: var(--ref-amber-wash);
+  --attention-fg: var(--ref-amber-ink);
+
+  --success: #5f9a14;  --success-soft: #eef6da;  --success-fg: #3f6a0b;
+  --warning: var(--attention);  --warning-soft: var(--attention-soft);  --warning-fg: var(--attention-fg);
+  --danger: #b84a42;   --danger-soft: #f9e9e7;   --danger-fg: #8e2f28;
+  --info: #5a7691;     --info-soft: #e9eef3;     --info-fg: #35506a;
+
+  --focus-ring: var(--ref-charcoal);
+
+  --code-bg: #1f2326;
+  --code-fg: #ecebe4;
+  --code-muted: #9a9d9a;
+
+  --hair: 1px;
+
+  /* ---- Data visualization (validated with the dataviz palette checks) ----
+     Categorical colors are assigned in fixed order and never cycled. Amber is not a series color.
+     Neutral is for "Other" and context data. Status colors stay separate (success, danger, attention). */
+  --chart-1: #2a6fbf;
+  --chart-2: #c2455f;
+  --chart-3: #008c9e;
+  --chart-4: #6f8f10;
+  --chart-5: #8a3d93;
+  --chart-neutral: #9a9d98;
+  /* Sequential: one hue, low to high. Diverging: two poles and a gray midpoint. */
+  --chart-seq-1: #94b6df;
+  --chart-seq-2: #6693cb;
+  --chart-seq-3: #3a74b8;
+  --chart-seq-4: #235a9a;
+  --chart-seq-5: #14406d;
+  --chart-div-neg: #c2455f;
+  --chart-div-mid: #e4e1d6;
+  --chart-div-pos: #2a6fbf;
+  --chart-grid: var(--border);
+  --chart-axis: var(--fg-subtle);
+
+  /* ---- Layout ---- */
+  --w-chat: 768px;     /* thread and composer reading width */
+  --w-home: 680px;     /* empty-thread column */
+  --w-page: 1120px;    /* documentation and settings pages */
+  --margin: 16px;      /* page margin, steps up at md and lg */
+  --gutter: 16px;
+  --density: 1;        /* 1 comfortable, 0.8 compact (data-density="compact") */
+
+  /* ---- Type (fluid, with a rem floor so 200% zoom still scales) ---- */
+  --text-display: clamp(2.25rem, 2vw + 1.5rem, 3.25rem);
+  --text-headline: clamp(1.625rem, 1vw + 1.25rem, 2rem);
+  --text-title: clamp(1.25rem, 0.5vw + 1.1rem, 1.5rem);
+  --measure: 72ch;
+
+  --shadow-sm: 0 1px 2px rgb(36 40 44 / 0.05);
+  --shadow-md: 0 6px 20px rgb(36 40 44 / 0.07), 0 1px 2px rgb(36 40 44 / 0.04);
+  --shadow-lg: 0 16px 40px rgb(36 40 44 / 0.12), 0 2px 6px rgb(36 40 44 / 0.05);
+
+  /* Motion: enter decelerates, exit accelerates, moves on screen use the standard curve. */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0.38, 0.9);
+  --dur-instant: 70ms;   /* press, toggle */
+  --dur-fast: 150ms;     /* hover, feedback, exits */
+  --dur-base: 220ms;     /* enter */
+  --dur-slow: 380ms;     /* panels and sheets. Nothing in the UI exceeds 400ms */
+}
+
+@media (min-width: 52.5rem) { :root { --margin: 24px; --gutter: 24px; } }
+@media (min-width: 75rem) { :root { --margin: 32px; } }
+[data-density="compact"] { --density: 0.8; }
+
+.dark, [data-theme="dark"] {
+  --bg: #181b1e;
+  --surface: #202428;
+  --surface-sunken: #1c1f23;
+  --surface-raised: #292d32;
+  --surface-hover: #2b3036;
+  --border: #31363b;
+  --border-strong: #484e54;
+
+  --fg: #f2f1ea;
+  --fg-muted: #b4b5b2;
+  --fg-subtle: #9a9d9f;              /* 4.9:1 or better on the dark surfaces */
+  --fg-on-accent: #24282c;
+  --on-danger: #24282c;
+
+  --accent: var(--ref-lime);
+  --accent-hover: #d2f493;
+  --accent-soft: #2a3320;
+  --accent-soft-border: #475b2a;
+  --accent-fg: var(--ref-lime);
+
+  --lime-soft: #2a3320;
+  --wf-ink: #d9d8d0; --wf-line: #4a5056; --wf-fill: #3a3f45; --wf-soft: #2c3035; --wf-paper: #24282c; --wf-ai: var(--ref-lime);
+
+  --attention: #e09468;
+  --attention-soft: #3a281c;
+  --attention-fg: #efb28c;
+
+  --success: #8cc63f;  --success-soft: #232e17;  --success-fg: #b4de78;
+  --danger: #ea7a72;   --danger-soft: #3a1f1d;   --danger-fg: #f3a7a1;
+  --info: #86a5c0;     --info-soft: #1f2a34;     --info-fg: #aac3d8;
+
+  --focus-ring: var(--ref-lime);
+  --code-bg: #121416;
+
+  --chart-1: #4a8cd8;
+  --chart-2: #d85874;
+  --chart-3: #12a0a8;
+  --chart-4: #82a420;
+  --chart-5: #a862b8;
+  --chart-neutral: #7d8185;
+  /* In dark themes lighter means more. */
+  --chart-seq-1: #3a64a0;
+  --chart-seq-2: #4f7fc0;
+  --chart-seq-3: #6e9ed8;
+  --chart-seq-4: #98bdec;
+  --chart-seq-5: #c4daf6;
+  --chart-div-neg: #d85874;
+  --chart-div-mid: #3a3f45;
+  --chart-div-pos: #4a8cd8;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 6px 20px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.5);
+}
+
+/* ---- Voice: data-voice="serif" on <html> swaps the display voice to a serif (load Newsreader yourself). ---- */
+[data-voice="serif"] {
+  --ds-font-display: "Newsreader", ui-serif, Georgia, "Times New Roman", serif;
+  --ds-display-weight: 400; --ds-display-tracking: 0;
+  --ds-voice-weight: 400; --ds-voice-tracking: 0;
+}
+
+/* ---- Colour themes: set data-palette on <html> to teal, indigo, harbor, plum or graphite; the default (lime) needs no attribute. A theme changes the greys and the AI colour in light and dark, and adds two soft wash colours (--ai-wash-1, --ai-wash-2). ---- */
+/* Theme: teal. Greys and the AI colour change; amber (needs a person) and the status colours stay. */
+[data-palette="teal"], [data-palette="teal"] [data-theme="light"] {
+  --ref-paper: #f4fcfc; --ref-sand: #eef6f6; --ref-sand-deep: #e6eeee; --ref-line: #dfe7e7; --ref-line-strong: #c2caca;
+  --ref-charcoal: #21292a; --ref-charcoal-soft: #4e5454; --ref-charcoal-mute: #646b6b;
+  --ref-lime: #7ae6e5; --ref-lime-deep: #69d5d5; --ref-lime-wash: #d2f9f8; --accent-soft-border: #9de3e2;
+  --accent-hover: #374041;
+  --ai-wash-1: #d0f9ed; --ai-wash-2: #d2f6ff;
+  --wf-ink: #3a4040; --wf-line: #cbd3d3; --wf-fill: #dde5e5; --wf-soft: #e9f1f1;
+}
+[data-palette="teal"].dark, [data-palette="teal"][data-theme="dark"], [data-palette="teal"] .dark, [data-palette="teal"] [data-theme="dark"] {
+  --bg: #151c1d; --surface: #1d2526; --surface-sunken: #192021; --surface-raised: #262e2f; --surface-hover: #293132;
+  --ref-lime: #77cfcf; --accent-hover: #a7edec; --accent-soft: #073232; --lime-soft: #073232; --accent-soft-border: #0b5c5c;
+  --ai-wash-1: #00342a; --ai-wash-2: #00323c;
+  --border: #2f3738; --border-strong: #474f50; --fg: #ebf2f3; --fg-muted: #b5bebf; --fg-subtle: #959f9f;
+  --wf-ink: #d0dada; --wf-line: #495152; --wf-fill: #384041; --wf-soft: #293132; --wf-paper: #21292a;
+}
+html[data-palette="teal"], html[data-palette="teal"].dark { --pastel-lilac: var(--ai-wash-1); --pastel-sky: var(--ai-wash-2); --pastel-mint: color-mix(in oklab, var(--ai-wash-1) 50%, var(--ai-wash-2)); --pastel-rose: color-mix(in oklab, var(--ai-wash-2) 55%, var(--bg)); }
+
+/* Theme: indigo. Greys and the AI colour change; amber (needs a person) and the status colours stay. */
+[data-palette="indigo"], [data-palette="indigo"] [data-theme="light"] {
+  --ref-paper: #f9fafe; --ref-sand: #f3f3f9; --ref-sand-deep: #ebebf1; --ref-line: #e4e4ea; --ref-line-strong: #c7c7cd;
+  --ref-charcoal: #27272d; --ref-charcoal-soft: #525257; --ref-charcoal-mute: #68696e;
+  --ref-lime: #c1c5ff; --ref-lime-deep: #afb2ff; --ref-lime-wash: #edefff; --accent-soft-border: #cdd0fe;
+  --accent-hover: #3d3e45;
+  --ai-wash-1: #e6efff; --ai-wash-2: #f2ebfe;
+  --wf-ink: #3e3e43; --wf-line: #d0d0d6; --wf-fill: #e2e2e8; --wf-soft: #eeeef4;
+}
+[data-palette="indigo"].dark, [data-palette="indigo"][data-theme="dark"], [data-palette="indigo"] .dark, [data-palette="indigo"] [data-theme="dark"] {
+  --bg: #1a1a20; --surface: #232329; --surface-sunken: #1e1e24; --surface-raised: #2c2c33; --surface-hover: #2f2f35;
+  --ref-lime: #b3b6fc; --accent-hover: #d8dbfe; --accent-soft: #282841; --lime-soft: #282841; --accent-soft-border: #4a4b75;
+  --ai-wash-1: #1c2b47; --ai-wash-2: #302442;
+  --border: #35353b; --border-strong: #4c4c54; --fg: #f0f0f6; --fg-muted: #bcbdc5; --fg-subtle: #9b9ca4;
+  --wf-ink: #d7d7e0; --wf-line: #4e4e56; --wf-fill: #3e3e45; --wf-soft: #2f2f36; --wf-paper: #27272d;
+}
+html[data-palette="indigo"], html[data-palette="indigo"].dark { --pastel-lilac: var(--ai-wash-1); --pastel-sky: var(--ai-wash-2); --pastel-mint: color-mix(in oklab, var(--ai-wash-1) 50%, var(--ai-wash-2)); --pastel-rose: color-mix(in oklab, var(--ai-wash-2) 55%, var(--bg)); }
+
+/* Theme: harbor. Greys and the AI colour change; amber (needs a person) and the status colours stay. */
+[data-palette="harbor"], [data-palette="harbor"] [data-theme="light"] {
+  --ref-paper: #f7fafe; --ref-sand: #f0f4f9; --ref-sand-deep: #e8ecf1; --ref-line: #e2e5eb; --ref-line-strong: #c5c8cd;
+  --ref-charcoal: #24282d; --ref-charcoal-soft: #505357; --ref-charcoal-mute: #66696e;
+  --ref-lime: #a3cffe; --ref-lime-deep: #86c0fc; --ref-lime-wash: #e5f2ff; --accent-soft-border: #b4d8ff;
+  --accent-hover: #3a3f45;
+  --ai-wash-1: #dcf3ff; --ai-wash-2: #e8eeff;
+  --wf-ink: #3c3f43; --wf-line: #cdd1d6; --wf-fill: #e0e3e8; --wf-soft: #ebeff4;
+}
+[data-palette="harbor"].dark, [data-palette="harbor"][data-theme="dark"], [data-palette="harbor"] .dark, [data-palette="harbor"] [data-theme="dark"] {
+  --bg: #171b20; --surface: #202429; --surface-sunken: #1b1f24; --surface-raised: #292d33; --surface-hover: #2b3036;
+  --ref-lime: #92c3f6; --accent-hover: #c6e1fe; --accent-soft: #192d41; --lime-soft: #192d41; --accent-soft-border: #305275;
+  --ai-wash-1: #033041; --ai-wash-2: #212947;
+  --border: #31363c; --border-strong: #494e54; --fg: #edf1f6; --fg-muted: #b7bdc4; --fg-subtle: #989da4;
+  --wf-ink: #d3d8e0; --wf-line: #4b5056; --wf-fill: #3a3f45; --wf-soft: #2c3036; --wf-paper: #24282d;
+}
+html[data-palette="harbor"], html[data-palette="harbor"].dark { --pastel-lilac: var(--ai-wash-1); --pastel-sky: var(--ai-wash-2); --pastel-mint: color-mix(in oklab, var(--ai-wash-1) 50%, var(--ai-wash-2)); --pastel-rose: color-mix(in oklab, var(--ai-wash-2) 55%, var(--bg)); }
+
+/* Theme: plum. Greys and the AI colour change; amber (needs a person) and the status colours stay. */
+[data-palette="plum"], [data-palette="plum"] [data-theme="light"] {
+  --ref-paper: #fef8fc; --ref-sand: #f8f2f6; --ref-sand-deep: #f0eaee; --ref-line: #e9e3e7; --ref-line-strong: #ccc6c9;
+  --ref-charcoal: #2c2529; --ref-charcoal-soft: #565154; --ref-charcoal-mute: #6c676b;
+  --ref-lime: #fdb1ec; --ref-lime-deep: #eca1db; --ref-lime-wash: #ffe9f9; --accent-soft-border: #f2c3e7;
+  --accent-hover: #433c40;
+  --ai-wash-1: #f7e8fe; --ai-wash-2: #fee7ef;
+  --wf-ink: #413d40; --wf-line: #d5cfd3; --wf-fill: #e7e1e5; --wf-soft: #f3edf0;
+}
+[data-palette="plum"].dark, [data-palette="plum"][data-theme="dark"], [data-palette="plum"] .dark, [data-palette="plum"] [data-theme="dark"] {
+  --bg: #1f191c; --surface: #282125; --surface-sunken: #231d21; --surface-raised: #312a2e; --surface-hover: #342d31;
+  --ref-lime: #e6a6d7; --accent-hover: #ffccf2; --accent-soft: #392334; --lime-soft: #392334; --accent-soft-border: #67415f;
+  --ai-wash-1: #36223e; --ai-wash-2: #401f2d;
+  --border: #3a3337; --border-strong: #524b4f; --fg: #f5eff2; --fg-muted: #c2b9bf; --fg-subtle: #a29a9f;
+  --wf-ink: #ded5da; --wf-line: #544d51; --wf-fill: #433c40; --wf-soft: #342d31; --wf-paper: #2c2529;
+}
+html[data-palette="plum"], html[data-palette="plum"].dark { --pastel-lilac: var(--ai-wash-1); --pastel-sky: var(--ai-wash-2); --pastel-mint: color-mix(in oklab, var(--ai-wash-1) 50%, var(--ai-wash-2)); --pastel-rose: color-mix(in oklab, var(--ai-wash-2) 55%, var(--bg)); }
+
+/* Theme: graphite. Greys and the AI colour change; amber (needs a person) and the status colours stay. */
+[data-palette="graphite"], [data-palette="graphite"] [data-theme="light"] {
+  --ref-paper: #fbfaf8; --ref-sand: #f5f4f2; --ref-sand-deep: #edecea; --ref-line: #e6e5e3; --ref-line-strong: #c9c8c6;
+  --ref-charcoal: #292724; --ref-charcoal-soft: #545352; --ref-charcoal-mute: #6a6967;
+  --ref-lime: #e0deda; --ref-lime-deep: #d0cdc9; --ref-lime-wash: #ffeed3; --accent-soft-border: #edd0a0;
+  --accent-hover: #403e3a;
+  --ai-wash-1: #eeeeee; --ai-wash-2: #eeeeee;
+  --wf-ink: #3f3e3d; --wf-line: #d2d1cf; --wf-fill: #e4e3e1; --wf-soft: #f0efed;
+}
+[data-palette="graphite"].dark, [data-palette="graphite"][data-theme="dark"], [data-palette="graphite"] .dark, [data-palette="graphite"] [data-theme="dark"] {
+  --bg: #1c1a19; --surface: #242321; --surface-sunken: #201f1d; --surface-raised: #2e2c2a; --surface-hover: #312f2d;
+  --ref-lime: #bfbdba; --accent-hover: #dfdedb; --accent-soft: #37290f; --lime-soft: #37290f; --accent-soft-border: #644b1e;
+  --ai-wash-1: #2b2b2b; --ai-wash-2: #2b2b2b;
+  --border: #363533; --border-strong: #4e4d4b; --fg: #f4f0eb; --fg-muted: #bdbcb9; --fg-subtle: #9e9c9a;
+  --wf-ink: #d9d7d5; --wf-line: #504f4d; --wf-fill: #403e3c; --wf-soft: #312f2d; --wf-paper: #292725;
+}
+html[data-palette="graphite"], html[data-palette="graphite"].dark { --pastel-lilac: var(--ai-wash-1); --pastel-sky: var(--ai-wash-2); --pastel-mint: color-mix(in oklab, var(--ai-wash-1) 50%, var(--ai-wash-2)); --pastel-rose: color-mix(in oklab, var(--ai-wash-2) 55%, var(--bg)); }
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface-sunken);
+  --color-raised: var(--surface-raised);
+  --color-hover: var(--surface-hover);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-on-accent: var(--fg-on-accent);
+  --color-on-danger: var(--on-danger);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-soft-border);
+  --color-accent-fg: var(--accent-fg);
+
+  --color-lime: var(--lime);
+  --color-lime-hover: var(--lime-hover);
+  --color-lime-soft: var(--lime-soft);
+  --color-on-lime: var(--on-lime);
+  --color-attention: var(--attention);
+  --color-attention-soft: var(--attention-soft);
+  --color-attention-fg: var(--attention-fg);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-fg: var(--success-fg);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-fg: var(--warning-fg);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-fg: var(--danger-fg);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-fg: var(--info-fg);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-neutral: var(--chart-neutral);
+  --color-chart-seq-1: var(--chart-seq-1);
+  --color-chart-seq-2: var(--chart-seq-2);
+  --color-chart-seq-3: var(--chart-seq-3);
+  --color-chart-seq-4: var(--chart-seq-4);
+  --color-chart-seq-5: var(--chart-seq-5);
+
+  --color-code: var(--code-bg);
+  --color-code-fg: var(--code-fg);
+  --color-code-muted: var(--code-muted);
+
+  --font-sans: var(--ds-font-sans);
+  --font-serif: var(--ds-font-display);
+  --font-mono: var(--ds-font-mono);
+
+  /* One scale. Pills for controls, 12 for rows inside cards, 16 for cards, 20 for panels, 24 for outer frames. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 24px;
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --animate-caret: caret 1s steps(1) infinite;
+  --animate-shimmer: shimmer 1.8s linear infinite;
+  --animate-pulse-dot: pulse-dot 1.2s var(--ease-standard) infinite;
+  --animate-rise: rise var(--dur-base) var(--ease-out) both;
+  --animate-fade: fade var(--dur-fast) var(--ease-out) both;
+  --animate-sheet: sheet var(--dur-slow) var(--ease-out) both;
+  --animate-word-in: word-in 150ms ease both;
+  /* Something arrived or was confirmed: a citation, a label, a copied check */
+  --animate-pop: pop var(--dur-base) var(--ease-out) both;
+  /* A quantity fills to its value: meters, confidence bars */
+  --animate-grow-x: grow-x var(--dur-slow) var(--ease-out) both;
+  --animate-grow-y: grow-y var(--dur-base) var(--ease-out) both;
+}
+
+/* Breakpoints follow the size classes of the layout system: compact, medium, expanded, large, extra large.
+   sm 600, md 840, lg 1200, xl 1600. Phone is 4 columns, tablet 8, desktop 12. */
+@theme {
+  --breakpoint-sm: 37.5rem;
+  --breakpoint-md: 52.5rem;
+  --breakpoint-lg: 75rem;
+  --breakpoint-xl: 100rem;
+  --breakpoint-2xl: 120rem;
+}
+
+/* Lines: crisp 1px borders everywhere, in a light neutral. */
+@utility border { border-style: solid; border-width: var(--hair); }
+@utility border-t { border-top-style: solid; border-top-width: var(--hair); }
+@utility border-b { border-bottom-style: solid; border-bottom-width: var(--hair); }
+
+@keyframes caret { 50% { opacity: 0; } }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@keyframes pulse-dot { 0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes word-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { 0% { opacity: 0; transform: scale(0.6); } 60% { opacity: 1; transform: scale(1.08); } 100% { opacity: 1; transform: none; } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes grow-y { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+@layer base {
+  html, body { background: var(--bg); }
+  html { color: var(--fg); font-family: var(--ds-font-sans); -webkit-font-smoothing: antialiased; }
+  h1, h2, h3 { font-family: var(--ds-font-display); font-weight: var(--ds-display-weight); letter-spacing: var(--ds-display-tracking); }
+  .font-serif { font-family: var(--ds-font-display); font-weight: var(--ds-voice-weight); letter-spacing: var(--ds-voice-tracking); }
+  
+  :focus-visible { outline: 1.5px solid var(--focus-ring); outline-offset: 2px; }
+  ::selection { background: var(--ref-lime); color: var(--ref-charcoal); }
+}
+
+/* Respect reduced motion: streaming and shimmer degrade to static states */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Moving between pages: the header stays put, the page fades and rises a little. */
+::view-transition-old(root) { animation: vt-out var(--dur-fast) var(--ease-in) both; }
+::view-transition-new(root) { animation: vt-in var(--dur-base) var(--ease-out) 60ms both; }
+::view-transition-group(site-header) { animation-duration: 0s; }
+::view-transition-group(morph) { animation-duration: var(--dur-slow); animation-timing-function: var(--ease-out); }
+@keyframes vt-out { to { opacity: 0; } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes sheet-out { to { opacity: 0; transform: translateX(24px); } }
+@keyframes fade-out { to { opacity: 0; } }
+html { scroll-padding-top: 4.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+}
+
+/* Touch screens: every button, tab, choice and text field is at least 44px tall. Switches and checkboxes grow their own hit area. */
+@layer base {
+  @media (pointer: coarse) {
+    :where(button, summary, select, [role="radio"], [role="tab"], [role="option"], [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]):not([role="switch"], [role="checkbox"], [data-compact]) { min-height: 44px; }
+    :where(input:not([type="radio"], [type="checkbox"], [type="range"], [type="hidden"]), textarea) { min-height: 44px; }
+    [role="checkbox"] { min-height: 44px; min-width: 44px; }
+    :where(button[aria-label]):has(> svg:only-child) { min-width: 44px; }
+    /* Small inline links keep their look and gain a larger invisible tap area. */
+    a[aria-label^="Source "] { position: relative; }
+    a[aria-label^="Source "]::after { content: ""; position: absolute; inset: -8px -6px; }
+  }
+}

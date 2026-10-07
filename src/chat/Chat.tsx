@@ -1,0 +1,252 @@
+// The AI agent, docked in the cockpit. You say what you want; it answers with live cards (quotes, charts,
+// chains, scans, positions) and drafts every trade as an editable ticket you approve in place. It also speaks
+// first when something happens to your money. The chart, watchlist and positions stay in view around it.
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ArrowUp, Bell, SquarePen, CircleAlert, CircleCheck, Mic, PanelRightClose, Square, Crosshair, ChevronDown, SquareSlash, CornerDownRight, Check } from 'lucide-react'
+import { AIMark, Badge, IconButton, Markdown, TypingIndicator, KeyHint, cn } from '../ds'
+import { useStore, type Msg } from '../store'
+import { INSTS, bySym, fmtIST } from '../market'
+import { ask } from '../ai'
+import { Chg, pct } from '../ui'
+import { CardView, DraftCard, say } from './cards'
+
+/** Starting over drops drafts that are still waiting for approval, so say so first. */
+function confirmClear() {
+  const waiting = useStore.getState().msgs.filter((m) => m.state === 'pending').length
+  return confirm(waiting ? `Start a new conversation? ${waiting} draft${waiting > 1 ? 's' : ''} waiting for approval will be discarded. Positions and orders are not affected.` : 'Start a new conversation? Positions and orders are not affected.')
+}
+
+/** The agent panel on the right of the cockpit. `resize` is the drag handle the layout passes in. */
+export function ChatPanel({ overlay, resize, full = false }: { overlay: boolean; resize?: ReactNode; full?: boolean }) {
+  const pending = useStore((s) => s.msgs.filter((m) => m.state === 'pending').length)
+  const hasChat = useStore((s) => s.msgs.length > 1)
+  useEffect(() => { if (overlay) document.querySelector<HTMLTextAreaElement>('#chat-input')?.focus({ preventScroll: true }) }, [overlay])
+  return (
+    // Docked it's a grid column (relative, for its resize handle); as a drawer it's fixed over the page. Never both:
+    // with both classes 'relative' wins, and the drawer would take a grid slot and push the folded rail onto a new row.
+    <aside id="copilot" aria-label="AI agent" className={cn('flex min-h-0 min-w-0 flex-col bg-bg', !full && 'border-l border-line', overlay ? 'fixed bottom-0 right-0 top-[86px] z-40 w-[min(440px,100vw)] shadow-lg animate-sheet' : 'relative max-md:border-l-0')}>
+      {resize}
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3">
+        <span className="inline-flex size-7 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
+        <h2 className="font-sans text-[13px] font-semibold text-fg">AI agent</h2>
+        {pending > 0 && <button type="button" onClick={() => document.querySelector('[data-pending]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}><Badge tone="warning">{pending} waiting for you</Badge></button>}
+        <span className="ml-auto flex items-center gap-0.5">
+          <KeyHint className="mr-1 max-lg:hidden">/</KeyHint>
+          <IconButton size="sm" label="New conversation" disabled={!hasChat} onClick={() => { if (confirmClear()) useStore.getState().clearChat() }}><SquarePen size={15} strokeWidth={1.5} /></IconButton>
+          {!full && <IconButton size="sm" className="max-md:hidden" label="Hide the agent ( ] )" onClick={() => useStore.getState().togglePanel('copilot')}><PanelRightClose size={15} strokeWidth={1.5} /></IconButton>}
+        </span>
+      </header>
+      <Thread full={full} />
+    </aside>
+  )
+}
+
+function Thread({ full = false }: { full?: boolean }) {
+  const msgs = useStore((s) => s.msgs); const busy = useStore((s) => s.busy)
+  const real = msgs.filter((m) => m.id !== 0)
+  const scroller = useRef<HTMLDivElement>(null); const pinned = useRef(true)
+  // Follow the conversation when you just asked something, or when you were already at the bottom.
+  // An event while you're reading further up doesn't yank the page; the toast and positions panel tell you instead.
+  useEffect(() => {
+    const el = scroller.current; const last = real[real.length - 1]; if (!el || !last) return
+    const userTurn = last.role === 'user' || real[real.length - 2]?.role === 'user'
+    if (!userTurn && !pinned.current) return
+    const go = () => el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    // Again once cards have laid out their charts, which grow the thread after the first frame.
+    requestAnimationFrame(go); const t = setTimeout(go, 120), t2 = setTimeout(go, 600); return () => { clearTimeout(t); clearTimeout(t2) }
+  }, [real.length, busy]) // eslint-disable-line react-hooks/exhaustive-deps
+  const lastAi = [...real].reverse().find((m) => m.role === 'ai')
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Conversation">
+      <div ref={scroller} onScroll={(e) => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120 }} className="scroll-thin min-h-0 flex-1 overflow-auto">
+        <div className="@container mx-auto w-full max-w-[800px] px-3.5 pb-6 pt-5">
+          {real.length === 0 ? <Hero /> : <div className="space-y-7">{real.map((m, i) => <Fragment key={m.id}>
+              <MsgView m={m} />
+              {m.restored && !real[i + 1]?.restored && <SessionDivider ts={m.ts} />}
+            </Fragment>)}
+            {busy && <div className="flex gap-3"><AgentAvatar /><TypingIndicator /></div>}</div>}
+        </div>
+      </div>
+      <ChatComposer full={full} chips={lastAi?.follow && lastAi.follow.length > 0 && !busy
+        ? <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Suggested next">{lastAi.follow.map((f) => <button key={f} type="button" onClick={() => say(f)} className="group inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface pl-2.5 pr-3 text-[12px] text-fg-muted transition-colors hover:border-line-strong hover:bg-hover hover:text-fg active:translate-y-px"><CornerDownRight size={12} strokeWidth={1.75} className="text-fg-subtle group-hover:text-fg-muted" />{f}</button>)}</div>
+        : null} />
+    </div>
+  )
+}
+
+/** Marks where the saved conversation ends and this visit begins. */
+function SessionDivider({ ts }: { ts?: number }) {
+  return (
+    <div role="separator" className="flex items-center gap-3 text-[11px] text-fg-subtle">
+      <span className="h-px flex-1 bg-line" />
+      <span className="text-center">You left off here{ts ? ` · ${new Date(ts).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}` : ''} · positions and orders carried over</span>
+      <span className="h-px flex-1 bg-line" />
+    </div>
+  )
+}
+
+const AgentAvatar = ({ tone }: { tone?: Msg['event'] }) => {
+  if (!tone) return <span className="mt-0.5 inline-flex size-7 max-sm:hidden shrink-0 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
+  const I = tone === 'good' ? CircleCheck : tone === 'bad' ? CircleAlert : tone === 'attention' ? CircleAlert : Bell
+  return <span className={cn('mt-0.5 inline-flex size-7 shrink-0 max-sm:size-6 items-center justify-center rounded-full', tone === 'good' ? 'bg-success-soft text-success-fg' : tone === 'bad' ? 'bg-danger-soft text-danger-fg' : tone === 'attention' ? 'bg-attention-soft text-attention-fg' : 'bg-sunken text-fg-muted')}><I size={15} strokeWidth={1.5} /></span>
+}
+const EVENT_LABEL: Record<NonNullable<Msg['event']>, string> = { info: 'Update', good: 'Done', bad: 'Loss taken', attention: 'Needs your attention' }
+
+function MsgView({ m }: { m: Msg }) {
+  if (m.role === 'user') return <div className="flex justify-end animate-rise"><div className="max-w-[80%] rounded-3xl rounded-br-lg bg-sunken px-4 py-2.5 text-[14px] leading-relaxed text-fg">{m.text}</div></div>
+  return (
+    <div id={`msg-${m.id}`} data-pending={m.state === 'pending' || undefined} className="flex gap-3 animate-rise">
+      <AgentAvatar tone={m.event} />
+      <div className="min-w-0 flex-1 space-y-3">
+        {m.event && <p className="text-[11px] text-fg-subtle">{EVENT_LABEL[m.event]} · {fmtIST((m.ts ?? Date.now()) / 1000, { hour: '2-digit', minute: '2-digit', hour12: false })} · I noticed this for you</p>}
+        {m.text && <div className="text-[14px] leading-6 text-fg [&_p]:my-0"><Markdown>{m.text}</Markdown></div>}
+        {m.cards?.map((c, i) => <CardView key={i} c={c} />)}
+        {m.pending && <DraftCard msgId={m.id} />}
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ first screen */
+
+const STARTERS: { group: string; items: string[] }[] = [
+  { group: 'Start the day', items: ['brief me', 'show my positions'] },
+  { group: 'Find trades', items: ['stocks near 52 week high with volume 2x', 'banks above 200 ema with rsi over 60'] },
+  { group: 'Trade', items: ['buy 50 sbi with sl 850 target 900', 'buy 1 lot nifty atm ce'] },
+  { group: 'Options', items: ['mildly bullish on nifty, max loss 5000', 'nifty option chain'] },
+]
+
+function Hero() {
+  const h = +fmtIST(Date.now() / 1000, { hour: 'numeric', hour12: false })
+  return (
+    <div className="pt-4 @2xl:pt-[6vh]">
+      <span className="inline-flex size-9 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={22} /></span>
+      <h1 className="mt-3 text-[22px] font-semibold leading-tight tracking-[-0.02em] @2xl:mt-5 @2xl:text-[34px]">{h < 12 ? 'Good morning.' : h < 17 ? 'Good afternoon.' : 'Good evening.'} What are we trading?</h1>
+      <p className="mt-2 max-w-xl text-[13px] leading-5 text-fg-muted @2xl:text-[15px] @2xl:leading-6">Say it in plain words. I pull up the data, draft the order with a stop, and nothing reaches the market until you approve it. I'll also tell you when a stop, target or alert is hit.</p>
+      <div className="mt-5 grid gap-4 @2xl:mt-7 @2xl:grid-cols-2 @2xl:gap-3">
+        {STARTERS.map((g) => <div key={g.group} className="@2xl:rounded-2xl @2xl:border @2xl:border-line @2xl:bg-surface @2xl:p-3">
+          <p className="px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-fg-subtle">{g.group}</p>
+          <ul className="mt-1">{g.items.map((it) => <li key={it}><button type="button" onClick={() => say(it)} className="w-full rounded-lg px-2 py-1.5 text-left text-[13px] text-fg hover:bg-hover">{it}</button></li>)}</ul>
+        </div>)}
+      </div>
+      <p className="mt-5 text-[12px] text-fg-subtle">Type <KeyHint>@</KeyHint> for a symbol, <KeyHint>/</KeyHint> for commands. Paper trading on simulated prices. Not investment advice.</p>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ composer with @symbol and /command */
+
+const COMMANDS: { cmd: string; text: string; desc: string }[] = [
+  { cmd: 'buy', text: 'buy ', desc: 'Draft a buy: “buy 50 sbi with sl 850 target 900”' },
+  { cmd: 'sell', text: 'sell ', desc: 'Draft a sell or short' },
+  { cmd: 'options', text: 'nifty option chain', desc: 'Option chain; tap a price to trade' },
+  { cmd: 'strategy', text: 'mildly bullish on nifty, max loss 5000', desc: 'Strategies that fit a view and a max loss' },
+  { cmd: 'scan', text: 'stocks ', desc: 'Screen in words: “above 200 ema with rsi over 60 in pharma”' },
+  { cmd: 'alert', text: 'alert me if ', desc: 'Price alert or GTT: “buy 10 tcs if it crosses 4200”' },
+  { cmd: 'positions', text: 'show my positions', desc: 'Live positions with exit controls' },
+  { cmd: 'brief', text: 'brief me', desc: 'Market and your book in one look' },
+  { cmd: 'review', text: 'review my trades', desc: 'What your last 30 days say' },
+  { cmd: 'limits', text: 'set max loss 5000', desc: 'Daily loss limit, trades per day' },
+  { cmd: 'exit', text: 'square off all', desc: 'Close everything (asks first)' },
+]
+
+/** focus: the @ list opened from the Focus chip, where picking switches the focus symbol instead of typing it. */
+type Menu = { kind: '@' | '/'; q: string; start: number; sel: number; focus?: boolean } | null
+
+function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boolean }) {
+  const tool = 'inline-flex size-8 shrink-0 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-hover hover:text-fg active:translate-y-px'
+  const [text, setText] = useState(''); const [menu, setMenu] = useState<Menu>(null); const [listening, setListening] = useState(false)
+  const ta = useRef<HTMLTextAreaElement>(null)
+  const busy = useStore((s) => s.busy); const sym = useStore((s) => s.sym); const prices = useStore((s) => s.prices)
+  useEffect(() => { const el = ta.current; if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 180) + 'px' } }, [text])
+  const items = useMemo(() => {
+    if (!menu) return []
+    const q = menu.q.toLowerCase()
+    if (menu.kind === '/') return COMMANDS.filter((c) => c.cmd.startsWith(q)).map((c) => ({ id: c.cmd, label: `/${c.cmd}`, hint: c.desc, apply: c.text, sym: '' }))
+    return INSTS.filter((i) => !q || i.sym.toLowerCase().startsWith(q) || i.name.toLowerCase().includes(q)).slice(0, menu.focus ? 12 : 7).map((i) => ({ id: i.sym, label: i.sym, hint: i.name, apply: i.sym + ' ', sym: i.sym }))
+  }, [menu])
+  const detect = (v: string, caret: number) => {
+    const before = v.slice(0, caret)
+    const at = /(^|\s)@(\w*)$/.exec(before); if (at) return setMenu({ kind: '@', q: at[2], start: caret - at[2].length - 1, sel: 0 })
+    const sl = /^\/(\w*)$/.exec(before); if (sl) return setMenu({ kind: '/', q: sl[1], start: 0, sel: 0 })
+    setMenu(null)
+  }
+  const pick = (i: number) => {
+    const it = items[i]; if (!it || !menu) return
+    if (menu.focus) { useStore.getState().setSym(it.sym); setMenu(null); ta.current?.focus(); return }
+    const caret = ta.current?.selectionStart ?? text.length
+    const next = menu.kind === '/' ? it.apply : text.slice(0, menu.start) + it.apply + text.slice(caret)
+    setText(next); setMenu(null)
+    requestAnimationFrame(() => { const el = ta.current; if (el) { el.focus(); const p = menu.kind === '/' ? next.length : menu.start + it.apply.length; el.setSelectionRange(p, p) } })
+  }
+  const send = (raw = text) => {
+    let t = raw.trim(); if (!t || busy) return
+    // Resolve "ATM" to a concrete strike before parsing.
+    t = t.replace(/\batm\b/i, () => { const s = /bank/i.test(t) ? 'BANKNIFTY' : /sensex/i.test(t) ? 'SENSEX' : /nifty/i.test(t) ? 'NIFTY' : sym; const i = bySym(s); return i && i.fno ? String(Math.round(prices[s].ltp / i.step) * i.step) : 'atm' })
+    setText(''); setMenu(null); void ask(t)
+  }
+  const voice = () => {
+    type SR = { lang: string; start: () => void; onresult: (e: { results: { 0: { transcript: string } }[] }) => void; onend: () => void }
+    const W = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR }
+    const C = W.SpeechRecognition ?? W.webkitSpeechRecognition
+    if (!C) return useStore.getState().setToast('Voice input is not supported in this browser')
+    const r = new C(); r.lang = 'en-IN'; r.onresult = (e) => send(e.results[0][0].transcript); r.onend = () => setListening(false); setListening(true); r.start()
+  }
+  const q = prices[sym]
+  return (
+    <>
+      <div className="relative mx-auto w-full max-w-[800px] px-3 pb-3">
+        {/* Cards scroll away under a short fade instead of being cut off at a hard edge. */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-full h-6 bg-gradient-to-t from-bg to-transparent" />
+        {chips}
+        <div className="relative">
+          {menu && items.length > 0 && <ul role="listbox" aria-label={menu.focus ? 'Change focus' : menu.kind === '@' ? 'Symbols' : 'Commands'} className="absolute bottom-full left-0 z-30 mb-2 max-h-80 w-full max-w-md overflow-auto rounded-2xl border border-line bg-raised p-1.5 shadow-lg animate-rise">
+            {menu.focus && <li role="presentation" className="px-3 pb-1 pt-1.5 text-[11px] text-fg-subtle">Switch focus. “it” and “buy 10” will mean this symbol</li>}
+            {items.map((it, i) => { const p = it.sym ? prices[it.sym] : undefined; return (
+              <li key={it.id} role="option" aria-selected={i === menu.sel}>
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); pick(i) }} onMouseEnter={() => setMenu({ ...menu, sel: i })} className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px]', i === menu.sel && 'bg-sunken')}>
+                  <span className="num w-24 shrink-0 font-medium text-fg">{it.label}</span><span className="min-w-0 flex-1 truncate text-fg-muted">{it.hint}</span>
+                  {p && <><span className="num text-fg">{p.ltp.toFixed(2)}</span><Chg v={pct(p.ltp, p.prev)} className="w-16 text-right text-[11px]" /></>}
+                  {menu.focus && <Check size={14} strokeWidth={2} aria-label={it.sym === sym ? 'Current focus' : undefined} className={cn('shrink-0 text-fg', it.sym !== sym && 'invisible')} />}
+                </button></li>) })}
+          </ul>}
+          {/* One unit, the way AI composers work: what you type on top, and everything that acts on it in the box's
+              own bottom row. Context on the left (the focus symbol, commands), input and send on the right. */}
+          <div className="rounded-2xl border border-line bg-surface p-1.5 shadow-sm transition-colors focus-within:border-line-strong">
+            <textarea id="chat-input" ref={ta} rows={1} value={text} aria-label="Message the trading agent" placeholder={matchMedia('(max-width: 640px)').matches ? 'Trade, scan or ask' : 'Trade, scan or ask. @ for a symbol, / for commands'}
+                onChange={(e) => { setText(e.target.value); if (!menu?.focus) detect(e.target.value, e.target.selectionStart) }}
+                onKeyDown={(e) => {
+                  if (menu && items.length) {
+                    if (e.key === 'ArrowDown') { e.preventDefault(); return setMenu({ ...menu, sel: (menu.sel + 1) % items.length }) }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); return setMenu({ ...menu, sel: (menu.sel - 1 + items.length) % items.length }) }
+                    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); return pick(menu.sel) }
+                    if (e.key === 'Escape') { e.preventDefault(); return setMenu(null) }
+                  }
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+                }}
+                onBlur={() => { if (menu?.focus) setMenu(null) }}
+                className="block max-h-[180px] min-h-8 w-full resize-none bg-transparent px-2 py-1 text-[14px] leading-6 outline-none placeholder:text-fg-subtle" />
+            <div className="mt-1 flex items-center gap-1">
+              <button type="button" aria-label={`Focus: ${sym}. Change`} aria-haspopup="listbox" aria-expanded={!!menu?.focus} onMouseDown={(e) => e.preventDefault()} title="The symbol “it” refers to. Click to switch"
+                onClick={() => { setMenu(menu?.focus ? null : { kind: '@', q: '', start: 0, sel: Math.max(0, INSTS.slice(0, 12).findIndex((i) => i.sym === sym)), focus: true }); ta.current?.focus() }}
+                className={cn('inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full bg-sunken pl-2.5 pr-2 text-[12px] transition-colors hover:bg-hover active:translate-y-px', menu?.focus && 'bg-hover')}>
+                <Crosshair size={13} strokeWidth={1.75} className="shrink-0 text-fg-muted" />
+                <span className="truncate font-medium text-fg">{sym}</span><span className="num text-fg-muted max-[420px]:hidden">{q.ltp.toFixed(2)}</span>
+                <ChevronDown size={13} strokeWidth={1.75} className={cn('shrink-0 text-fg-muted transition-transform', menu?.focus && 'rotate-180')} /></button>
+              <button type="button" aria-label="Commands" title="Commands ( / )" onClick={() => { setText('/'); setMenu({ kind: '/', q: '', start: 0, sel: 0 }); ta.current?.focus() }} className={tool}>
+                <SquareSlash size={16} strokeWidth={1.5} /></button>
+              <span className="flex-1" />
+              <button type="button" aria-label={listening ? 'Listening' : 'Speak'} aria-pressed={listening} title={listening ? 'Listening…' : 'Speak'} onClick={voice}
+                className={cn(tool, listening && 'bg-accent text-on-accent hover:bg-accent hover:text-on-accent animate-pulse')}><Mic size={16} strokeWidth={1.5} /></button>
+              <button type="button" aria-label={busy ? 'Working' : 'Send'} disabled={!text.trim() && !busy} onClick={() => send()} className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-fg text-bg transition-opacity disabled:opacity-30">
+                {busy ? <Square size={12} fill="currentColor" strokeWidth={0} /> : <ArrowUp size={16} strokeWidth={2} />}</button>
+            </div>
+          </div>
+        </div>
+        {full && <p className="mt-2 text-center text-[11px] text-fg-subtle">Paper trading on simulated prices · not investment advice</p>}
+      </div>
+      {/* In Terminal the panel ends in a 49px bar with its top rule, level with the folded positions bar beside it. */}
+      {!full && <div className="flex h-[49px] shrink-0 items-center justify-center border-t border-line bg-surface px-3 text-[11px] text-fg-subtle">Paper trading on simulated prices · not investment advice</div>}
+    </>
+  )
+}
