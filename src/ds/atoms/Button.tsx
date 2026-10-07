@@ -29,7 +29,7 @@ export function Button({ variant = "primary", size = "md", leading, trailing, cl
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center rounded-full font-medium whitespace-nowrap select-none cursor-pointer",
+        "inline-flex items-center justify-center rounded-md font-medium whitespace-nowrap select-none cursor-pointer",
         "transition-colors duration-[var(--dur-fast)] disabled:opacity-50 disabled:pointer-events-none",
         variants[variant], sizes[size], className,
       )}
@@ -57,7 +57,7 @@ export function IconButton({ label, variant = "ghost", size = "md", active, clas
       title={label}
       aria-pressed={active}
       className={cn(
-        "inline-flex items-center justify-center rounded-full cursor-pointer transition-colors duration-[var(--dur-fast)] disabled:pointer-events-none",
+        "inline-flex items-center justify-center rounded-md cursor-pointer transition-colors duration-[var(--dur-fast)] disabled:pointer-events-none",
         variant !== "lime" && "disabled:opacity-50",
         size === "sm" ? "size-7" : "size-9", v, active && "bg-accent-soft text-accent-fg", className,
       )}

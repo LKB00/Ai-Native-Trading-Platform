@@ -42,8 +42,8 @@ export default function Strategy() {
   const upd = (i: number, p: Partial<Leg>) => setLegs(legs.map((l, j) => (i === j ? { ...l, ...p } : l)), stratName)
   const maxProfitUnl = (unbounded(exp[N], 1) && far[1] > exp[N]) || (unbounded(exp[0], 0) && far[0] > exp[0])
   const maxLossUnl = (unbounded(exp[N], 1) && far[1] < exp[N]) || (unbounded(exp[0], 0) && far[0] < exp[0])
-  const sel = 'h-8 rounded-full border border-line bg-surface px-3 text-[12px] outline-none focus:border-fg-subtle'
-  const pill = (on: boolean, tone: 'up' | 'down' | 'neutral') => `h-7 min-w-12 rounded-full px-2.5 text-[11px] font-bold ${tone === 'up' ? 'bg-success-soft text-success-fg' : tone === 'down' ? 'bg-danger-soft text-danger-fg' : 'border border-line bg-surface'} ${on ? '' : ''}`
+  const sel = 'h-8 rounded-md border border-line bg-surface px-3 text-[12px] outline-none focus:border-fg-subtle'
+  const pill = (on: boolean, tone: 'up' | 'down' | 'neutral') => `h-7 min-w-12 rounded-md px-2.5 text-[11px] font-bold ${tone === 'up' ? 'bg-success-soft text-success-fg' : tone === 'down' ? 'bg-danger-soft text-danger-fg' : 'border border-line bg-surface'} ${on ? '' : ''}`
 
   return (
     <div className="space-y-4 p-4">
@@ -54,7 +54,7 @@ export default function Strategy() {
           <option value="">Start from a template…</option>{Object.keys(STRATEGIES).map((k) => <option key={k} value={k}>{k[0].toUpperCase() + k.slice(1)}</option>)}</select>
         <Button size="sm" variant="secondary" leading={<PlusIcon width={14} height={14} />} onClick={() => setLegs([...legs, { side: 'BUY', type: 'CE', strike: atm, lots: 1 }], stratName || 'custom')}>Add leg</Button>
         {legs.length > 0 && <Button size="sm" variant="ghost" onClick={() => setLegs([])}>Clear all legs</Button>}
-        {stratName && legs.length > 0 && <h2 className="ml-auto text-lg capitalize">{stratName}</h2>}
+        {stratName && legs.length > 0 && <h2 className="ml-auto text-[13px] font-semibold capitalize text-fg">{stratName}</h2>}
       </div>
       {!legs.length ? <EmptyState compact title="No legs yet" action={<Button size="sm" onClick={() => setLegs(STRATEGIES['iron condor'].build(atm, inst.step, 1), 'iron condor')}>Try an iron condor</Button>}>
           Pick a template, hover a price in the option chain, or ask the copilot: “bull call spread on nifty 2 lots”.</EmptyState> : <>
@@ -70,7 +70,7 @@ export default function Strategy() {
                   <IconButton size="sm" variant="secondary" label={`Lower leg ${i + 1} strike`} onClick={() => upd(i, { strike: l.strike - inst.step })}>−</IconButton>
                   <span className="w-14 text-center">{l.strike}</span>
                   <IconButton size="sm" variant="secondary" label={`Raise leg ${i + 1} strike`} onClick={() => upd(i, { strike: l.strike + inst.step })}>+</IconButton></span></td>
-                <td><input type="number" min={1} aria-label={`Leg ${i + 1} lots`} value={l.lots} onChange={(e) => upd(i, { lots: Math.max(1, +e.target.value) })} className="num h-7 w-16 rounded-full border border-line bg-surface px-3 text-right" /></td>
+                <td><input type="number" min={1} aria-label={`Leg ${i + 1} lots`} value={l.lots} onChange={(e) => upd(i, { lots: Math.max(1, +e.target.value) })} className="num h-7 w-16 rounded-md border border-line bg-surface px-3 text-right" /></td>
                 <td>{k.price.toFixed(2)}</td><td>{k.iv.toFixed(1)}</td><td>{k.delta.toFixed(2)}</td>
                 <td><IconButton size="sm" label={`Remove leg ${i + 1}`} onClick={() => setLegs(legs.filter((_, j) => j !== i), stratName)}><XIcon width={12} height={12} /></IconButton></td>
               </tr>) })}</tbody>
@@ -92,7 +92,7 @@ export default function Strategy() {
         </Section>
         <Section id="strategy.payoff" title="Payoff" bodyClassName="space-y-3"
           summary={be.length ? `Breakeven ${be.map((b) => b.toFixed(0)).join(' / ')}` : 'No breakeven in range'}>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl bg-sunken px-4 py-3 text-[12px]">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[10px] bg-sunken px-4 py-3 text-[12px]">
           <span className="font-bold">What if</span>
           <label className="flex items-center gap-2">Days passed <input type="range" min={0} max={daysLeft} value={Math.min(days, daysLeft)} onChange={(e) => setDays(+e.target.value)} className="w-32 accent-[var(--fg)]" /><span className="num w-16">{Math.min(days, daysLeft)} of {daysLeft}</span></label>
           <label className="flex items-center gap-2">IV change <input type="range" min={-10} max={10} value={ivShift} onChange={(e) => setIvShift(+e.target.value)} className="w-32 accent-[var(--fg)]" /><span className="num w-14">{ivShift >= 0 ? '+' : '−'}{Math.abs(ivShift)} pts</span></label>

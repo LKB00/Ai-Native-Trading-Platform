@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../ds'
 import { useStore } from '../store'
 import { INSTS, bySym, history, barStart, simNow, marketOpenNow, fmtIST } from '../market'
-import { Dir } from '../ui'
 
 /** 'up' or 'down' for a moment after the value changes, so a tick is visible without reading digits. */
 export function useFlash(v: number): 'up' | 'down' | null {
@@ -16,10 +15,13 @@ export function useFlash(v: number): 'up' | 'down' | null {
   return f
 }
 
-/** A price that briefly tints green or red when it ticks. */
+/**
+ * A price whose digits briefly turn green or red when it ticks. Only the text changes colour: filled flashes on every
+ * tick of every row turn a calm list into a strobe.
+ */
 export function FlashPrice({ v, className, digits = 2 }: { v: number; className?: string; digits?: number }) {
   const f = useFlash(+v.toFixed(digits))
-  return <span className={cn('num rounded px-1 transition-colors duration-500', f === 'up' ? 'bg-success-soft text-success-fg duration-0' : f === 'down' ? 'bg-danger-soft text-danger-fg duration-0' : '', className)}>
+  return <span className={cn('num transition-colors duration-700', f === 'up' ? 'text-up duration-0' : f === 'down' ? 'text-down duration-0' : '', className)}>
     {v.toLocaleString('en-IN', { minimumFractionDigits: digits, maximumFractionDigits: digits })}</span>
 }
 
@@ -60,30 +62,33 @@ export function MarketClock() {
   )
 }
 
-function TapeItem({ sym }: { sym: string }) {
-  const q = useStore((s) => s.prices[sym]); const setSym = useStore((s) => s.setSym)
+/** One index in the market strip: name, price, change. Click to chart it. */
+function StripItem({ sym, label }: { sym: string; label?: string }) {
+  const q = useStore((s) => s.prices[sym]); const setSym = useStore((s) => s.setSym); const cur = useStore((s) => s.sym === sym)
   const chg = (q.ltp / q.prev - 1) * 100; const up = chg >= 0
   return (
-    <button type="button" onClick={() => { setSym(sym); useStore.getState().setView('chart') }} className="flex shrink-0 items-baseline gap-1.5 px-3 text-[12px] hover:text-fg">
-      <span className="font-semibold text-fg">{sym}</span><FlashPrice v={q.ltp} className="text-fg" />
-      <span className={cn('num', up ? 'text-up' : 'text-down')}><Dir up={up} /> {up ? '+' : '−'}{Math.abs(chg).toFixed(2)}%</span>
+    <button type="button" onClick={() => { setSym(sym); useStore.getState().setView('chart') }} aria-current={cur || undefined}
+      className={cn('flex h-full shrink-0 items-center gap-2 border-r border-line px-3 text-[12px] transition-colors hover:bg-hover', cur && 'bg-sunken')}>
+      <span className="font-medium text-fg-muted">{label ?? sym}</span><FlashPrice v={q.ltp} className="text-fg" />
+      <span className={cn('num', up ? 'text-up' : 'text-down')}>{up ? '+' : '−'}{Math.abs(chg).toFixed(2)}%</span>
     </button>
   )
 }
 
-/** The moving tape under the top bar: indices, your watchlist and the day's biggest movers. Pauses on hover. */
+/**
+ * The market strip under the top bar: session state, the four indices in fixed places, and breadth. It used to be a
+ * scrolling tape; a strip that holds still can be read at a glance, and only the numbers move.
+ */
 export function TickerTape() {
-  const watch = useStore((s) => s.watch); const prices = useStore((s) => s.prices)
-  const movers = useMemo(() => INSTS.filter((i) => i.seg === 'EQ' && !watch.includes(i.sym)).map((i) => ({ s: i.sym, c: Math.abs(prices[i.sym].ltp / prices[i.sym].prev - 1) })).sort((a, b) => b.c - a.c).slice(0, 6).map((x) => x.s),
-    [Math.floor(Date.now() / 30000), watch.join()]) // eslint-disable-line react-hooks/exhaustive-deps
-  const syms = [...new Set(['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', ...watch, ...movers])]
+  const prices = useStore((s) => s.prices)
+  const eq = INSTS.filter((i) => i.seg === 'EQ'); const adv = eq.filter((i) => prices[i.sym].ltp >= prices[i.sym].prev).length
   return (
-    <div className="col-span-full flex h-[30px] min-w-0 items-center border-b border-line bg-surface" aria-label="Market ticker">
+    <div className="col-span-full flex h-[30px] min-w-0 items-center overflow-hidden border-b border-line bg-surface" aria-label="Market">
       <div className="flex h-full shrink-0 items-center border-r border-line px-3"><MarketClock /></div>
-      <div className="group relative min-w-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_24px,black_calc(100%-24px),transparent)]">
-        <div className="flex w-max animate-[tape_90s_linear_infinite] group-hover:[animation-play-state:paused] motion-reduce:animate-none">
-          {[0, 1].map((k) => <div key={k} className="flex" aria-hidden={k === 1 || undefined}>{syms.map((s) => <TapeItem key={s + k} sym={s} />)}</div>)}
-        </div>
+      {['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY'].map((s) => <StripItem key={s} sym={s} />)}
+      <div className="ml-auto flex h-full shrink-0 items-center gap-2 border-l border-line px-3 text-[12px] max-xl:hidden" title={`${adv} of ${eq.length} stocks are up today`}>
+        <span className="text-fg-muted">Breadth</span>
+        <span className="num text-up">{adv}</span><span className="relative h-1 w-14 overflow-hidden rounded-full bg-danger/70" aria-hidden><span className="absolute inset-y-0 left-0 bg-success" style={{ width: `${adv / eq.length * 100}%` }} /></span><span className="num text-down">{eq.length - adv}</span>
       </div>
     </div>
   )

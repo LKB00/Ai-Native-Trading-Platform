@@ -10,7 +10,7 @@ import { XIcon } from './ds/lib/icons'
    the StatTile row above them is never folded. */
 const DAY = 86400000
 const STCG = 0.2, LTCG = 0.125, LTCG_EXEMPT = 125000
-const field = 'h-8 rounded-full border border-line bg-surface px-3 text-[12px] num outline-none focus:border-fg-subtle'
+const field = 'h-8 rounded-md border border-line bg-surface px-3 text-[12px] num outline-none focus:border-fg-subtle'
 const sign = (n: number) => (n > 0 ? '+' : '') + inr(n)
 const dir = (n: number) => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat') as 'up' | 'down' | 'flat'
 
@@ -117,7 +117,7 @@ export default function Portfolio() {
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <Section id="portfolio.allocation" title="Allocation by sector" bodyClassName="space-y-3"
             summary={t.alloc[0] ? `Top: ${t.alloc[0].k} ${((t.alloc[0].v / (t.value || 1)) * 100).toFixed(0)}%` : undefined}>
-            <div role="img" aria-label={`Sector allocation: ${t.alloc.map((a) => `${a.k} ${((a.v / (t.value || 1)) * 100).toFixed(0)}%`).join(', ')}`} className="flex h-4 overflow-hidden rounded-full bg-sunken">
+            <div role="img" aria-label={`Sector allocation: ${t.alloc.map((a) => `${a.k} ${((a.v / (t.value || 1)) * 100).toFixed(0)}%`).join(', ')}`} className="flex h-4 overflow-hidden rounded-md bg-sunken">
               {t.alloc.map((a) => <div key={a.k} className="h-full border-r-2 border-surface last:border-r-0" style={{ width: `${(a.v / (t.value || 1)) * 100}%`, background: a.color }} />)}
             </div>
             <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">

@@ -439,7 +439,7 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
           </div>
           {cfg.inds.filter((ins) => indDef(ins.type)?.overlay).map((ins) => <IndRow key={ins.id} ins={ins} values={[0, 1, 2].map((i) => legendFor(ins.id, i)).filter((x) => x !== undefined).map((v) => fmtV(v, !!indDef(ins.type)?.ownScale || ins.type === 'obv'))} editing={editInd === ins.id} setEditing={(v) => setEditInd(v ? ins.id : null)} />)}
           {toolHint && active && <Badge tone="info">{toolHint} · Esc to cancel</Badge>}
-          {interval && <span className="pointer-events-auto inline-flex items-center gap-2 rounded-xl border border-line bg-raised px-3 py-2 text-[13px] shadow-md"><b className="num">{interval}</b><span className="text-fg-subtle">Enter to change interval</span></span>}
+          {interval && <span className="pointer-events-auto inline-flex items-center gap-2 rounded-lg border border-line bg-raised px-3 py-2 text-[13px] shadow-md"><b className="num">{interval}</b><span className="text-fg-subtle">Enter to change interval</span></span>}
         </div>
         {/* Legends for indicator panes */}
         {paneTops.map((pt) => { const ins = cfg.inds.find((x) => x.id === pt.id); if (!ins) return null; return (
@@ -451,11 +451,11 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
         {specs.filter((sp) => sp.kind !== 'pivot' && !sp.kind.startsWith('g-') && (!multi || sp.kind !== 'ai')).map((sp) => {
           const y = yFor(dragRef.current?.spec.id === sp.id ? dragRef.current.price : sp.price); if (y == null || y < 4) return null
           return (
-            <div key={sp.id} data-overlay className="absolute right-[70px] z-10 flex -translate-y-1/2 items-center gap-1 rounded-full border bg-surface py-0.5 pl-2.5 pr-1 text-[11px] shadow-sm" style={{ top: y, borderColor: sp.color }}>
+            <div key={sp.id} data-overlay className="absolute right-[70px] z-10 flex -translate-y-1/2 items-center gap-1 rounded-md border bg-surface py-0.5 pl-2.5 pr-1 text-[11px]" style={{ top: y, borderColor: sp.color }}>
               {sp.kind === 'ai' && <AIMark size={16} />}
               <span className="num whitespace-nowrap" style={{ color: sp.kind === 'position' ? undefined : sp.color }}>{sp.label}</span>
-              {sp.kind === 'position' && !s.brackets[key]?.sl && !multi && <button className="rounded-full px-1.5 text-fg-muted hover:bg-hover" onClick={() => { const a = atr(d).at(-1)! * 1.5; s.setBracket(key, { sl: +(pos!.avg - Math.sign(pos!.qty) * a).toFixed(2), tgt: +(pos!.avg + Math.sign(pos!.qty) * 2 * a).toFixed(2) }) }}>Add stop and target</button>}
-              {sp.kind === 'sl' && !multi && <button className="rounded-full px-1.5 text-fg-muted hover:bg-hover" onClick={() => s.setBracket(key, { trail: Math.abs(ltp - sp.price), peak: ltp })}>{s.brackets[key]?.trail ? 'Trailing' : 'Trail'}</button>}
+              {sp.kind === 'position' && !s.brackets[key]?.sl && !multi && <button className="rounded-md px-1.5 text-fg-muted hover:bg-hover" onClick={() => { const a = atr(d).at(-1)! * 1.5; s.setBracket(key, { sl: +(pos!.avg - Math.sign(pos!.qty) * a).toFixed(2), tgt: +(pos!.avg + Math.sign(pos!.qty) * 2 * a).toFixed(2) }) }}>Add stop and target</button>}
+              {sp.kind === 'sl' && !multi && <button className="rounded-md px-1.5 text-fg-muted hover:bg-hover" onClick={() => s.setBracket(key, { trail: Math.abs(ltp - sp.price), peak: ltp })}>{s.brackets[key]?.trail ? 'Trailing' : 'Trail'}</button>}
               {removeLabel[sp.kind] && <IconButton size="sm" label={removeLabel[sp.kind]!} onClick={() => removeLine(sp)}><XIcon width={10} height={10} /></IconButton>}
             </div>)
         })}
@@ -468,11 +468,11 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
         {/* "+" on the price axis: trade at that price */}
         {hover && !ticket && !draft && !isDrawTool(tool) && tool !== 'hline' && tool !== 'alert' && tradable && active && (
           <button data-overlay onClick={() => openTicket(hover.price <= ltp ? 'BUY' : 'SELL', hover.price)} aria-label={`Place an order at ${hover.price.toFixed(2)}`}
-            className="absolute right-[56px] z-20 flex size-5 -translate-y-1/2 items-center justify-center rounded-full bg-accent text-on-accent shadow-sm" style={{ top: hover.y }}>
+            className="absolute right-[56px] z-20 flex size-5 -translate-y-1/2 items-center justify-center rounded-md bg-accent text-on-accent" style={{ top: hover.y }}>
             <PlusIcon width={12} height={12} /></button>)}
 
         {/* Right-click menu */}
-        {menu && <div data-overlay role="menu" aria-label="Chart actions" className="absolute z-40 w-64 overflow-hidden rounded-2xl border border-line bg-raised p-1.5 text-[13px] shadow-lg animate-rise" style={{ left: Math.min(menu.x, (wrap.current?.clientWidth ?? 400) - 270), top: Math.min(menu.y, (wrap.current?.clientHeight ?? 400) - 280) }}>
+        {menu && <div data-overlay role="menu" aria-label="Chart actions" className="absolute z-40 w-64 overflow-hidden rounded-[10px] border border-line bg-raised p-1.5 text-[13px] shadow-lg animate-rise" style={{ left: Math.min(menu.x, (wrap.current?.clientWidth ?? 400) - 270), top: Math.min(menu.y, (wrap.current?.clientHeight ?? 400) - 280) }}>
           {[
             ...(tradable ? [{ label: `Buy ${menu.price < ltp ? 'limit' : 'stop'} at ${menu.price.toFixed(2)}`, run: () => openTicket('BUY', menu.price) }, { label: `Sell ${menu.price > ltp ? 'limit' : 'stop'} at ${menu.price.toFixed(2)}`, run: () => openTicket('SELL', menu.price) }] : []),
             ...(!opt ? [{ label: `Add alert at ${menu.price.toFixed(2)}`, run: () => { s.addTrigger({ sym: key, dir: menu.price >= ltp ? 'above' : 'below', price: +menu.price.toFixed(2) }); s.setToast(`Alert set at ₹${menu.price.toFixed(2)}`) } }] : []),
@@ -481,7 +481,7 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
             { label: cfg.hideAll ? 'Show drawings' : 'Hide drawings', run: () => s.setChart({ hideAll: !cfg.hideAll }) },
             { label: 'Remove all drawings', run: () => { s.removeShape(key); s.set({ drawings: { ...s.drawings, [key]: [] } }) } },
             { label: `Copy price ${menu.price.toFixed(2)}`, run: () => navigator.clipboard?.writeText(menu.price.toFixed(2)) },
-          ].map((it) => <button key={it.label} role="menuitem" onClick={() => { it.run(); setMenu(null) }} className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left hover:bg-hover"><span>{it.label}</span>{'hint' in it && it.hint && <span className="text-[11px] text-fg-subtle">{it.hint}</span>}</button>)}
+          ].map((it) => <button key={it.label} role="menuitem" onClick={() => { it.run(); setMenu(null) }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-hover"><span>{it.label}</span>{'hint' in it && it.hint && <span className="text-[11px] text-fg-subtle">{it.hint}</span>}</button>)}
         </div>}
 
         {ticket && <ChartTicket k={key} t={ticket} ltp={ltp} lot={opt ? inst.lot : 1} onChange={setTicket} onClose={() => setTicket(null)} />}
@@ -517,11 +517,11 @@ function IndRow({ ins, values, editing, setEditing }: { ins: IndInstance; values
         <button aria-label={`${def.name} settings`} onClick={() => setEditing(!editing)} className="rounded p-0.5 text-fg-subtle hover:bg-hover hover:text-fg"><SettingsGearIcon width={14} height={14} /></button>
         <button aria-label={`Remove ${def.name}`} onClick={() => st.setChart({ inds: st.chart.inds.filter((x) => x.id !== ins.id) })} className="rounded p-0.5 text-fg-subtle hover:bg-hover hover:text-fg"><XIcon width={11} height={11} /></button>
       </span>
-      {editing && <div role="dialog" aria-label={`${def.name} settings`} className="absolute left-0 top-full z-40 mt-1 w-64 space-y-3 rounded-2xl border border-line bg-raised p-3 text-[12px] shadow-lg">
-        <p className="font-serif text-[15px]">{def.name}</p>
+      {editing && <div role="dialog" aria-label={`${def.name} settings`} className="absolute left-0 top-full z-40 mt-1 w-64 space-y-3 rounded-[10px] border border-line bg-raised p-3 text-[12px] shadow-lg">
+        <p className="font-semibold text-[15px]">{def.name}</p>
         <p className="text-fg-subtle">{def.desc}</p>
-        {def.params.map((p) => <label key={p.key} className="flex items-center justify-between gap-2">{p.label}<input type="number" min={p.min} max={p.max} step={p.step ?? 1} defaultValue={ins.params[p.key] ?? p.def} onBlur={(e) => update({ params: { ...ins.params, [p.key]: +e.target.value } })} className="num h-8 w-20 rounded-full border border-line bg-surface px-3 text-right outline-none focus:border-fg-subtle" /></label>)}
-        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Color">{SWATCHES.map((c) => <button key={c} role="radio" aria-checked={ins.color === c} aria-label={c.replace('--', '')} onClick={() => update({ color: c })} className={cn('size-6 rounded-full border-2', ins.color === c ? 'border-fg' : 'border-transparent')} style={{ background: `var(${c})` }} />)}</div>
+        {def.params.map((p) => <label key={p.key} className="flex items-center justify-between gap-2">{p.label}<input type="number" min={p.min} max={p.max} step={p.step ?? 1} defaultValue={ins.params[p.key] ?? p.def} onBlur={(e) => update({ params: { ...ins.params, [p.key]: +e.target.value } })} className="num h-8 w-20 rounded-md border border-line bg-surface px-3 text-right outline-none focus:border-fg-subtle" /></label>)}
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Color">{SWATCHES.map((c) => <button key={c} role="radio" aria-checked={ins.color === c} aria-label={c.replace('--', '')} onClick={() => update({ color: c })} className={cn('size-6 rounded-md border-2', ins.color === c ? 'border-fg' : 'border-transparent')} style={{ background: `var(${c})` }} />)}</div>
         <div className="flex gap-2"><Button size="sm" onClick={() => setEditing(false)}>Done</Button><Button size="sm" variant="ghost" onClick={() => update({ params: Object.fromEntries(def.params.map((p) => [p.key, p.def])), color: undefined })}>Defaults</Button></div>
       </div>}
     </div>
@@ -531,18 +531,18 @@ function IndRow({ ins, values, editing, setEditing }: { ins: IndInstance; values
 /** Floating toolbar for a selected drawing: color, width, style, extend, text, lock, clone, alert, trade, delete. */
 function DrawingToolbar({ sh, k, onDelete, onTrade, onAlert }: { sh: Drawing; k: string; onDelete: () => void; onTrade?: () => void; onAlert?: () => void }) {
   const st = useStore(); const upd = (p: Partial<Drawing>) => { st.snapshot(k); st.updateShape(k, sh.id, p) }
-  const btn = 'flex h-7 items-center gap-1 rounded-full px-2 text-[12px] text-fg-muted hover:bg-hover hover:text-fg'
+  const btn = 'flex h-7 items-center gap-1 rounded-md px-2 text-[12px] text-fg-muted hover:bg-hover hover:text-fg'
   const color = sh.color ?? DEFAULT_COLOR[sh.kind]
   return (
-    <div data-overlay role="toolbar" aria-label={`${KIND_LABEL[sh.kind]} options`} className="absolute left-1/2 top-2 z-30 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-line bg-raised p-1 shadow-md">
+    <div data-overlay role="toolbar" aria-label={`${KIND_LABEL[sh.kind]} options`} className="absolute left-1/2 top-2 z-30 flex -translate-x-1/2 items-center gap-0.5 rounded-md border border-line bg-raised p-1 shadow-md">
       <span className="px-2 text-[12px] font-bold">{KIND_LABEL[sh.kind]}</span>
-      {sh.kind !== 'long' && sh.kind !== 'short' && sh.kind !== 'measure' && <span className="flex items-center gap-1 px-1" role="radiogroup" aria-label="Color">{SWATCHES.slice(0, 6).map((c) => <button key={c} role="radio" aria-checked={color === c} aria-label={c.replace('--', '')} onClick={() => upd({ color: c })} className={cn('size-4 rounded-full border-2', color === c ? 'border-fg' : 'border-transparent')} style={{ background: `var(${c})` }} />)}</span>}
+      {sh.kind !== 'long' && sh.kind !== 'short' && sh.kind !== 'measure' && <span className="flex items-center gap-1 px-1" role="radiogroup" aria-label="Color">{SWATCHES.slice(0, 6).map((c) => <button key={c} role="radio" aria-checked={color === c} aria-label={c.replace('--', '')} onClick={() => upd({ color: c })} className={cn('size-4 rounded-md border-2', color === c ? 'border-fg' : 'border-transparent')} style={{ background: `var(${c})` }} />)}</span>}
       {!['text', 'long', 'short', 'measure'].includes(sh.kind) && <>
         <button className={btn} aria-label="Line width" onClick={() => upd({ width: (((sh.width ?? 1) % 3) + 1) as 1 | 2 | 3 })}>{sh.width ?? 1}px</button>
         <button className={btn} aria-label="Line style" onClick={() => upd({ dash: (((sh.dash ?? 0) + 1) % 3) as 0 | 1 | 2 })}>{['Solid', 'Dashed', 'Dotted'][sh.dash ?? 0]}</button>
       </>}
       {(sh.kind === 'trend' || sh.kind === 'channel' || sh.kind === 'fib') && <button className={btn} aria-pressed={!!sh.extendRight} onClick={() => upd({ extendRight: !sh.extendRight })}>Extend right</button>}
-      {sh.kind === 'text' && <input aria-label="Text" defaultValue={sh.text} onChange={(e) => st.updateShape(k, sh.id, { text: e.target.value || 'Text' })} className="h-7 w-36 rounded-full border border-line bg-surface px-3 text-[12px] outline-none focus:border-fg-subtle" autoFocus />}
+      {sh.kind === 'text' && <input aria-label="Text" defaultValue={sh.text} onChange={(e) => st.updateShape(k, sh.id, { text: e.target.value || 'Text' })} className="h-7 w-36 rounded-md border border-line bg-surface px-3 text-[12px] outline-none focus:border-fg-subtle" autoFocus />}
       {onTrade && <Button size="sm" variant="primary" onClick={onTrade}>Trade this</Button>}
       {onAlert && <button className={btn} onClick={onAlert} aria-label="Alert at this drawing"><BellIcon width={14} height={14} /></button>}
       <button className={btn} onClick={() => st.addShape(k, { ...sh, t1: sh.t1 + 5 * 60, t2: sh.t2 + 5 * 60 })} aria-label="Clone"><CloneIcon width={14} height={14} /></button>
@@ -563,13 +563,13 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
   const held = gate && opensPosition(k, t.side, qty, opt ? 'NRML' : product)
   const valid = (t.sl - entry) * dir < 0 && (t.tgt - entry) * dir > 0
   const otype: OType = t.market ? 'MARKET' : (t.side === 'BUY') === (entry < ltp) ? 'LIMIT' : 'SL-M'
-  const field = 'num h-8 w-24 rounded-full border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
+  const field = 'num h-8 w-24 rounded-md border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
   const place = () => {
     const msg = st.place(k, t.side, qty, otype, otype === 'LIMIT' ? entry : 0, opt ? 'NRML' : product, { trigger: otype === 'SL-M' ? entry : undefined, sl: t.sl, tgt: t.tgt, trail: trail ? +perUnit.toFixed(2) : undefined, via: 'chart' })
     st.setToast(msg); if (!msg.startsWith('Rejected')) onClose()
   }
   return (
-    <div data-overlay role="dialog" aria-label={`${t.side === 'BUY' ? 'Buy' : 'Sell'} ${labelOf(k)} from the chart`} className="absolute bottom-3 left-3 z-30 w-[300px] max-w-[calc(100%-24px)] rounded-2xl border border-line bg-raised p-3 shadow-lg animate-rise">
+    <div data-overlay role="dialog" aria-label={`${t.side === 'BUY' ? 'Buy' : 'Sell'} ${labelOf(k)} from the chart`} className="absolute bottom-3 left-3 z-30 w-[300px] max-w-[calc(100%-24px)] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise">
       <div className="flex items-center gap-2">
         <SegmentedControl size="sm" label="Side" value={t.side} onChange={(side) => { const a = Math.abs(entry - t.sl) || ltp * 0.01; const d = side === 'BUY' ? 1 : -1; onChange({ ...t, side, sl: +Math.max(0.05, entry - d * a).toFixed(2), tgt: +Math.max(0.05, entry + d * 2 * a).toFixed(2) }) }} options={[{ value: 'BUY', label: 'Buy' }, { value: 'SELL', label: 'Sell' }]} />
         {!opt && <SegmentedControl size="sm" label="Product" value={product} onChange={setProduct} options={[{ value: 'MIS', label: 'Intraday' }, { value: 'CNC', label: 'Delivery' }]} />}
@@ -584,7 +584,7 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
         <span className="text-up">Target</span><input aria-label="Target price" type="number" step={0.05} className={field} value={t.tgt} onChange={(e) => onChange({ ...t, tgt: +e.target.value })} />
         <span className="text-fg-subtle">Risk ₹</span><input aria-label="Rupees to risk" type="number" step={500} className={field} value={risk} onChange={(e) => setRisk(Math.max(100, +e.target.value))} />
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-sunken p-2 text-center text-[11px]">
+      <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-sunken p-2 text-center text-[11px]">
         <div><div className="text-fg-subtle">Quantity</div><b className="num text-[13px]">{qty}</b>{opt && <div className="text-fg-subtle">{qty / lot} lot{qty / lot > 1 ? 's' : ''}</div>}</div>
         <div><div className="text-fg-subtle">Risk / reward</div><b className="num text-[13px]">1 : {rr.toFixed(1)}</b></div>
         <div><div className="text-fg-subtle">Reward</div><b className="num text-[13px] text-up">{inr(reward)}</b></div>

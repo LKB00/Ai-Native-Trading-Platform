@@ -26,12 +26,15 @@ export function Chg({ v, suffix = '%', className, digits = 2 }: { v: number; suf
 export function Money({ v, className }: { v: number; className?: string }) {
   return <span className={cn('num', v > 0 ? 'text-up' : v < 0 ? 'text-down' : 'text-fg', className)}>{v > 0 ? '+' : ''}{inr(v)}</span>
 }
-/** Page header used by full-width views. */
+/**
+ * Page header for full-width views: one 48px line, the same height as the instrument header, so switching between
+ * the chart and a page doesn't make the layout jump. Title, a quiet subtitle, actions on the right.
+ */
 export function ViewHeader({ title, sub, children }: { title: string; sub?: string; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-end gap-3 border-b border-line px-4 py-3">
-      <div className="min-w-0"><h2 className="text-xl tracking-tight">{title}</h2>{sub && <p className="text-[12px] text-fg-subtle">{sub}</p>}</div>
-      <div className="ml-auto flex flex-wrap items-center gap-2">{children}</div>
+    <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-2">
+      <h2 className="text-[16px] font-semibold tracking-tight text-fg">{title}</h2>{sub && <p className="truncate text-[12px] text-fg-subtle">{sub}</p>}
+      <div className="ml-auto flex flex-wrap items-center gap-1.5">{children}</div>
     </div>
   )
 }
@@ -47,16 +50,16 @@ export function Section({ id, title, sub, summary, actions, children, defaultOpe
   const open = useStore((s) => s.sections[id] ?? defaultOpen); const toggle = useStore((s) => s.toggleSection)
   const bodyId = `sec-${id}`
   return (
-    <section className={cn('rounded-2xl border border-line bg-surface', className)} aria-labelledby={`${bodyId}-h`}>
-      <div className="flex items-center gap-2 px-4 py-3">
+    <section className={cn('rounded-[10px] border border-line bg-surface', className)} aria-labelledby={`${bodyId}-h`}>
+      <div className="flex min-h-10 items-center gap-2 px-3.5 py-1.5">
         <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => toggle(id, !open)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <ChevronIcon width={14} height={14} className={cn('shrink-0 text-fg-subtle transition-transform duration-[var(--dur-fast)]', open && 'rotate-90')} />
-          <span className="min-w-0"><span id={`${bodyId}-h`} className="font-serif text-[17px] leading-6">{title}</span>{sub && open && <span className="block text-[12px] text-fg-subtle">{sub}</span>}</span>
+          <span className="flex min-w-0 items-baseline gap-2"><span id={`${bodyId}-h`} className="text-[13px] font-semibold leading-5 text-fg">{title}</span>{sub && open && <span className="truncate text-[12px] text-fg-subtle">{sub}</span>}</span>
           {!open && summary && <span className="ml-auto truncate pl-3 text-[12px] text-fg-muted">{summary}</span>}
         </button>
         {open && actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
-      <div id={bodyId} hidden={!open} className={cn('px-4 pb-4', bodyClassName)}>{children}</div>
+      <div id={bodyId} hidden={!open} className={cn('px-3.5 pb-3.5', bodyClassName)}>{children}</div>
     </section>
   )
 }
@@ -67,6 +70,18 @@ export function LabeledSwitch({ label, checked, onChange, className }: { label: 
     <div className={cn('flex items-center justify-between gap-3', className)}>
       <span className="cursor-pointer select-none text-[12px] text-fg" onClick={() => onChange(!checked)}>{label}</span>
       <Switch label={label} checked={checked} onChange={onChange} className="shrink-0" />
+    </div>
+  )
+}
+
+/**
+ * The agent's note on a page: a label and one or two lines behind a thin indigo rule, the same treatment as the agent's
+ * read on cards, so commentary looks the same everywhere and never outshouts the numbers.
+ */
+export function AgentNote({ label, children, className }: { label?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn('border-l-2 border-[var(--lime)] py-0.5 pl-3 text-[13px] leading-5 text-fg-muted', className)}>
+      {label && <p className="mb-0.5 text-[11px] font-medium text-fg-subtle">{label}</p>}<div className="[&_b]:font-medium [&_b]:text-fg">{children}</div>
     </div>
   )
 }

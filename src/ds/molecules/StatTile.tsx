@@ -64,13 +64,13 @@ export function StatTile({ label, value, serif, delta, goodDirection = "up", det
   const tone = verdict === "better" ? "text-success-fg" : verdict === "worse" ? "text-danger-fg" : "text-fg-muted";
   const dirWord = delta ? { up: "up", down: "down", flat: "unchanged" }[delta.direction] : "";
   return (
-    <div role="group" aria-label={label} className={cn("min-w-0 rounded-2xl border border-line bg-surface p-4", className)}>
+    <div role="group" aria-label={label} className={cn("min-w-0 rounded-[10px] border border-line bg-surface px-3.5 py-3", className)}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs leading-5 text-fg-muted">{label}</p>
         {needsAction && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-attention-soft px-2 py-0.5 text-[11px] leading-4 font-medium text-attention-fg"><AlertIcon width={12} height={12} />{actionText}</span>}
       </div>
       <div className="mt-1 flex items-end justify-between gap-3">
-        <p className={cn("min-w-0 text-[30px] leading-9 font-medium tracking-[-0.01em] text-fg [overflow-wrap:anywhere]", serif && "font-serif font-normal")}>{value}</p>
+        <p className={cn("num min-w-0 text-[22px] leading-8 font-semibold tracking-[-0.01em] text-fg [overflow-wrap:anywhere]", serif && "font-serif font-normal")}>{value}</p>
         {spark && <div className="shrink-0 pb-1">{spark}</div>}
       </div>
       {delta && (

@@ -31,13 +31,13 @@ export function SegmentedControl<T extends string>({ options, value, onChange, l
     refs.current[next]?.focus();
   };
   return (
-    <div role="radiogroup" aria-label={label} className={cn("inline-flex rounded-full border border-line bg-sunken p-0.5", className)}>
+    <div role="radiogroup" aria-label={label} className={cn("inline-flex rounded-lg border border-line bg-sunken p-0.5", className)}>
       {options.map((o, i) => {
         const on = o.value === value;
         return (
           <button key={o.value} ref={(el) => { refs.current[i] = el; }} type="button" role="radio" aria-checked={on} title={o.description}
             tabIndex={on || (!hasMatch && i === 0) ? 0 : -1} onClick={() => onChange(o.value)} onKeyDown={(e) => move(i, e)}
-            className={cn("cursor-pointer rounded-full font-medium whitespace-nowrap transition-colors", size === "sm" ? "px-2.5 py-1 text-[11px]" : "px-3.5 py-1.5 text-xs",
+            className={cn("cursor-pointer rounded-md font-medium whitespace-nowrap transition-colors", size === "sm" ? "px-2.5 py-1 text-[11px]" : "px-3.5 py-1.5 text-xs",
               on ? "bg-surface text-fg shadow-sm" : "text-fg-muted hover:text-fg")}>
             {o.label}
           </button>

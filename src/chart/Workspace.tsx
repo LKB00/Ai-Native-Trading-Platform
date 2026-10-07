@@ -111,7 +111,7 @@ export default function Workspace() {
           </Popover>
           <IconButton size="sm" label="Take a snapshot (downloads a PNG)" onClick={shot}><I.CameraIcon /></IconButton>
           <IconButton size="sm" label={full ? 'Exit full screen' : 'Full screen'} onClick={() => (full ? document.exitFullscreen() : root.current?.requestFullscreen())}>{full ? <I.ExitFullscreenIcon /> : <I.FullscreenIcon />}</IconButton>
-          {(inst.seg === 'EQ' || !!k.strike) && gate && <span className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-sunken px-3 text-[12px] font-medium text-fg-muted" title={`${gate.why} Exits still work: close from the position line or the positions panel.`}><GateIcon g={gate} />{gate.short}</span>}
+          {(inst.seg === 'EQ' || !!k.strike) && gate && <span className="ml-1 inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-sunken px-2.5 text-[12px] font-medium text-fg-muted" title={`${gate.why} Exits still work: close from the position line or the positions panel.`}><GateIcon g={gate} />{gate.short}</span>}
           {(inst.seg === 'EQ' || !!k.strike) && !gate && <div className="ml-1 flex items-center gap-1">
             <button onClick={() => setReq({ side: 'SELL', n: Date.now() })} className="flex h-8 flex-col items-center justify-center rounded-lg bg-danger-soft px-3 leading-none text-danger-fg" aria-label={`Sell ${labelOf(pane.k)} at ${(ltp - spread).toFixed(2)}`}><span className="text-[10px]">Sell</span><span className="num text-[12px] font-bold">{(ltp - spread).toFixed(2)}</span></button>
             <span className="num text-[10px] text-fg-subtle">{(spread * 2).toFixed(2)}</span>
@@ -165,9 +165,9 @@ function ToolGroup({ g, tool, setTool }: { g: (typeof GROUPS)[number]; tool: Too
         onClick={() => setTool(on && g.id !== 'cursor' ? 'cross' : shown.v)} className={cn('flex size-8 items-center justify-center rounded-lg text-fg-muted hover:bg-hover hover:text-fg', on && 'bg-accent text-on-accent hover:bg-accent hover:text-on-accent')}>{shown.icon({ width: 18, height: 18 })}</button>
       {g.tools.length > 1 && <button type="button" aria-label={`More ${g.label.toLowerCase()}`} aria-expanded={open} onClick={() => setOpen(!open)}
         className="absolute -right-1 bottom-0 flex h-4 w-3 items-center justify-center text-fg-subtle opacity-0 group-hover:opacity-100 focus:opacity-100"><ChevronRight size={10} strokeWidth={2} aria-hidden /></button>}
-      {open && <div role="menu" aria-label={g.label} className="absolute left-full top-0 z-40 ml-1 w-56 rounded-2xl border border-line bg-raised p-1.5 shadow-lg animate-rise">
+      {open && <div role="menu" aria-label={g.label} className="absolute left-full top-0 z-40 ml-1 w-56 rounded-[10px] border border-line bg-raised p-1.5 shadow-lg animate-rise">
         <p className="px-2 py-1 text-[11px] uppercase tracking-[0.08em] text-fg-subtle">{g.label}</p>
-        {g.tools.map((t) => <button key={t.v} role="menuitemradio" aria-checked={tool === t.v} onClick={() => { setTool(t.v); setOpen(false) }} className={cn('flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-[13px] hover:bg-hover', tool === t.v && 'bg-sunken')}>
+        {g.tools.map((t) => <button key={t.v} role="menuitemradio" aria-checked={tool === t.v} onClick={() => { setTool(t.v); setOpen(false) }} className={cn('flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-hover', tool === t.v && 'bg-sunken')}>
           {t.icon({ width: 18, height: 18 })}<span className="flex-1">{t.label}</span>{t.key && <span className="text-[11px] text-fg-subtle">{t.key}</span>}</button>)}
       </div>}
     </div>
@@ -192,7 +192,7 @@ function BottomBar({ tf, setTf, active }: { tf: TF; setTf: (t: TF) => void; acti
       <div role="group" aria-label="Date range" className="flex items-center gap-0.5 overflow-x-auto">{RANGES.map((r) => <button key={r.label} className={tbtn(false)} onClick={() => pick(r)} title={`${r.label} · ${TF_LABEL[r.tf]} bars`}>{r.label}</button>)}</div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <span className="num text-fg-muted" title="Exchange time (IST)">{fmtIST(simNow(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} (UTC+5:30)</span>
-        <Badge tone={live ? 'success' : 'neutral'}>{live ? 'Market open' : 'Simulated session'}</Badge>
+        <span className="flex items-center gap-1.5 text-[11px] text-fg-subtle"><span className={cn('size-1.5 rounded-full', live ? 'bg-success' : 'bg-[var(--border-strong)]')} aria-hidden />{live ? 'Live' : 'Simulated'}</span>
         <span aria-hidden className="h-4 w-px bg-line" />
         <button className={tbtn(cfg.scale === 'percent')} aria-pressed={cfg.scale === 'percent'} onClick={() => setChart({ scale: cfg.scale === 'percent' ? 'normal' : 'percent' })} title="Percent scale (Alt+P)">%</button>
         <button className={tbtn(cfg.scale === 'log')} aria-pressed={cfg.scale === 'log'} onClick={() => setChart({ scale: cfg.scale === 'log' ? 'normal' : 'log' })} title="Log scale (Alt+L)">log</button>
@@ -221,14 +221,14 @@ function SymbolSearch({ seed, onClose, onPick }: { seed: string; onClose: () => 
   // Portaled: inside the canvas or terminal content it would sit in their stacking context, under the top bar.
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-scrim px-4 pt-[10vh]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label="Symbol search" className="flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-raised shadow-lg animate-rise">
+      <div role="dialog" aria-modal="true" aria-label="Symbol search" className="flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-[10px] border border-line bg-raised shadow-lg animate-rise">
         <div className="flex items-center gap-3 border-b border-line px-4"><SearchIcon width={16} height={16} />
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Symbol, e.g. RELIANCE or NIFTY" aria-label="Search symbol" className="h-12 flex-1 bg-transparent text-[15px] outline-none"
             onKeyDown={(e) => { if (e.key === 'Escape') onClose(); if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => Math.min(s + 1, rows.length - 1)) } if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)) } if (e.key === 'Enter' && rows[sel]) onPick(rows[sel].k) }} />
           <IconButton size="sm" label="Close" onClick={onClose}><XIcon width={12} height={12} /></IconButton></div>
-        <div role="tablist" aria-label="Type" className="flex gap-1 border-b border-line px-3 py-2">{(['All', 'Stocks', 'Indices', 'Options', 'ETF'] as const).map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn('h-7 rounded-full px-3 text-[12px]', tab === t ? 'bg-accent text-on-accent' : 'text-fg-muted hover:bg-hover')}>{t}</button>)}</div>
+        <div role="tablist" aria-label="Type" className="flex gap-1 border-b border-line px-3 py-2">{(['All', 'Stocks', 'Indices', 'Options', 'ETF'] as const).map((t) => <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn('h-7 rounded-md px-3 text-[12px]', tab === t ? 'bg-accent text-on-accent' : 'text-fg-muted hover:bg-hover')}>{t}</button>)}</div>
         <ul role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-auto p-1.5">
-          {rows.map((r, i) => <li key={r.k} role="option" aria-selected={i === sel}><button onMouseEnter={() => setSel(i)} onClick={() => onPick(r.k)} className={cn('grid w-full grid-cols-[140px_1fr_auto] items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px]', i === sel && 'bg-sunken')}>
+          {rows.map((r, i) => <li key={r.k} role="option" aria-selected={i === sel}><button onMouseEnter={() => setSel(i)} onClick={() => onPick(r.k)} className={cn('grid w-full grid-cols-[140px_1fr_auto] items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px]', i === sel && 'bg-sunken')}>
             <b className="truncate">{labelOf(r.k)}</b><span className="truncate text-fg-muted">{r.name}</span><span className="flex items-center gap-1.5 text-[11px] text-fg-subtle">{r.type}<Badge>{r.ex}</Badge></span></button></li>)}
           {!rows.length && <li className="px-3 py-6 text-center text-fg-subtle">No symbols match “{q}”.</li>}
         </ul>
@@ -246,13 +246,13 @@ function IndicatorDialog({ onClose }: { onClose: () => void }) {
   // Portaled: inside the canvas or terminal content it would sit in their stacking context, under the top bar.
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-scrim px-4 pt-[8vh]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label="Indicators" className="flex max-h-[76vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-raised shadow-lg animate-rise">
+      <div role="dialog" aria-modal="true" aria-label="Indicators" className="flex max-h-[76vh] w-full max-w-2xl flex-col overflow-hidden rounded-[10px] border border-line bg-raised shadow-lg animate-rise">
         <div className="flex items-center gap-3 border-b border-line px-4 py-3"><h2 className="flex-1 text-lg">Indicators</h2><IconButton size="sm" label="Close" onClick={onClose}><XIcon width={12} height={12} /></IconButton></div>
-        <label className="mx-4 mt-3 flex h-9 items-center gap-2 rounded-full border border-line bg-sunken px-3"><SearchIcon width={14} height={14} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search, e.g. RSI or moving average" aria-label="Search indicators" className="w-full bg-transparent text-[13px] outline-none" /></label>
+        <label className="mx-4 mt-3 flex h-9 items-center gap-2 rounded-md border border-line bg-sunken px-3"><SearchIcon width={14} height={14} /><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search, e.g. RSI or moving average" aria-label="Search indicators" className="w-full bg-transparent text-[13px] outline-none" /></label>
         <div className="flex min-h-0 flex-1">
           <div role="tablist" aria-orientation="vertical" aria-label="Category" className="flex w-36 shrink-0 flex-col gap-0.5 p-3">{(['All', 'Trend', 'Momentum', 'Volatility', 'Volume'] as const).map((c) => <button key={c} role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={cn('rounded-lg px-3 py-1.5 text-left text-[13px]', cat === c ? 'bg-sunken font-bold' : 'text-fg-muted hover:bg-hover')}>{c}</button>)}</div>
           <ul className="min-h-0 flex-1 overflow-auto p-2">{list.map((d) => { const n = inds.filter((x) => x.type === d.type).length; return (
-            <li key={d.type}><button onClick={() => setChart({ inds: [...useStore.getState().chart.inds, newInstance(d.type)] })} className="flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left hover:bg-hover">
+            <li key={d.type}><button onClick={() => setChart({ inds: [...useStore.getState().chart.inds, newInstance(d.type)] })} className="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left hover:bg-hover">
               <span className="min-w-0 flex-1"><span className="block text-[13px] font-bold">{d.name} {n > 0 && <Badge tone="info">{n} on chart</Badge>}</span><span className="block text-[12px] text-fg-subtle">{d.desc}</span></span>
               <span className="shrink-0 text-[11px] text-fg-subtle">{d.overlay ? 'On price' : 'New pane'}</span></button></li>) })}</ul>
         </div>

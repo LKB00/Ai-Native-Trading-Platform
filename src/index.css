@@ -39,7 +39,8 @@ body { margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); fon
 .tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
 .tbl th { position: sticky; top: 0; z-index: 1; background: var(--surface); color: var(--fg-subtle); font-weight: 400; text-align: right; padding: 8px 12px; border-bottom: var(--hair) solid var(--border); white-space: nowrap; }
 .tbl td { text-align: right; padding: 7px 12px; border-bottom: var(--hair) solid var(--border); font-family: var(--ds-font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tbl th:first-child, .tbl td:first-child { text-align: left; }
+.tbl th:first-child, .tbl td:first-child { text-align: left; padding-left: 16px; }
+.tbl th:last-child, .tbl td:last-child { padding-right: 16px; }
 .tbl tbody tr:hover td { background: var(--surface-hover); }
 
 .chain td.ce.itm { background: color-mix(in oklab, var(--success-soft) 70%, transparent); }
@@ -69,7 +70,7 @@ body { margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); fon
 .tbl-card th { font-weight: 500; font-size: 11px; color: var(--fg-subtle); text-align: right; padding: 8px 12px; border-bottom: var(--hair) solid var(--border); white-space: nowrap; }
 .tbl-card td { text-align: right; padding: 10px 12px; border-bottom: var(--hair) solid var(--border); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--fg); }
 .tbl-card tbody tr:last-child td { border-bottom: 0; }
-.tbl-card th:first-child, .tbl-card td:first-child { text-align: left; padding-left: 20px; }
+.tbl-card th:first-child, .tbl-card td:first-child { text-align: left; padding-left: 14px; }
 .tbl-card th:last-child, .tbl-card td:last-child { padding-right: 20px; }
 .tbl-card tbody tr { transition: background-color 120ms; }
 .tbl-card tbody tr:hover td { background: var(--surface-hover); }

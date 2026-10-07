@@ -19,8 +19,8 @@ export default function Chain() {
   const Bar = ({ v, tone }: { v: number; tone: 'up' | 'down' }) => <span aria-hidden className="mx-1.5 inline-block h-1.5 rounded-full align-middle" style={{ width: (v / maxOi) * 44, background: `var(--${tone === 'up' ? 'success' : 'danger'})` }} />
   const Trade = ({ v, strike, type }: { v: number; strike: number; type: 'CE' | 'PE' }) => (
     <span className="inline-flex items-center gap-1.5">
-      <button aria-label={`Buy ${strike} ${type}`} onClick={() => add(strike, type, 'BUY')} className="h-5 rounded-full bg-success-soft px-1.5 font-sans text-[10px] font-bold text-success-fg opacity-0 group-hover:opacity-100 focus:opacity-100">B</button>
-      <button aria-label={`Sell ${strike} ${type}`} onClick={() => add(strike, type, 'SELL')} className="h-5 rounded-full bg-danger-soft px-1.5 font-sans text-[10px] font-bold text-danger-fg opacity-0 group-hover:opacity-100 focus:opacity-100">S</button>
+      <button aria-label={`Buy ${strike} ${type}`} onClick={() => add(strike, type, 'BUY')} className="h-5 rounded-md bg-success-soft px-1.5 font-sans text-[10px] font-bold text-success-fg opacity-0 group-hover:opacity-100 focus:opacity-100">B</button>
+      <button aria-label={`Sell ${strike} ${type}`} onClick={() => add(strike, type, 'SELL')} className="h-5 rounded-md bg-danger-soft px-1.5 font-sans text-[10px] font-bold text-danger-fg opacity-0 group-hover:opacity-100 focus:opacity-100">S</button>
       <b className="inline-block min-w-14">{v.toFixed(2)}</b>
     </span>)
   const chg = (n: number) => <span className={n >= 0 ? 'text-up' : 'text-down'}>{n >= 0 ? '+' : '−'}{L(Math.abs(n))}</span>

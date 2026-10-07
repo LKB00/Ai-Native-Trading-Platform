@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { useStore, type Trade } from './store'
 import { parseKey } from './market'
 import { ask } from './ai'
-import { inr, inrShort, Money, Section, SortMark, ViewHeader } from './ui'
-import { Badge, Button, EmptyState, KeyTakeaway, LineChart, SegmentedControl, StatTile, cn } from './ds'
+import { inr, inrShort, Money, Section, SortMark, ViewHeader, AgentNote } from './ui'
+import { Badge, Button, EmptyState, LineChart, SegmentedControl, StatTile, cn } from './ds'
 import { SparkleIcon, InfoIcon } from './ds/lib/icons'
 
 /* Sections: insights, P&L calendar and equity curve open by default (primary review); breakdown tables and the full
@@ -134,7 +134,7 @@ export default function Journal() {
             summary={flags[0] ?? 'No strong patterns yet'}
             actions={<Button size="sm" variant="primary" leading={<SparkleIcon width={14} height={14} />} onClick={() => ask('review my trades')}>Ask AI to review my trades</Button>}>
             {flags.length === 0 ? <p className="text-[13px] text-fg-muted">No strong patterns yet. Flags appear once there are enough trades to compare.</p> : (<>
-              <KeyTakeaway label="Biggest pattern">{flags[0]}</KeyTakeaway>
+              <AgentNote label="Biggest pattern">{flags[0]}</AgentNote>
               {flags.length > 1 && <ul className="space-y-2">{flags.slice(1).map((f) => <li key={f} className="flex gap-2 text-[13px] leading-6"><InfoIcon width={14} height={14} className="mt-1 shrink-0 text-fg-subtle" aria-hidden />{f}</li>)}</ul>}
             </>)}
             <p className="text-[11px] text-fg-subtle">Computed from your journal with fixed rules. Patterns in small samples can be chance.</p>
@@ -232,13 +232,13 @@ function Calendar({ ts, period }: { ts: T[]; period: Period }) {
 function Weekdays({ rows }: { rows: Group[] }) {
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.net)))
   return (
-    <section className="rounded-2xl border border-line bg-surface p-4">
+    <section className="rounded-[10px] border border-line bg-surface p-4">
       <h3 className="mb-2 text-base">By weekday</h3>
       <ul className="space-y-2">{rows.map((r) => (
         <li key={r.k} className={cn('grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-1.5 py-1 text-[12px]', r.k === 'Tue' && 'bg-sunken')}>
           <span className="flex items-center gap-1">{r.k}{r.k === 'Tue' && <span className="sr-only"> (expiry day)</span>}</span>
           <div className="relative h-2.5 rounded-full bg-sunken" aria-hidden>
-            <div className="absolute top-0 h-full rounded-full" style={{ left: r.net >= 0 ? '50%' : `${50 - (Math.abs(r.net) / max) * 50}%`, width: `${(Math.abs(r.net) / max) * 50}%`, background: r.net >= 0 ? 'var(--success)' : 'var(--danger)' }} />
+            <div className="absolute top-0 h-full rounded-md" style={{ left: r.net >= 0 ? '50%' : `${50 - (Math.abs(r.net) / max) * 50}%`, width: `${(Math.abs(r.net) / max) * 50}%`, background: r.net >= 0 ? 'var(--success)' : 'var(--danger)' }} />
             <div className="absolute left-1/2 top-[-2px] h-[14px] w-px bg-line-strong" />
           </div>
           <span className="flex items-center gap-2 whitespace-nowrap"><Money v={r.net} /><span className="num w-24 text-right text-fg-subtle">{pc(r.wins / r.n)} · {r.n}</span></span>
@@ -252,7 +252,7 @@ function Weekdays({ rows }: { rows: Group[] }) {
 
 function Breakdown({ title, head, rows }: { title: string; head: string; rows: Group[] }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface">
+    <section className="rounded-[10px] border border-line bg-surface">
       <h3 className="px-4 pt-3 text-base">{title}</h3>
       <div className="scroll-thin mt-1 overflow-x-auto">
         <table className="tbl">

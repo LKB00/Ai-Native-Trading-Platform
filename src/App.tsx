@@ -7,8 +7,8 @@ import { ask } from './ai'
 import type { Action } from './actions'
 import { AIMark, Badge, Button, IconButton, MeterBar, Popover, SegmentedControl, KeyHint, cn } from './ds'
 import { ChevronIcon, EyeIcon, MoonIcon, SunIcon, SettingsIcon, SearchIcon, XIcon, PlusIcon, CheckIcon, ShieldIcon, ArrowRightIcon } from './ds/lib/icons'
-import { inr, pct, Chg, Dir, Money, LabeledSwitch } from './ui'
-import { FlashPrice, Spark, TickerTape } from './cockpit/live'
+import { inr, pct, Chg, Money, LabeledSwitch } from './ui'
+import { FlashPrice, TickerTape } from './cockpit/live'
 import Chart from './Chart'
 import Chain from './Chain'
 import Strategy from './Strategy'
@@ -317,30 +317,29 @@ function Watchlist() {
   )
 }
 
+/** Shown in the market strip, so kept out of the watchlist body. */
 const INDICES = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY']
 
-/** One dense watchlist row: symbol, intraday sparkline, a price that flashes on each tick, change, and your position. */
+/**
+ * One watchlist row, 32px: symbol (with your position, if any), price and change in aligned columns. Buy and sell
+ * appear on hover. The company name is in the tooltip, not the row: the list is for scanning numbers.
+ */
 function WatchRow({ w, sel, pick, onTrade, onRemove }: { w: string; sel: boolean; pick: () => void; onTrade?: (side: 'BUY' | 'SELL') => void; onRemove?: () => void }) {
   const p = useStore((s) => s.prices[w]); const pos = useStore((s) => s.positions[w])
   const chg = pct(p.ltp, p.prev); const up = chg >= 0
   return (
-    <li className={cn('group relative flex h-11 items-center gap-2 border-l-2 pl-3.5 pr-3', sel ? 'border-[var(--accent)] bg-sunken' : 'border-transparent hover:bg-hover')}>
-      <button className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={pick} aria-current={sel || undefined} title={bySym(w)!.name}>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 text-[13px] font-semibold leading-4 text-fg">{w}{pos?.qty ? <span className={cn('rounded px-1 text-[10px] font-semibold leading-4', pos.qty > 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')} title={`Your position: ${pos.qty > 0 ? 'long' : 'short'} ${Math.abs(pos.qty)}`}>{pos.qty > 0 ? '+' : ''}{pos.qty}</span> : null}</span>
-          <span className="block truncate text-[11px] leading-4 text-fg-subtle">{bySym(w)!.name}</span>
-        </span>
-        <Spark sym={w} w={44} h={18} />
+    <li className={cn('group relative flex h-8 items-center gap-1.5 border-l-2 pl-3 pr-3 text-[12px]', sel ? 'border-[var(--lime)] bg-sunken' : 'border-transparent hover:bg-hover')}>
+      <button className="flex min-w-0 flex-1 items-center gap-1.5 text-left" onClick={pick} aria-current={sel || undefined} title={bySym(w)!.name}>
+        <span className="truncate font-medium text-fg">{w}</span>
+        {pos?.qty ? <span className={cn('num shrink-0 rounded px-1 text-[10px] font-medium leading-4', pos.qty > 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')} title={`Your position: ${pos.qty > 0 ? 'long' : 'short'} ${Math.abs(pos.qty)}`}>{pos.qty > 0 ? '+' : ''}{pos.qty}</span> : null}
       </button>
-      {onTrade && <div className="absolute right-[92px] flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-        <button aria-label={`Buy ${w}`} onClick={() => onTrade('BUY')} className="h-6 rounded-md bg-success px-2 text-[11px] font-bold text-white dark:text-[var(--bg)]">B</button>
-        <button aria-label={`Sell ${w}`} onClick={() => onTrade('SELL')} className="h-6 rounded-md bg-danger px-2 text-[11px] font-bold text-white dark:text-[var(--bg)]">S</button>
+      {onTrade && <div className="absolute right-[118px] hidden gap-1 group-hover:flex group-focus-within:flex">
+        <button aria-label={`Buy ${w}`} onClick={() => onTrade('BUY')} className="h-6 w-6 rounded bg-success text-[11px] font-semibold text-white dark:text-[var(--bg)]">B</button>
+        <button aria-label={`Sell ${w}`} onClick={() => onTrade('SELL')} className="h-6 w-6 rounded bg-danger text-[11px] font-semibold text-white dark:text-[var(--bg)]">S</button>
       </div>}
-      <div className="w-[82px] shrink-0 text-right leading-4">
-        <FlashPrice v={p.ltp} className="-mr-1 text-[13px] font-medium" />
-        <div className={cn('num text-[11px]', up ? 'text-up' : 'text-down')}><Dir up={up} /> {up ? '+' : '−'}{Math.abs(chg).toFixed(2)}%</div>
-      </div>
-      {onRemove && <button aria-label={`Remove ${w} from watchlist`} onClick={onRemove} className="absolute right-0.5 top-0.5 text-fg-subtle opacity-0 group-hover:opacity-100"><XIcon width={10} height={10} /></button>}
+      <FlashPrice v={p.ltp} className="w-16 shrink-0 text-right text-fg" />
+      <span className={cn('num w-12 shrink-0 text-right text-[11px]', up ? 'text-up' : 'text-down')}>{up ? '+' : '−'}{Math.abs(chg).toFixed(2)}%</span>
+      {onRemove && <button aria-label={`Remove ${w} from watchlist`} onClick={onRemove} className="absolute -right-0 hidden size-5 items-center justify-center text-fg-subtle hover:text-fg group-hover:flex"><XIcon width={9} height={9} /></button>}
     </li>
   )
 }
@@ -354,19 +353,21 @@ function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => v
   const results = q ? INSTS.filter((i) => (i.sym + i.name).toLowerCase().includes(q.toLowerCase()) && !watch.includes(i.sym)).slice(0, 8) : []
   return (
     <>
-      <div className="flex h-12 shrink-0 items-center border-b border-line px-3">
-        <label className="flex h-8 w-full items-center gap-2 rounded-full border border-line bg-sunken px-3 text-fg-subtle focus-within:border-fg-subtle">
+      <div className="flex h-12 shrink-0 items-center gap-1 border-b border-line pl-3 pr-1.5">
+        <label className="flex h-8 w-full items-center gap-2 rounded-md border border-line bg-sunken px-2.5 text-fg-subtle focus-within:border-fg-subtle">
           <SearchIcon width={14} height={14} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search and add" aria-label="Search instruments" className="w-full bg-transparent text-[13px] text-fg outline-none" />
         </label>
+        {header}
       </div>
-      {results.length > 0 && <ul className="mx-3 mb-2 overflow-hidden rounded-xl border border-line">
+      {results.length > 0 && <ul className="mx-3 my-2 overflow-hidden rounded-md border border-line">
         {results.map((i) => <li key={i.sym}><button onClick={() => { watchOp('add', i.sym); setQ('') }} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-hover">
           <span className="min-w-0 truncate"><b>{i.sym}</b> <span className="text-fg-subtle">{i.name}</span></span><PlusIcon width={14} height={14} /></button></li>)}
       </ul>}
-      <div className="flex items-center gap-1 px-4 pb-1 pt-3"><p className="flex-1 text-[11px] font-medium uppercase tracking-[0.08em] text-fg-subtle">Indices</p>{header}</div>
-      <ul className="border-b border-line pb-1">{INDICES.map((w) => <WatchRow key={w} w={w} sel={w === sym} pick={() => pick(w)} />)}</ul>
-      <div className="flex items-center px-4 pb-1 pt-2.5"><p className="flex-1 text-[11px] font-medium uppercase tracking-[0.08em] text-fg-subtle">Watchlist · {list.length}</p></div>
+      {/* Indices live in the market strip above, so the list is only your names. Column labels line up with the rows. */}
+      <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-line pl-3.5 pr-3 text-[11px] text-fg-subtle">
+        <span className="flex-1">Watchlist <span className="num">{list.length}</span></span><span className="w-16 text-right">Price</span><span className="w-12 text-right">Chg</span>
+      </div>
       <ul className="scroll-thin min-h-0 flex-1 overflow-auto">
         {list.map((w) => <WatchRow key={w} w={w} sel={w === sym} pick={() => pick(w)} onTrade={gate ? undefined : (side) => setTicket({ sym: w, side })} onRemove={() => watchOp('remove', w)} />)}
       </ul>
@@ -413,18 +414,28 @@ function Ticket({ sym, side: s0, close }: { sym: string; side: 'BUY' | 'SELL'; c
   )
 }
 
+/**
+ * The instrument header, one line: what you're looking at (symbol, name), its price and change in the largest type in
+ * the column, then the session's open, high, low and previous close. Trading actions live in the chart toolbar.
+ */
 function SubBar() {
-  const { view, setView, sym, prices } = useStore(); const p = prices[sym]
+  const { view, setView, sym, prices } = useStore(); const p = prices[sym]; const inst = bySym(sym)!
   if (!TRADING.includes(view)) return <div />
+  const ch = p.ltp - p.prev; const up = ch >= 0
+  const stat = (k: string, v: number) => <span className="whitespace-nowrap"><span className="text-fg-subtle">{k}</span> <span className="num text-fg-muted">{v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></span>
   return (
-    <div className="flex h-12 min-w-0 items-center gap-x-4 overflow-hidden border-b border-line bg-surface px-4">
-      <div className="flex min-w-0 items-baseline gap-3">
-        <h1 className="text-xl tracking-tight">{sym}</h1>
-        <span className="num text-[15px] font-bold">{p.ltp.toFixed(2)}</span><Chg v={pct(p.ltp, p.prev)} />
-        <span className="num text-[11px] text-fg-subtle max-lg:hidden">H {p.high.toFixed(1)} · L {p.low.toFixed(1)} · {bySym(sym)!.name}{bySym(sym)!.seg === 'EQ' ? ` · ${bySym(sym)!.sector}` : ''}</span>
+    <div className="flex h-12 min-w-0 items-center gap-x-5 overflow-hidden border-b border-line bg-surface px-4">
+      <div className="flex min-w-0 shrink-0 items-baseline gap-2">
+        <h1 className="text-[16px] font-semibold tracking-tight text-fg">{sym}</h1>
+        <span className="max-w-[180px] truncate text-[12px] text-fg-subtle max-xl:hidden">{inst.name}</span>
       </div>
+      <div className="flex shrink-0 items-baseline gap-2">
+        <FlashPrice v={p.ltp} className="text-[18px] font-semibold text-fg" />
+        <span className={cn('num text-[12px] font-medium', up ? 'text-up' : 'text-down')}>{up ? '+' : '−'}{Math.abs(ch).toFixed(2)} ({up ? '+' : '−'}{Math.abs(pct(p.ltp, p.prev)).toFixed(2)}%)</span>
+      </div>
+      <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden text-[11px] max-lg:hidden">{stat('O', p.open)}{stat('H', p.high)}{stat('L', p.low)}<span className="max-xl:hidden">{stat('Prev', p.prev)}</span></div>
       {view !== 'chart' && <SegmentedControl className="ml-auto" size="sm" label="Options view" value={view} onChange={setView} options={[{ value: 'chain', label: 'Option chain' }, { value: 'strategy', label: 'Strategy builder' }]} />}
-      {view === 'chart' && bySym(sym)!.fno && <Button size="sm" variant="ghost" className="ml-auto" trailing={<ArrowRightIcon width={12} height={12} />} onClick={() => setView('chain')}>{sym} option chain</Button>}
+      {view === 'chart' && inst.fno && <button type="button" onClick={() => setView('chain')} className="ml-auto inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg">Option chain<ArrowRightIcon width={12} height={12} /></button>}
     </div>
   )
 }
@@ -481,20 +492,25 @@ function Bottom() {
   return (
     <section className="relative flex min-h-0 flex-col border-t border-line bg-surface" aria-label="Positions and orders">
       {open_ && <Splitter dir="y" sign={-1} value={s.panels.bottomH} min={120} max={Math.round(innerHeight * 0.7)} label="Positions panel height" onSize={(bottomH) => s.setPanels({ bottomH })} onToggle={() => s.togglePanel('bottom')} className="-top-1" />}
-      <div className="flex h-12 shrink-0 items-center gap-3 overflow-x-auto px-4">
-        <SegmentedControl size="sm" label="Panel" value={tab} onChange={setTab} options={[
-          { value: 'pos', label: `Positions ${open}` }, { value: 'ord', label: `Orders${working ? ` · ${working} working` : ''}` }, { value: 'gtt', label: `Alerts and GTT ${active}` }, { value: 'log', label: 'Activity' }]} />
-        {tab === 'pos' && <span className="shrink-0 whitespace-nowrap text-[12px] text-fg-subtle">Net after charges <Money v={p.net} className="font-bold" /> · charges <span className="num">{inr(p.charges)}</span></span>}
-        {tab === 'pos' && open > 0 && <Button size="sm" variant="danger" className="ml-auto shrink-0" onClick={() => s.setToast(`Closed ${s.squareoff()} position(s)`)}>{open === 1 ? 'Exit 1 position' : `Exit all ${open} positions`}</Button>}
+      <div className="flex h-12 shrink-0 items-center gap-4 overflow-x-auto border-b border-line px-4">
+        {/* Underline tabs, like a broker's panel: the count rides with each name, and the active one is the only bold thing. */}
+        <div role="tablist" aria-label="Panel" className="-mb-px flex h-12 shrink-0 items-stretch gap-4">
+          {([['pos', 'Positions', open], ['ord', 'Orders', working], ['gtt', 'Alerts and GTT', active], ['log', 'Activity', undefined]] as const).map(([v, l, n]) => (
+            <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => setTab(v)}
+              className={cn('flex items-center gap-1.5 border-b-2 text-[12px] transition-colors', tab === v && open_ ? 'border-fg font-medium text-fg' : 'border-transparent text-fg-muted hover:text-fg')}>
+              {l}{n != null && <span className={cn('num rounded px-1 text-[10px] leading-4', n ? 'bg-sunken text-fg' : 'text-fg-subtle')}>{n}</span>}</button>))}
+        </div>
+        {tab === 'pos' && <span className="shrink-0 whitespace-nowrap border-l border-line pl-4 text-[12px] text-fg-subtle">Net after charges <Money v={p.net} className="font-semibold" /><span className="ml-2">charges <span className="num">{inr(p.charges)}</span></span></span>}
+        {tab === 'pos' && open > 0 && <button type="button" className="ml-auto h-7 shrink-0 rounded-md border border-[var(--danger)] px-2.5 text-[12px] font-medium text-down transition-colors hover:bg-danger-soft" onClick={() => s.setToast(`Closed ${s.squareoff()} position(s)`)}>{open === 1 ? 'Exit 1 position' : `Exit all ${open}`}</button>}
         <IconButton size="sm" className={cn('shrink-0', !(tab === 'pos' && open > 0) && 'ml-auto')} label={open_ ? 'Fold positions panel ( \\ )' : 'Open positions panel ( \\ )'} onClick={() => s.togglePanel('bottom')}><ChevronIcon width={14} height={14} className={open_ ? 'rotate-90' : '-rotate-90'} /></IconButton>
       </div>
       <div className="scroll-thin min-h-0 flex-1 overflow-auto" hidden={!open_}>
         {tab === 'pos' && <table className="tbl"><thead><tr><th>Instrument</th><th>Product</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&amp;L</th><th>Exit plan</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
           {pos.map((x) => { const l = s.ltp(x.key); const pl = (l - x.avg) * x.qty + x.realized; return <tr key={x.key}>
-            <td className="!font-sans"><button className="hover:underline" onClick={() => { s.setSym(parseKey(x.key).und); s.setView(parseKey(x.key).strike ? 'chain' : 'chart') }}>{labelOf(x.key)}</button>{x.tag && <span className="ml-2 text-[11px] text-fg-subtle">{x.tag}</span>}</td><td><Badge>{x.product}</Badge></td>
+            <td className="!font-sans"><button className="hover:underline" onClick={() => { s.setSym(parseKey(x.key).und); s.setView(parseKey(x.key).strike ? 'chain' : 'chart') }}>{labelOf(x.key)}</button>{x.tag && <span className="ml-2 text-[11px] text-fg-subtle">{x.tag}</span>}</td><td className="text-fg-muted">{x.product}</td>
             <td className={x.qty > 0 ? 'text-up' : x.qty < 0 ? 'text-down' : 'text-fg-subtle'}>{x.qty > 0 ? '+' : ''}{x.qty}</td>
             <td>{x.avg ? x.avg.toFixed(2) : '—'}</td><td>{l.toFixed(2)}</td><td><Money v={pl} /></td><td><ExitPlan k={x.key} /></td>
-            <td>{x.qty !== 0 && <Button size="sm" variant="secondary" onClick={() => s.setToast(s.place(x.key, x.qty > 0 ? 'SELL' : 'BUY', Math.abs(x.qty), 'MARKET', 0, x.product))}>Exit</Button>}</td></tr> })}
+            <td>{x.qty !== 0 && <button type="button" className="h-6 rounded-md border border-line px-2 font-sans text-[11px] font-medium text-fg transition-colors hover:border-line-strong hover:bg-hover" onClick={() => s.setToast(s.place(x.key, x.qty > 0 ? 'SELL' : 'BUY', Math.abs(x.qty), 'MARKET', 0, x.product))}>Exit</button>}</td></tr> })}
           {!pos.length && empty(8, <>No positions yet. Press <KeyHint>B</KeyHint> on the chart, or ask the copilot: <i>buy 50 sbi with sl 850</i>.</>)}
         </tbody></table>}
         {tab === 'ord' && <table className="tbl"><thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th>Qty</th><th>Type</th><th>Price</th><th>Status</th><th>Source</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>

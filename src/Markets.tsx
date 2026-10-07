@@ -3,8 +3,8 @@ import { useStore } from './store'
 import { INSTS, SECTORS, bySym, nextExpiries, isExpiryDay } from './market'
 import { allMetrics, type Metrics } from './scan'
 import { ask } from './ai'
-import { Chg, Dir, Section, ViewHeader, inrShort, pct } from './ui'
-import { AIBadge, Badge, Button, KeyTakeaway, MeterBar, cn } from './ds'
+import { Chg, Dir, Section, ViewHeader, inrShort, pct, AgentNote } from './ui'
+import { AIBadge, Badge, Button, MeterBar, cn } from './ds'
 import { SparkleIcon } from './ds/lib/icons'
 
 /* Sections: breadth, sectors, movers and today's expiries open by default (primary briefing); sector strength, flows/VIX and
@@ -12,7 +12,7 @@ import { SparkleIcon } from './ds/lib/icons'
 const IDX = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX']
 /** ETFs are not a sector; keep them out of breadth and sector maths. */
 const SECT = SECTORS.filter((s) => s !== 'ETF')
-const card = 'rounded-2xl border border-line bg-surface p-4'
+const card = 'rounded-[10px] border border-line bg-surface p-4'
 const label = 'text-[11px] uppercase tracking-[0.08em] text-fg-subtle'
 
 function rng(seed: number) { return () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296 } }
@@ -79,9 +79,9 @@ export default function Markets() {
         {/* Index strip */}
         <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @4xl:grid-cols-4">
           {IDX.map((s) => { const q = prices[s]; const span = q.high - q.low || 1; const at = Math.min(Math.max((q.ltp - q.low) / span, 0), 1); return (
-            <button key={s} onClick={() => open(s)} className={cn(card, 'text-left transition-shadow hover:shadow-md')} title={`${bySym(s)!.name}: open chart`}>
+            <button key={s} onClick={() => open(s)} className={cn(card, 'text-left transition-colors hover:border-line-strong hover:bg-hover')} title={`${bySym(s)!.name}: open chart`}>
               <div className="flex items-baseline justify-between gap-2"><span className="font-bold">{s}</span><Chg v={pct(q.ltp, q.prev)} className="text-[12px]" /></div>
-              <div className="num mt-1 text-[20px] leading-7">{q.ltp.toFixed(2)}</div>
+              <div className="num mt-1 text-[18px] font-semibold leading-7">{q.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               <div className="mt-2" aria-label={`Day range ${q.low.toFixed(0)} to ${q.high.toFixed(0)}`}>
                 <div className="relative h-1.5 rounded-full bg-sunken"><span className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg" style={{ left: `${at * 100}%` }} /></div>
                 <div className="num mt-1 flex justify-between text-[11px] text-fg-subtle"><span>L {q.low.toFixed(0)}</span><span>H {q.high.toFixed(0)}</span></div>
@@ -89,16 +89,16 @@ export default function Markets() {
             </button>) })}
         </div>
 
-        <KeyTakeaway label="At a glance">
+        <AgentNote label="At a glance">
           {a.adv >= a.dec ? 'Buyers lead' : 'Sellers lead'}: {a.adv} stocks up, {a.dec} down. {lead && lag && <>{lead.s} is the strongest sector over 3 months, {lag.s} the weakest. </>}
           {a.above200} of {rows.length} stocks trade above their 200-day EMA.
-        </KeyTakeaway>
+        </AgentNote>
 
         <div className="grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 space-y-4">
             {/* Breadth */}
             <Section id="markets.breadth" title="Market breadth" summary={`${a.adv} up · ${a.dec} down`}>
-              <div className="flex h-7 overflow-hidden rounded-full text-[12px]" role="img" aria-label={`${a.adv} advancing, ${a.dec} declining`}>
+              <div className="flex h-7 overflow-hidden rounded-md text-[12px]" role="img" aria-label={`${a.adv} advancing, ${a.dec} declining`}>
                 <div className="flex items-center bg-success-soft px-3 text-success-fg" style={{ width: `${(a.adv / Math.max(a.adv + a.dec, 1)) * 100}%` }}><span className="num whitespace-nowrap"><Dir up /> {a.adv}</span></div>
                 <div className="flex flex-1 items-center justify-end bg-danger-soft px-3 text-danger-fg"><span className="num whitespace-nowrap"><Dir up={false} /> {a.dec}</span></div>
               </div>
@@ -113,7 +113,7 @@ export default function Markets() {
             <Section id="markets.sectors" title="Sectors today" sub="Tap a sector to scan it" summary={top ? `Leader: ${top.s} ${sgn(top.chg, 1)}` : undefined}>
               <div className="grid grid-cols-2 gap-2 @md:grid-cols-3 @2xl:grid-cols-4">
                 {a.sectors.map((x) => (
-                  <button key={x.s} onClick={() => toSector(x.s)} className="rounded-xl border border-line p-3 text-left transition-shadow hover:shadow-md" style={{ background: heat(x.chg) }}>
+                  <button key={x.s} onClick={() => toSector(x.s)} className="rounded-lg border border-line p-3 text-left transition-shadow hover:shadow-md" style={{ background: heat(x.chg) }}>
                     <div className="truncate text-[13px] font-bold">{x.s}</div>
                     <div className="mt-1 flex items-baseline justify-between gap-1"><Chg v={x.chg} className="text-[12px]" /><span className="text-[11px] text-fg-subtle">{x.n}</span></div>
                   </button>))}
@@ -130,7 +130,7 @@ export default function Markets() {
                       <span className="truncate">{x.s}</span>
                       <span className="relative h-2.5" aria-hidden>
                         <span className="absolute inset-y-0 left-1/2 w-px bg-line-strong" />
-                        <span className={cn('absolute inset-y-0 rounded-full', x.rs >= 0 ? 'left-1/2 bg-success-soft' : 'right-1/2 bg-danger-soft')} style={{ width: `${Math.abs(x.rs) / maxRs * 50}%` }} />
+                        <span className={cn('absolute inset-y-0 rounded-md', x.rs >= 0 ? 'left-1/2 bg-success-soft' : 'right-1/2 bg-danger-soft')} style={{ width: `${Math.abs(x.rs) / maxRs * 50}%` }} />
                       </span>
                       <Chg v={x.rs} digits={1} className="text-right text-[11px]" />
                     </button>

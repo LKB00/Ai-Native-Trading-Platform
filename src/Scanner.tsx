@@ -15,7 +15,7 @@ type Op = Filter['op']
 const ASC = new Set(['gapdn', 'oversold', 'lo52'])
 /** Always-on columns after Symbol / LTP / Change. */
 const FIXED = ['rsi', 'volx', 'rs', 'pe']
-const field = 'h-8 rounded-full border border-line bg-surface px-3 text-[12px] text-fg outline-none focus:border-fg-subtle'
+const field = 'h-8 rounded-md border border-line bg-surface px-3 text-[12px] text-fg outline-none focus:border-fg-subtle'
 
 /** Format a metric value with its unit, sign shown for percent fields. */
 function fmt(f: string, v: number | string | boolean) {
@@ -71,7 +71,7 @@ export default function Scanner() {
 
   const th = (k: string, label: string, left = false) => (
     <th key={k} aria-sort={sortKey === k ? (desc ? 'descending' : 'ascending') : 'none'} className={left ? '!text-left' : undefined}>
-      <button onClick={() => sortBy(k)} className={cn('inline-flex items-center gap-1 rounded-full hover:text-fg', sortKey === k && 'text-fg')} title={FIELDS[k]?.label}>
+      <button onClick={() => sortBy(k)} className={cn('inline-flex items-center gap-1 rounded-md hover:text-fg', sortKey === k && 'text-fg')} title={FIELDS[k]?.label}>
         {label}{sortKey === k && <SortMark desc={desc} />}
       </button>
     </th>
@@ -89,7 +89,7 @@ export default function Scanner() {
           <ul className="grid gap-2 @md:grid-cols-2 @4xl:grid-cols-1">
             {PRESETS.filter((p) => p.group === group).map((p) => { const on = active?.id === p.id; return (
               <li key={p.id}>
-                <button onClick={() => runPreset(p)} aria-pressed={on} className={cn('w-full rounded-2xl border p-3 text-left transition-colors', on ? 'border-fg bg-sunken' : 'border-line bg-surface hover:bg-hover')}>
+                <button onClick={() => runPreset(p)} aria-pressed={on} className={cn('w-full rounded-[10px] border p-3 text-left transition-colors', on ? 'border-fg bg-sunken' : 'border-line bg-surface hover:bg-hover')}>
                   <div className="flex items-baseline justify-between gap-2"><span className="font-bold">{p.name}</span><span className="num text-[11px] text-fg-subtle">{counts[p.id]} stocks</span></div>
                   <p className="mt-0.5 text-[12px] text-fg-muted">{p.desc}</p>
                 </button>
@@ -102,9 +102,9 @@ export default function Scanner() {
           {/* Active conditions */}
           <div className="flex flex-wrap items-center gap-2" aria-label="Active conditions">
             {scan.filters.map((f, i) => (
-              <span key={i} className="inline-flex h-8 items-center gap-1 rounded-full border border-line bg-sunken pl-3 pr-1 text-[12px]">
+              <span key={i} className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-sunken pl-3 pr-1 text-[12px]">
                 {describeFilter(f)}
-                <button aria-label={`Remove condition: ${describeFilter(f)}`} onClick={() => setFilters(scan.filters.filter((_, j) => j !== i))} className="inline-flex size-6 items-center justify-center rounded-full text-fg-subtle hover:bg-hover hover:text-fg"><XIcon width={12} height={12} /></button>
+                <button aria-label={`Remove condition: ${describeFilter(f)}`} onClick={() => setFilters(scan.filters.filter((_, j) => j !== i))} className="inline-flex size-6 items-center justify-center rounded-md text-fg-subtle hover:bg-hover hover:text-fg"><XIcon width={12} height={12} /></button>
               </span>))}
             {!scan.filters.length && <span className="text-[12px] text-fg-subtle">No conditions. Showing every stock.</span>}
             <AddCondition onAdd={(f) => setFilters([...scan.filters, f])} />
@@ -113,7 +113,7 @@ export default function Scanner() {
               <div className="w-64 p-2">
                 <div className="scroll-thin max-h-72 overflow-auto">
                   {SECTORS.map((s) => (
-                    <label key={s} className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 text-[13px] hover:bg-hover">
+                    <label key={s} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] hover:bg-hover">
                       <input type="checkbox" checked={sectors.includes(s)} onChange={(e) => setSectors(e.target.checked ? [...sectors, s] : sectors.filter((x) => x !== s))} />{s}
                     </label>))}
                 </div>
@@ -181,7 +181,7 @@ function AddCondition({ onAdd }: { onAdd: (f: Filter) => void }) {
       <Button size="sm" variant="secondary" onClick={toggle} {...triggerProps} leading={<PlusIcon width={14} height={14} />}>Add condition</Button>)}>
       {({ close }) => (
         <form className="w-72 space-y-2 p-3" onSubmit={(e) => { e.preventDefault(); if (!bool && v.trim() === '') return; onAdd(bool ? { field: f, op: '=', value: Number(v) ? 1 : 0 } : { field: f, op, value: Number(v) }); close() }}>
-          <p className="font-serif text-base">Add condition</p>
+          <p className="font-semibold text-base">Add condition</p>
           <label className="block text-[12px] text-fg-subtle">Field
             <select value={f} onChange={(e) => { setF(e.target.value); if (FIELDS[e.target.value].kind === 'bool') setV('1') }} className={cn(field, 'mt-1 w-full')}>
               {keys.map((k) => <option key={k} value={k}>{FIELDS[k].label}{FIELDS[k].unit && FIELDS[k].unit !== '₹' ? ` (${FIELDS[k].unit})` : ''}</option>)}
@@ -209,7 +209,7 @@ function AlertForm({ m, onSet, onCancel }: { m: Metrics; onSet: (dir: 'above' | 
     <form className="flex flex-wrap items-center gap-2 py-1" onSubmit={(e) => { e.preventDefault(); if (px > 0) onSet(dir, +px.toFixed(2)) }}>
       <span className="text-[12px] text-fg-muted">Alert when <b className="text-fg">{m.sym}</b> goes <b className="text-fg">{dir}</b></span>
       <input aria-label={`Alert price for ${m.sym}`} type="number" step={0.05} value={px} onChange={(e) => setPx(+e.target.value)} className={cn(field, 'num w-28')} />
-      {picks.map((p) => <button key={p.label} type="button" onClick={() => setPx(+p.v.toFixed(1))} className="h-7 rounded-full border border-line bg-surface px-2.5 text-[11px] text-fg-muted hover:bg-hover hover:text-fg">{p.label}</button>)}
+      {picks.map((p) => <button key={p.label} type="button" onClick={() => setPx(+p.v.toFixed(1))} className="h-7 rounded-md border border-line bg-surface px-2.5 text-[11px] text-fg-muted hover:bg-hover hover:text-fg">{p.label}</button>)}
       <Button size="sm" type="submit">Set alert</Button>
       <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
     </form>
