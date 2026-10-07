@@ -21,7 +21,7 @@ export type Action =
   | { t: 'squareoff'; key?: string }
   | { t: 'nav'; view?: ViewName; sym?: string; expiryIdx?: number }
   | { t: 'watch'; op: 'add' | 'remove'; sym: string }
-  | { t: 'trigger'; sym: string; dir: 'above' | 'below'; price: number; then?: OrderAction }
+  | { t: 'trigger'; sym: string; dir: 'above' | 'below'; price: number; then?: OrderAction; note?: string }
   | { t: 'bracket'; key: string; sl?: number; tgt?: number; trail?: number }
   | { t: 'risk'; maxLoss?: number; maxProfit?: number; maxTrades?: number; kill?: boolean }
   /** Standing trading rules (see rules.ts). `off` turns one off. */
@@ -47,6 +47,8 @@ export type Card =
   | { k: 'journal' }
   | { k: 'risk' }
   | { k: 'rules' }
+  | { k: 'setup' }
+  | { k: 'setups' }
   | { k: 'funds' }
 
 export type AIResult = { reply: string; actions: Action[]; cards?: Card[]; follow?: string[] }

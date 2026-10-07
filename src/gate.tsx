@@ -73,9 +73,9 @@ export const GateIcon = ({ g, size = 13 }: { g: Gate; size?: number }) => g.kind
 export function GatePill({ g, className, onReview }: { g: Gate; className?: string; onReview?: () => void }) {
   return (
     <span className={cn('inline-flex min-w-0 items-center gap-2', className)} title={`${g.why} Exits still work.`}>
-      <span className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line bg-sunken px-3.5 text-[12px] font-medium text-fg-muted"><GateIcon g={g} />{g.short}</span>
-      <span className="truncate text-[11px] text-fg-subtle max-[480px]:hidden">Exits still work</span>
-      {onReview && <button type="button" onClick={onReview} className="inline-flex h-8 shrink-0 items-center rounded-full border border-line-strong bg-sunken px-3 text-[12px] font-medium text-fg shadow-xs transition-colors hover:bg-hover">Review today</button>}
+      <span className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-line bg-sunken px-3 text-[12px] font-medium text-fg-muted"><GateIcon g={g} />{g.short}</span>
+      {onReview && <span className="truncate text-[11px] text-fg-subtle max-[480px]:hidden">Exits still work</span>}
+      {onReview && <button type="button" onClick={onReview} className="inline-flex h-8 shrink-0 items-center rounded-md border border-line bg-surface px-3 text-[12px] font-medium text-fg shadow-xs transition-colors hover:bg-hover">Review today</button>}
     </span>
   )
 }

@@ -11,12 +11,22 @@ import { progress } from '../watch'
 import { useShallow } from 'zustand/react/shallow'
 import { ask } from '../ai'
 import { Chg, Money, pct } from '../ui'
-import { CardView, DraftCard, say } from './cards'
+import { CardView, DraftCard, SetupCard, say } from './cards'
+import { DeskBar } from '../agent/Desk'
 
 /** Starting over drops drafts that are still waiting for approval, so say so first. */
 function confirmClear() {
   const waiting = actionablePending(useStore.getState())
   return confirm(waiting ? `Start a new conversation? ${waiting} draft${waiting > 1 ? 's' : ''} waiting for approval will be discarded. Positions and orders are not affected.` : 'Start a new conversation? Positions and orders are not affected.')
+}
+
+/** Chat-layout actions for the top bar: drafts waiting on you, and a new conversation. */
+export function ChatTopActions() {
+  const pending = usePendingCount(); const hasChat = useStore((s) => s.msgs.length > 1)
+  return <>
+    {pending > 0 && <button type="button" onClick={() => document.querySelector('[data-pending]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}><Badge tone="warning">{pending} waiting for you</Badge></button>}
+    <IconButton label="New conversation" disabled={!hasChat} onClick={() => { if (confirmClear()) useStore.getState().clearChat() }}><SquarePen size={16} strokeWidth={1.5} /></IconButton>
+  </>
 }
 
 /** The agent panel on the right of the cockpit. `resize` is the drag handle the layout passes in. */
@@ -29,16 +39,19 @@ export function ChatPanel({ overlay, resize, full = false }: { overlay: boolean;
     // with both classes 'relative' wins, and the drawer would take a grid slot and push the folded rail onto a new row.
     <aside id="copilot" aria-label="AI agent" className={cn('flex min-h-0 min-w-0 flex-col bg-bg', !full && 'border-l border-line', overlay ? 'fixed bottom-0 right-0 top-[86px] z-40 w-[min(440px,100vw)] shadow-lg animate-sheet' : 'relative max-md:border-l-0')}>
       {resize}
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface px-3">
+      {/* In the Chat layout the top bar already says where you are, so the panel drops its header; New chat and the
+          drafts badge move up there (ChatTopActions). The docked panel keeps it, to name the column. */}
+      {!full && <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface pl-4 pr-2">
         <span className="inline-flex size-7 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
         <h2 className="font-sans text-[13px] font-semibold text-fg">AI agent</h2>
         {pending > 0 && <button type="button" onClick={() => document.querySelector('[data-pending]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}><Badge tone="warning">{pending} waiting for you</Badge></button>}
         <span className="ml-auto flex items-center gap-0.5">
           <KeyHint className="mr-1 max-lg:hidden">/</KeyHint>
           <IconButton size="sm" label="New conversation" disabled={!hasChat} onClick={() => { if (confirmClear()) useStore.getState().clearChat() }}><SquarePen size={15} strokeWidth={1.5} /></IconButton>
-          {!full && <IconButton size="sm" className="max-md:hidden" label="Hide the agent ( ] )" onClick={() => useStore.getState().togglePanel('copilot')}><PanelRightClose size={15} strokeWidth={1.5} /></IconButton>}
+          <IconButton size="sm" className="max-md:hidden" label="Hide the agent ( ] )" onClick={() => useStore.getState().togglePanel('copilot')}><PanelRightClose size={15} strokeWidth={1.5} /></IconButton>
         </span>
-      </header>
+      </header>}
+      {full && <div className="min-[960px]:hidden"><DeskBar /></div>}
       <Thread full={full} />
     </aside>
   )
@@ -62,16 +75,16 @@ function Thread({ full = false }: { full?: boolean }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Conversation">
       <div ref={scroller} onScroll={(e) => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120 }} className="scroll-thin min-h-0 flex-1 overflow-auto">
-        <div className="@container mx-auto w-full max-w-[800px] px-3.5 pb-6 pt-5">
-          {real.length === 0 ? <Hero /> : <div className="space-y-7">{real.map((m, i) => <Fragment key={m.id}>
-              <MsgView m={m} />
+        <div className={cn('@container mx-auto w-full max-w-[800px] px-4 pb-8', full ? 'pt-8' : 'pt-5')}>
+          {real.length === 0 ? <Hero /> : <div>{real.map((m, i) => <Fragment key={m.id}>
+              <div className={i === 0 ? undefined : gap(real[i - 1], m)}><MsgView m={m} /></div>
               {m.restored && !real[i + 1]?.restored && <SessionDivider ts={m.ts} />}
             </Fragment>)}
-            {busy && <div className="flex gap-3"><AgentAvatar /><TypingIndicator /></div>}</div>}
+            {busy && <div className="mt-4 flex h-6 items-center gap-2 text-fg-subtle"><AIMark size={16} className="animate-pulse text-fg" /><TypingIndicator /></div>}</div>}
         </div>
       </div>
       <ChatComposer full={full} chips={lastAi?.follow && lastAi.follow.length > 0 && !busy
-        ? <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Suggested next">{lastAi.follow.map((f) => <button key={f} type="button" onClick={() => say(f)} className="group inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface pl-2.5 pr-3 text-[12px] text-fg-muted transition-colors hover:border-line-strong hover:bg-hover hover:text-fg active:translate-y-px"><CornerDownRight size={12} strokeWidth={1.75} className="text-fg-subtle group-hover:text-fg-muted" />{f}</button>)}</div>
+        ? <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Suggested next">{lastAi.follow.map((f) => <button key={f} type="button" onClick={() => say(f)} className="group inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-surface pl-2 pr-2.5 text-[12px] text-fg-muted transition-colors hover:border-line-strong hover:bg-hover hover:text-fg active:translate-y-px"><CornerDownRight size={12} strokeWidth={1.75} className="text-fg-subtle group-hover:text-fg-muted" />{f}</button>)}</div>
         : null} />
     </div>
   )
@@ -80,32 +93,63 @@ function Thread({ full = false }: { full?: boolean }) {
 /** Marks where the saved conversation ends and this visit begins. */
 function SessionDivider({ ts }: { ts?: number }) {
   return (
-    <div role="separator" className="flex items-center gap-3 text-[11px] text-fg-subtle">
+    <div role="separator" className="my-8 flex items-center gap-3 text-[11px] text-fg-subtle">
       <span className="h-px flex-1 bg-line" />
-      <span className="text-center">You left off here{ts ? ` · ${new Date(ts).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}` : ''} · positions and orders carried over</span>
+      <span>Earlier{ts ? ` · ${new Date(ts).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}` : ''}</span>
       <span className="h-px flex-1 bg-line" />
     </div>
   )
 }
 
-const AgentAvatar = ({ tone }: { tone?: Msg['event'] }) => {
-  if (!tone) return <span className="mt-0.5 inline-flex size-7 max-sm:hidden shrink-0 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
-  const I = tone === 'good' ? CircleCheck : tone === 'bad' ? CircleAlert : tone === 'attention' ? CircleAlert : Bell
-  return <span className={cn('mt-0.5 inline-flex size-7 shrink-0 max-sm:size-6 items-center justify-center rounded-full', tone === 'good' ? 'bg-success-soft text-success-fg' : tone === 'bad' ? 'bg-danger-soft text-danger-fg' : tone === 'attention' ? 'bg-attention-soft text-attention-fg' : 'bg-sunken text-fg-muted')}><I size={15} strokeWidth={1.5} /></span>
+/** Bookkeeping lines, including ones saved before they were marked. */
+const isActivity = (m: Msg) => m.kind === 'activity' || (m.role === 'ai' && !m.cards?.length && !m.pending && !m.event && !m.follow?.length && /^(✓|⚠️|Moved your|Cancelled your|Closed your)/.test(m.text))
+
+/**
+ * Space between messages says how they relate: a reply sits close under its question, a new question opens a new
+ * exchange, and runs of bookkeeping lines stack tightly.
+ */
+function gap(prev: Msg, m: Msg) {
+  if (isActivity(m)) return isActivity(prev) ? 'mt-1.5' : 'mt-4'
+  if (m.role === 'user') return 'mt-7'
+  return prev.role === 'user' ? 'mt-3' : 'mt-4'
 }
-const EVENT_LABEL: Record<NonNullable<Msg['event']>, string> = { info: 'Update', good: 'Done', bad: 'Loss taken', attention: 'Needs your attention' }
+
+const clock = (ts?: number) => fmtIST((ts ?? Date.now()) / 1000, { hour: '2-digit', minute: '2-digit', hour12: false })
+const TONE: Record<NonNullable<Msg['event']>, { label: string; icon: typeof Bell; cls: string }> = {
+  info: { label: 'Update', icon: Bell, cls: 'text-fg-muted' },
+  good: { label: 'Done', icon: CircleCheck, cls: 'text-up' },
+  bad: { label: 'Loss taken', icon: CircleAlert, cls: 'text-down' },
+  attention: { label: 'Needs your attention', icon: CircleAlert, cls: 'text-[var(--attention-fg)]' },
+}
 
 function MsgView({ m }: { m: Msg }) {
-  if (m.role === 'user') return <div className="flex justify-end animate-rise"><div className="max-w-[80%] rounded-3xl rounded-br-lg bg-sunken px-4 py-2.5 text-[14px] leading-relaxed text-fg">{m.text}</div></div>
-  return (
-    <div id={`msg-${m.id}`} data-pending={m.state === 'pending' || undefined} className="flex gap-3 animate-rise">
-      <AgentAvatar tone={m.event} />
-      <div className="min-w-0 flex-1 space-y-3">
-        {m.event && <p className="text-[11px] text-fg-subtle">{EVENT_LABEL[m.event]} · {fmtIST((m.ts ?? Date.now()) / 1000, { hour: '2-digit', minute: '2-digit', hour12: false })} · I noticed this for you</p>}
-        {m.text && <div className="text-[14px] leading-6 text-fg [&_p]:my-0"><Markdown>{m.text}</Markdown></div>}
-        {m.cards?.map((c, i) => <CardView key={i} c={c} />)}
-        {m.pending && <DraftCard msgId={m.id} />}
+  // Your words: a bubble on the right. Its time shows on hover, on the side away from the text.
+  if (m.role === 'user') return (
+    <div className="group flex items-end justify-end gap-2 animate-rise">
+      <span className="mb-1.5 text-[11px] tabular-nums text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100">{clock(m.ts)}</span>
+      <div className="max-w-[75%] whitespace-pre-wrap rounded-lg bg-sunken px-3 py-1.5 text-[13px] leading-6 text-fg">{m.text}</div>
+    </div>
+  )
+  // Bookkeeping: one quiet line with its time, so it reads as a log entry, not a reply.
+  if (isActivity(m)) {
+    const bad = m.text.startsWith('⚠️') || /^Rejected/.test(m.text)
+    return (
+      <div className="flex items-start gap-2 text-[12px] leading-5 text-fg-muted">
+        <span className={cn('mt-[7px] size-1.5 shrink-0 rounded-full', bad ? 'bg-danger' : 'bg-[var(--border-strong)]')} aria-hidden />
+        <span className="min-w-0 flex-1 [&_p]:my-0 [&_strong]:font-medium [&_strong]:text-fg"><Markdown>{m.text.replace(/^(✓|⚠️)\s*/gm, '')}</Markdown></span>
+        <span className="shrink-0 tabular-nums text-fg-subtle">{clock(m.ts)}</span>
       </div>
+    )
+  }
+  // The agent: full width, no avatar. Something it noticed on its own carries a tone, a label and the time.
+  const t = m.event ? TONE[m.event] : undefined
+  return (
+    <div id={`msg-${m.id}`} data-pending={m.state === 'pending' || undefined} className="min-w-0 space-y-3 animate-rise">
+      {t && <p className={cn('flex items-center gap-1.5 text-[12px] font-medium', t.cls)}><t.icon size={14} strokeWidth={2} aria-hidden />{t.label}<span className="font-normal text-fg-subtle">· {clock(m.ts)}</span></p>}
+      {/* Prose rhythm: 8px between paragraphs and lists, tighter between list items, bold in medium weight. */}
+      {m.text && <div className="text-[13px] leading-[22px] text-fg [&>*]:my-0 [&>*+*]:mt-2 [&_li+li]:mt-1 [&_li]:my-0 [&_strong]:font-semibold [&_ul]:pl-5"><Markdown>{m.text}</Markdown></div>}
+      {m.cards?.map((c, i) => <CardView key={i} c={c} />)}
+      {m.pending && <DraftCard msgId={m.id} />}
     </div>
   )
 }
@@ -121,18 +165,21 @@ const STARTERS: { group: string; items: string[] }[] = [
 
 function Hero() {
   const h = +fmtIST(Date.now() / 1000, { hour: 'numeric', hour12: false })
+  const fresh = useStore((s) => !s.profile)
   return (
     <div className="pt-4 @2xl:pt-[6vh]">
       <span className="inline-flex size-9 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={22} /></span>
       <h1 className="mt-3 text-[22px] font-semibold leading-tight tracking-[-0.02em] @2xl:mt-5 @2xl:text-[34px]">{h < 12 ? 'Good morning.' : h < 17 ? 'Good afternoon.' : 'Good evening.'} What are we trading?</h1>
       <p className="mt-2 max-w-xl text-[13px] leading-5 text-fg-muted @2xl:text-[15px] @2xl:leading-6">Say it in plain words. I pull up the data, draft the order with a stop, and nothing reaches the market until you approve it. I'll also tell you when a stop, target or alert is hit.</p>
+      {/* First visit: set up the desk before anything else; the starters come after, in the agent's reply. */}
+      {fresh ? <div className="mt-5 @2xl:mt-7"><SetupCard first /></div> : <>
       <div className="mt-5 grid gap-4 @2xl:mt-7 @2xl:grid-cols-2 @2xl:gap-3">
         {STARTERS.map((g) => <div key={g.group} className="@2xl:rounded-2xl @2xl:border @2xl:border-line @2xl:bg-surface @2xl:p-3">
           <p className="px-1 text-[11px] font-medium uppercase tracking-[0.08em] text-fg-subtle">{g.group}</p>
           <ul className="mt-1">{g.items.map((it) => <li key={it}><button type="button" onClick={() => say(it)} className="w-full rounded-lg px-2 py-1.5 text-left text-[13px] text-fg hover:bg-hover">{it}</button></li>)}</ul>
         </div>)}
       </div>
-      <p className="mt-5 text-[12px] text-fg-subtle">Type <KeyHint>@</KeyHint> for a symbol, <KeyHint>/</KeyHint> for commands. Paper trading on simulated prices. Not investment advice.</p>
+      <p className="mt-5 text-[12px] text-fg-subtle">Type <KeyHint>@</KeyHint> for a symbol, <KeyHint>/</KeyHint> for commands. Paper trading on simulated prices. Not investment advice.</p></>}
     </div>
   )
 }
@@ -202,7 +249,7 @@ const COMMANDS: { cmd: string; text: string; desc: string }[] = [
 type Menu = { kind: '@' | '/'; q: string; start: number; sel: number; focus?: boolean } | null
 
 function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boolean }) {
-  const tool = 'inline-flex size-8 shrink-0 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-hover hover:text-fg active:translate-y-px'
+  const tool = 'inline-flex size-7 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-hover hover:text-fg active:translate-y-px'
   const [text, setText] = useState(''); const [menu, setMenu] = useState<Menu>(null); const [listening, setListening] = useState(false)
   const ta = useRef<HTMLTextAreaElement>(null)
   const busy = useStore((s) => s.busy); const sym = useStore((s) => s.sym); const prices = useStore((s) => s.prices)
@@ -244,19 +291,20 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
   const q = prices[sym]
   return (
     <>
-      <div className="relative mx-auto w-full max-w-[800px] px-3 pb-3">
+      <div className="@container relative mx-auto w-full max-w-[800px] px-4 pb-3">
         {/* Cards scroll away under a short fade instead of being cut off at a hard edge. */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-full h-6 bg-gradient-to-t from-bg to-transparent" />
-        <PositionStrip />
+        {/* The agent view's desk rail already shows positions and the lock, so these strips are for the docked panel only. */}
+        {!full && <PositionStrip />}
         {/* Locked mode: the state of the day sits where you're about to type, with the way forward next to it. */}
-        {gate && <div role="status" className="mb-2 flex items-center gap-2.5 rounded-xl border border-line bg-sunken py-1.5 pl-3 pr-1.5 text-[12px] leading-5 text-fg-muted">
+        {gate && !full && <div role="status" className="mb-2 flex min-h-10 items-center gap-2.5 rounded-xl border border-line bg-sunken py-[5px] pl-3 pr-1.5 text-[12px] leading-5 text-fg-muted">
           <span className="shrink-0 text-fg"><GateIcon g={gate} size={14} /></span>
-          <p className="min-w-0 flex-1"><b className="font-medium text-fg">{gate.kind === 'locked' ? 'Locked for today.' : gate.kind === 'cooloff' ? `Paused for ${gate.short.split('· ')[1]}.` : gate.kind === 'rule' ? `${gate.short}.` : 'Trade limit reached.'}</b> <span className="max-sm:hidden">{gate.why} </span>Exits and stops still work.</p>
-          <button type="button" onClick={() => say('review today')} className="inline-flex h-7 shrink-0 items-center rounded-full border border-line-strong bg-surface px-3 text-[12px] font-medium text-fg shadow-xs transition-colors hover:bg-hover">Review today</button>
+          <p className="min-w-0 flex-1"><b className="font-medium text-fg">{gate.kind === 'locked' ? 'Locked for today.' : gate.kind === 'cooloff' ? `Paused for ${gate.short.split('· ')[1]}.` : gate.kind === 'rule' ? `${gate.short}.` : 'Trade limit reached.'}</b> <span className="@max-md:hidden">{gate.why} </span>Exits and stops still work.</p>
+          <button type="button" onClick={() => say('review today')} className="inline-flex h-7 shrink-0 items-center rounded-md border border-line-strong bg-surface px-3 text-[12px] font-medium text-fg shadow-xs transition-colors hover:bg-hover">Review today</button>
         </div>}
         {chips}
         <div className="relative">
-          {menu && items.length > 0 && <ul role="listbox" aria-label={menu.focus ? 'Change focus' : menu.kind === '@' ? 'Symbols' : 'Commands'} className="absolute bottom-full left-0 z-30 mb-2 max-h-80 w-full max-w-md overflow-auto rounded-2xl border border-line bg-raised p-1.5 shadow-lg animate-rise">
+          {menu && items.length > 0 && <ul role="listbox" aria-label={menu.focus ? 'Change focus' : menu.kind === '@' ? 'Symbols' : 'Commands'} className="absolute bottom-full left-0 z-30 mb-2 max-h-80 w-full max-w-md overflow-auto rounded-lg border border-line bg-raised p-1 shadow-lg animate-rise">
             {menu.focus && <li role="presentation" className="px-3 pb-1 pt-1.5 text-[11px] text-fg-subtle">Switch focus. “it” and “buy 10” will mean this symbol</li>}
             {items.map((it, i) => { const p = it.sym ? prices[it.sym] : undefined; return (
               <li key={it.id} role="option" aria-selected={i === menu.sel}>
@@ -268,7 +316,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
           </ul>}
           {/* One unit, the way AI composers work: what you type on top, and everything that acts on it in the box's
               own bottom row. Context on the left (the focus symbol, commands), input and send on the right. */}
-          <div className="rounded-2xl border border-line bg-surface p-1.5 shadow-sm transition-colors focus-within:border-line-strong">
+          <div className="rounded-lg border border-line bg-surface p-1.5 transition-colors focus-within:border-line-strong">
             <textarea id="chat-input" ref={ta} rows={1} value={text} aria-label="Message the trading agent" placeholder={gate ? (matchMedia('(max-width: 640px)').matches ? 'Ask, review or exit' : 'Ask, review the day, or close a position') : matchMedia('(max-width: 640px)').matches ? 'Trade, scan or ask' : 'Trade, scan or ask. @ for a symbol, / for commands'}
                 onChange={(e) => { setText(e.target.value); if (!menu?.focus) detect(e.target.value, e.target.selectionStart) }}
                 onKeyDown={(e) => {
@@ -285,7 +333,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
             <div className="mt-1 flex items-center gap-1">
               <button type="button" aria-label={`Focus: ${sym}. Change`} aria-haspopup="listbox" aria-expanded={!!menu?.focus} onMouseDown={(e) => e.preventDefault()} title="The symbol “it” refers to. Click to switch"
                 onClick={() => { setMenu(menu?.focus ? null : { kind: '@', q: '', start: 0, sel: Math.max(0, INSTS.slice(0, 12).findIndex((i) => i.sym === sym)), focus: true }); ta.current?.focus() }}
-                className={cn('inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full bg-sunken pl-2.5 pr-2 text-[12px] transition-colors hover:bg-hover active:translate-y-px', menu?.focus && 'bg-hover')}>
+                className={cn('inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md bg-sunken pl-2 pr-1.5 text-[12px] transition-colors hover:bg-hover active:translate-y-px', menu?.focus && 'bg-hover')}>
                 <Crosshair size={13} strokeWidth={1.75} className="shrink-0 text-fg-muted" />
                 <span className="truncate font-medium text-fg">{sym}</span><span className="num text-fg-muted max-[420px]:hidden">{q.ltp.toFixed(2)}</span>
                 <ChevronDown size={13} strokeWidth={1.75} className={cn('shrink-0 text-fg-muted transition-transform', menu?.focus && 'rotate-180')} /></button>
@@ -294,7 +342,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
               <span className="flex-1" />
               <button type="button" aria-label={listening ? 'Listening' : 'Speak'} aria-pressed={listening} title={listening ? 'Listening…' : 'Speak'} onClick={voice}
                 className={cn(tool, listening && 'bg-accent text-on-accent hover:bg-accent hover:text-on-accent animate-pulse')}><Mic size={16} strokeWidth={1.5} /></button>
-              <button type="button" aria-label={busy ? 'Working' : 'Send'} disabled={!text.trim() && !busy} onClick={() => send()} className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-fg text-bg transition-opacity disabled:opacity-30">
+              <button type="button" aria-label={busy ? 'Working' : 'Send'} disabled={!text.trim() && !busy} onClick={() => send()} className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-fg text-bg transition-opacity disabled:opacity-30">
                 {busy ? <Square size={12} fill="currentColor" strokeWidth={0} /> : <ArrowUp size={16} strokeWidth={2} />}</button>
             </div>
           </div>
@@ -302,7 +350,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
         {full && <p className="mt-2 text-center text-[11px] text-fg-subtle">Paper trading on simulated prices · not investment advice</p>}
       </div>
       {/* In Terminal the panel ends in a 49px bar with its top rule, level with the folded positions bar beside it. */}
-      {!full && <div className="flex h-[49px] shrink-0 items-center justify-center border-t border-line bg-surface px-3 text-[11px] text-fg-subtle">Paper trading on simulated prices · not investment advice</div>}
+      {!full && <div className="flex h-[49px] shrink-0 items-center justify-center border-t border-line bg-surface px-4 text-[11px] text-fg-subtle">Paper trading on simulated prices · not investment advice</div>}
     </>
   )
 }

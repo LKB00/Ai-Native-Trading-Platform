@@ -52,7 +52,7 @@ export function attachOverlays(chart: TVChartApi, brokerDraws: () => boolean): (
     return l.setLineColor(color).setLineStyle(dashed ? LineStyle.Dashed : LineStyle.Solid).setBodyBorderColor(color).setBodyTextColor(color).setBodyBackgroundColor(c.bg)
       .setQuantityBackgroundColor(color).setQuantityBorderColor(color).setQuantityTextColor(c.bg).setCancelButtonBorderColor(color).setCancelButtonIconColor(color).setExtendLeft(false)
   }
-  const note = (text: string) => useStore.getState().addMsg({ role: 'ai', text })
+  const note = (text: string) => useStore.getState().addMsg({ role: 'ai', text, kind: 'activity' })
 
   function clear() {
     for (const d of orders.values()) d.line.remove(); orders.clear()

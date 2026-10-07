@@ -5,6 +5,7 @@ import { patterns } from './Chart'
 import type { Action, Card, AIResult, Filter, OrderAction } from './actions'
 import { entryGate, isEntry, type Gate } from './gate'
 import { ruleText, type RuleId } from './rules'
+import { styleOf } from './setup'
 
 const ALIAS: Record<string, string> = {
   'bank nifty': 'BANKNIFTY', banknifty: 'BANKNIFTY', 'nifty bank': 'BANKNIFTY', nifty: 'NIFTY', 'nifty 50': 'NIFTY', finnifty: 'FINNIFTY', 'fin nifty': 'FINNIFTY', sensex: 'SENSEX',
@@ -227,8 +228,10 @@ export function localAI(input: string): AIResult {
     const keys = Object.values(s.positions).filter((p) => p.qty && (!named || parseKey(p.key).und === named))
     return { reply: keys.length ? `This closes ${keys.length} position${keys.length > 1 ? 's' : ''} at market and cancels their working orders.` : 'You have no open positions.', actions: keys.length ? [{ t: 'squareoff', key: named && keys.length === 1 ? keys[0].key : undefined }] : [], cards: keys.length ? [{ k: 'positions' }] : undefined }
   }
-  if (/brief|morning|what.?s happening|market (today|summary|overview)|how.?s the market/.test(t)) return { reply: briefing(), actions: [{ t: 'nav', view: 'markets' }], cards: [{ k: 'brief' }], follow: ['show my positions', 'stocks with volume 2x today', 'nifty option chain', 'mildly bullish on nifty, max loss 5000'] }
+  if (/brief|morning|what.?s happening|market (today|summary|overview)|how.?s the market/.test(t)) return { reply: briefing(), actions: [{ t: 'nav', view: 'markets' }], cards: [{ k: 'brief' }], follow: ["today's setups", 'show my positions', 'stocks with volume 2x today', 'nifty option chain'] }
   if (/explain (my )?(p&?n?l|profit|loss)|why (am i|did i) (lose|losing|make|down|up)|where did .* (money|profit|loss)/.test(t)) return { reply: explainPnl(), actions: [], cards: [{ k: 'positions' }], follow: ['review my trades', 'tighten my stops'] }
+  if (/\bsetups?\b(?! (my )?desk)|trade ideas|ideas for today|what (should i|to) watch|morning plan|pre.?market/.test(t)) return { reply: s.mode === 'chat' ? '' : 'Setups from your watchlist.', actions: [], cards: [{ k: 'setups' }], follow: ['brief me', 'show my positions'] }
+  if (/set ?up (my )?desk|onboard|change my (trading )?(style|setup)|start over setup/.test(t)) return { reply: 'Four quick questions, and I will set your limits, rules and watchlist to match. Nothing changes until you confirm.', actions: [], cards: [{ k: 'setup' }] }
   // Standing rules: show them, or set one in plain words.
   if (/\b(my|show|list|trading) rules?\b|what are my rules/.test(t)) return { reply: 'Your standing rules. I apply them to every draft and order; switch any of them off here.', actions: [], cards: [{ k: 'rules' }], follow: ['review my trades'] }
   {
@@ -239,7 +242,7 @@ export function localAI(input: string): AIResult {
     const rp = t.match(/risk (?:at most |max(?:imum)? |only )?(\d+(?:\.\d+)?) ?% (?:of (?:my )?capital )?(?:per|a|each) trade/)
     if (rp) return on('maxRiskPct', { t: 'rules', maxRiskPct: +rp[1] })
   }
-  if (/review (my )?(today|day)|debrief|what went wrong today|today'?s review/.test(t)) return { reply: debrief(), actions: [], cards: [{ k: 'positions' }], follow: ['review my trades', 'my rules'] }
+  if (/review (my )?(today|day)|debrief|what went wrong today|today'?s review/.test(t)) return { reply: debrief(), actions: [], follow: ['show my positions', 'review my trades', 'my rules'] }
   if (/review (my )?trades|journal|how am i doing|my (trading )?mistakes|win rate/.test(t)) return { reply: reviewTrades(), actions: [{ t: 'nav', view: 'journal' }], cards: [{ k: 'journal' }], follow: ['my rules', 'set max loss 5000'] }
   if (/p&?l|pnl|positions?|margin|funds|balance|holdings?|portfolio/.test(t) && !/\b(buy|sell|add|stop|sl)\b/.test(t)) return { reply: s.mode === 'chat' ? '' : portfolio(), actions: /holding|portfolio/.test(t) ? [{ t: 'nav', view: 'portfolio' }] : [], cards: /holding|portfolio/.test(t) ? [{ k: 'funds' }] : /margin|funds|balance/.test(t) ? [{ k: 'funds' }] : [{ k: 'positions' }], follow: ['explain my pnl', 'square off all'] }
   if (named && /why .*(up|down|moving|rally|fall|fell|jump|crash)|what.?s (up|happening) with/.test(t)) return { reply: whyMove(sym), actions: [{ t: 'chart', sym }], cards: [{ k: 'chart', sym, tf: '5m' }], follow: [`analyse ${sym.toLowerCase()}`, `buy ${sym.toLowerCase()}`, `alert me if ${sym.toLowerCase()} crosses ${Math.ceil(s.prices[sym].high)}`] }
@@ -289,9 +292,14 @@ export function localAI(input: string): AIResult {
   }
 
   // Alerts.
-  const trig = t.match(/(falls?|drops?|dips?|goes? (?:down )?(?:to|below)|below|under|rises?|goes? (?:up )?(?:to|above)|above|over|crosses|reaches|hits|touch(?:es)?)\s*(?:to|at)?\s*(\d+(?:\.\d+)?)/)
-  const trigDir = trig ? (/fall|drop|dip|below|under|down/.test(trig[1]) ? 'below' : /rise|above|over|up/.test(trig[1]) ? 'above' : +trig[2] >= s.prices[sym].ltp ? 'above' : 'below') as 'above' | 'below' : undefined
-  if (/alert|notify|remind|ping|tell me/.test(t) && trig && trigDir) return { reply: `I'll alert you when ${sym} goes ${trigDir} ${trig[2]}. It also shows as a line on the chart.`, actions: [{ t: 'trigger', sym, dir: trigDir, price: +trig[2] }], cards: [{ k: 'alerts' }] }
+  const trig = t.match(/(falls?|drops?|dips?|goes? (?:down )?(?:to|below)|below|under|rises?|gains?|jumps?|goes? (?:up )?(?:to|above)|above|over|crosses|reaches|hits|touch(?:es)?)\s*(?:to|at|by)?\s*(\d+(?:\.\d+)?)\s*(%|percent)?/)
+  const trigDir = trig ? (/fall|drop|dip|below|under|down/.test(trig[1]) ? 'below' : /rise|gain|jump|above|over|up/.test(trig[1]) ? 'above' : +trig[2] >= s.prices[sym].ltp ? 'above' : 'below') as 'above' | 'below' : undefined
+  // "falls 2%" means 2% from the previous close: turn it into the price the watch checks, and keep the words for the rail.
+  const trigPct = trig?.[3] ? +trig[2] : undefined
+  const trigPrice = trig ? (trigPct != null ? +(Math.round(s.prices[sym].prev * (1 + (trigDir === 'below' ? -trigPct : trigPct) / 100) / 0.05) * 0.05).toFixed(2) : +trig[2]) : 0
+  // Short form for the rail ("falls 2%"); replies add "from yesterday's close".
+  const trigNote = trigPct != null ? `${trigDir === 'below' ? 'falls' : 'rises'} ${trigPct}%` : undefined
+  if (/alert|notify|remind|ping|tell me/.test(t) && trig && trigDir) return { reply: `I'll alert you when ${sym} ${trigNote ? `${trigNote} from yesterday's close (₹${trigPrice.toLocaleString('en-IN')})` : `goes ${trigDir} ${trigPrice}`}. It also shows as a line on the chart.`, actions: [{ t: 'trigger', sym, dir: trigDir, price: trigPrice, note: trigNote }], cards: [{ k: 'alerts' }] }
 
   // SIP.
   const sip = t.match(/sip (?:of )?(\d+)/) ?? t.match(/(\d+) (?:a|per|every) month/)
@@ -302,8 +310,8 @@ export function localAI(input: string): AIResult {
   if (sd) {
     const side: 'BUY' | 'SELL' = /buy|long/.test(sd[1]) ? 'BUY' : 'SELL'
     let rest = t
-    const cond = trig && /\b(if|when|once|after)\b/.test(t) ? trig : null
-    if (cond) rest = rest.replace(/\b(if|when|once|after)\b.*$/, '')
+    const cond = trig && /\b(if|when|whenever|once|after)\b/.test(t) ? trig : null
+    if (cond) rest = rest.replace(/\b(if|when|whenever|once|after)\b.*$/, '')
     for (const m of [slM, tgM, trM]) if (m) rest = rest.replace(m[0], ' ')
     const strikeM = rest.match(/\b(\d{3,6})\s*(ce|pe|call|put)\b/)
     rest = rest.replace(/\b(\d{3,6})\s*(ce|pe|call|put)\b/, ' ')
@@ -320,14 +328,16 @@ export function localAI(input: string): AIResult {
     if (!strikeM && rsM) qty = Math.max(1, Math.floor(+rsM[1] / s.prices[sym].ltp))
     if (strikeM && lotM) qty = parseInt(lotM[1])
     const limit = !isMkt && priceM ? +priceM[1] : undefined
-    const a: OrderAction = { t: 'order', und: sym, side, qty, otype: limit ? 'LIMIT' : 'MARKET', price: limit, product: strikeM ? 'NRML' : /deliver|cnc|hold|invest|swing/.test(t) || misClosedNow() ? 'CNC' : 'MIS', sl: slM ? +slM[1] : undefined, tgt: tgM ? +tgM[1] : undefined, trail: trM ? +trM[1] : undefined, ...(strikeM ? { strike: +strikeM[1], ot: /ce|call/.test(strikeM[2]) ? 'CE' as const : 'PE' as const, expiryIdx } : {}) }
+    const a: OrderAction = { t: 'order', und: sym, side, qty, otype: limit ? 'LIMIT' : 'MARKET', price: limit, product: strikeM ? 'NRML' : /deliver|cnc|hold|invest|swing/.test(t) || misClosedNow() || (['swing', 'investing'].includes(styleOf(s.profile) ?? '') && !/intraday|mis\b/.test(t)) ? 'CNC' : 'MIS', sl: slM ? +slM[1] : undefined, tgt: tgM ? +tgM[1] : undefined, trail: trM ? +trM[1] : undefined, ...(strikeM ? { strike: +strikeM[1], ot: /ce|call/.test(strikeM[2]) ? 'CE' as const : 'PE' as const, expiryIdx } : {}) }
     if (a.strike && (a.strike % inst.step)) return { reply: `${a.strike} isn't a valid ${sym} strike. Strikes are in steps of ${inst.step}.`, actions: [] }
     const ref = limit ?? s.prices[sym].ltp
     if (!strikeM && a.sl && (side === 'BUY' ? a.sl >= ref : a.sl <= ref)) return { reply: `A stop at ${a.sl} is on the wrong side of the ${ref.toFixed(2)} entry for a ${side.toLowerCase()}. Check the price.`, actions: [] }
     const what = strikeM ? `${qty} lot${qty > 1 ? 's' : ''} (${qty * inst.lot} qty) ${sym} ${strikeM[1]} ${a.ot}` : `${qty} ${sym}`
     const plan = a.sl || a.tgt ? ` with ${[a.sl && `stop ${a.sl}`, a.tgt && `target ${a.tgt}`, a.trail && `trailing ${a.trail}`].filter(Boolean).join(', ')}` : ''
     const risk = !strikeM && a.sl ? ` Risk if stopped: ${inr(Math.abs(ref - a.sl) * qty)}${a.tgt ? `, reward ${inr(Math.abs(a.tgt - ref) * qty)} (1 : ${(Math.abs(a.tgt - ref) / Math.abs(ref - a.sl)).toFixed(1)})` : ''}.` : !strikeM ? ' No stop set. Add "sl 850" to attach one.' : ''
-    if (cond && trigDir) return { reply: `GTT: when ${sym} goes ${trigDir} ${cond[2]}, ${side.toLowerCase()} ${what}${plan}.`, actions: [{ t: 'trigger', sym, dir: trigDir, price: +cond[2], then: a }] }
+    if (cond && trigDir) return { reply: `GTT: when ${sym} ${trigNote ? `${trigNote} from yesterday's close (₹${trigPrice.toLocaleString('en-IN')})` : `goes ${trigDir} ${trigPrice}`}, I'll ${side.toLowerCase()} ${what}${plan} automatically, within your limits and rules.`, actions: [{ t: 'trigger', sym, dir: trigDir, price: trigPrice, then: a, note: trigNote }] }
+    // In chat the draft card shows every number, so the reply only says what to do with it instead of repeating it.
+    if (s.mode === 'chat') return { reply: a.sl || strikeM ? 'Here it is. Check it over, then place it.' : 'Here it is, without a stop for now. Add one before you place it.', actions: [a] }
     return { reply: `${side === 'BUY' ? 'Buy' : 'Sell'} ${what} ${limit ? `at limit ${limit}` : 'at market'}${plan} · ${a.product === 'MIS' ? 'intraday' : a.product === 'CNC' ? 'delivery' : 'F&O'}.${risk}`, actions: [a] }
   }
 
@@ -443,7 +453,7 @@ export function confirm(msgId: number) {
   const first = m.pending[0]; const und = 'und' in first ? first.und.toLowerCase() : undefined
   s.patchMsg(msgId, { state: 'confirmed', orderIds, follow: s.mode === 'chat' && und ? (first.t === 'order' && !first.sl ? [`add stop to ${und}`, 'show my positions'] : first.t === 'legs' ? ['show my positions', 'explain my pnl'] : [`trail my ${und} stop`, 'show my positions']) : m.follow })
   // In chat the approved card turns into a live order tracker, so a separate receipt message is only needed in the terminal.
-  if (s.mode !== 'chat' || !orderIds.length) s.addMsg({ role: 'ai', text: out.map((x) => (x.startsWith('Rejected') ? '⚠️ ' : '✓ ') + x).join('\n\n') })
+  if (s.mode !== 'chat' || !orderIds.length) s.addMsg({ role: 'ai', kind: 'activity', text: out.map((x) => (x.startsWith('Rejected') ? '⚠️ ' : '✓ ') + x).join('\n\n') })
   s.log('user', `Approved: ${out.join(' | ')}`)
 }
 /**

@@ -16,7 +16,8 @@ import Scanner from './Scanner'
 import Markets from './Markets'
 import Portfolio from './Portfolio'
 import Journal from './Journal'
-import { ChatPanel } from './chat/Chat'
+import { ChatPanel, ChatTopActions } from './chat/Chat'
+import { DeskRail } from './agent/Desk'
 
 export { inr, Chg, Money }
 
@@ -72,12 +73,13 @@ function Cockpit() {
   const cp = panels.copilot && !narrow ? (compact ? Math.min(panels.copilotW, 360) : panels.copilotW) : 48
   const bh = panels.bottom ? panels.bottomH : 49 // folded: the 48px header plus its 1px top rule
   if (mobile) return <PhoneCockpit />
-  // Expanded agent: the conversation fills the screen, with the ticker above and positions below.
+  // Agent view: the whole product through the agent. The desk rail keeps your money, positions and watches in sight,
+  // so nothing needs the terminal; the agent log fills the rest.
   if (panels.chatFull) return (
-    <div className="grid h-full grid-cols-1 grid-rows-[56px_30px_minmax(0,1fr)_var(--bh)]" style={{ '--bh': `${bh}px` } as React.CSSProperties}>
+    <div className="grid h-full grid-cols-1 grid-rows-[56px_30px_minmax(0,1fr)] min-[960px]:grid-cols-[272px_minmax(0,1fr)]">
       <Top /><TickerTape />
+      <div className="hidden min-h-0 min-[960px]:flex [&>aside]:flex-1"><DeskRail /></div>
       <ChatPanel overlay={false} full />
-      <Bottom />
       <Toast /><Palette /><FnoDisclosure />
     </div>
   )
@@ -204,10 +206,11 @@ export function TopBar({ left, extras }: { left?: ReactNode; extras?: ReactNode 
         <span className="inline-flex size-7 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
         <span className="whitespace-nowrap font-serif text-[17px] tracking-tight max-lg:hidden">Prompt Terminal</span>
       </div>
-      <SegmentedControl size="sm" label="Layout" className="max-md:hidden" value={chatFull ? 'chat' : 'terminal'} onChange={(v) => switchLayout(v === 'chat')} options={[{ value: 'chat', label: 'Chat' }, { value: 'terminal', label: 'Terminal' }]} />
+      <SegmentedControl size="sm" label="Layout" className="max-md:hidden" value={chatFull ? 'chat' : 'terminal'} onChange={(v) => switchLayout(v === 'chat')} options={[{ value: 'chat', label: 'Agent' }, { value: 'terminal', label: 'Terminal' }]} />
       <span aria-hidden className="h-5 w-px shrink-0 bg-line max-md:hidden" />
       <div className="flex min-w-0 shrink-0 items-center gap-2 max-md:hidden">{left}</div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        {chatFull && <ChatTopActions />}
         {extras}
         <RiskCenter net={net} />
         <Popover label="AI engine" align="end" trigger={({ toggle, triggerProps }) => (
@@ -228,7 +231,7 @@ export function TopBar({ left, extras }: { left?: ReactNode; extras?: ReactNode 
 }
 
 function Top() {
-  const { setView, view } = useStore()
+  const { setView, view } = useStore(); const chatFull = useStore((s) => s.panels.chatFull)
   const nav = NAV.find((n) => n.views.includes(view))?.value ?? 'chart'
   return (
     <TopBar
@@ -236,7 +239,7 @@ function Top() {
       extras={<>
         <button onClick={() => useStore.setState({ palette: true })} className="flex h-8 items-center gap-2 rounded-full border border-line bg-sunken px-3 text-[12px] text-fg-subtle hover:border-line-strong max-2xl:hidden" aria-label="Open command palette">
           <SearchIcon width={13} height={13} />Search<KeyHint>⌘K</KeyHint></button>
-        <FocusToggle />
+        {!chatFull && <FocusToggle />}
       </>} />
   )
 }
@@ -548,7 +551,7 @@ export function Palette() {
       { label: 'New conversation (clear chat history)', hint: 'Chat', run: () => { if (window.confirm('Clear the conversation? Positions and orders are not affected.')) st.clearChat() } },
       { label: st.panels.watch ? 'Hide watchlist' : 'Show watchlist', hint: '[', run: () => st.togglePanel('watch') },
       { label: st.panels.copilot ? 'Hide the AI agent' : 'Show the AI agent', hint: ']', run: () => st.togglePanel('copilot') },
-      { label: st.panels.chatFull ? 'Switch to Terminal' : 'Switch to Chat', hint: 'Layout', run: () => switchLayout(!st.panels.chatFull) },
+      { label: st.panels.chatFull ? 'Switch to Terminal' : 'Switch to Agent', hint: 'Layout', run: () => switchLayout(!st.panels.chatFull) },
       { label: st.panels.bottom ? 'Fold positions panel' : 'Open positions panel', hint: '\\', run: () => st.togglePanel('bottom') },
       { label: st.panels.focus ? 'Leave focus mode' : 'Focus mode: hide all panels', hint: 'Shift+F', run: () => st.togglePanel('focus') },
       { label: 'Reset layout', hint: 'Command', run: () => { st.setPanels({ watch: true, copilot: true, bottom: true, watchW: 240, copilotW: 380, bottomH: 240, focus: false, chips: true }); try { localStorage.removeItem('sections') } catch { /* storage unavailable */ } st.set({ sections: {} }) } },

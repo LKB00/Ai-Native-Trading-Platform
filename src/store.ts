@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { INSTS, bySym, nextExpiries, optQuote, simNow, keyOf, parseKey, labelOf, history, charges, FREEZE, isExpiryDay, SQUARE_OFF, secOfDay, sessionDay, expiryDate, type Leg, type TF } from './market'
 import { DEFAULT_RULES, hhmm, type Rules } from './rules'
+import type { Profile } from './setup'
 import type { Action, Card, Filter, OrderAction, ViewName } from './actions'
 
 export type OType = 'MARKET' | 'LIMIT' | 'SL' | 'SL-M'
@@ -15,13 +16,19 @@ export type Order = {
 export type Position = { key: string; qty: number; avg: number; realized: number; product: string; charges: number; openedAt: number; tag?: string }
 /** Exit plan on an open position: stop, target (OCO) and optional trailing distance. */
 export type Bracket = { sl?: number; tgt?: number; trail?: number; peak?: number }
-export type Trigger = { id: number; sym: string; dir: 'above' | 'below'; price: number; then?: OrderAction; done?: boolean; created: number }
+export type Trigger = { id: number; sym: string; dir: 'above' | 'below'; price: number; then?: OrderAction; done?: boolean; created: number
+  /** A paused watch keeps its settings but isn't checked until resumed. */
+  paused?: boolean
+  /** How it was asked, when it came from a percentage ("falls 2%"), so the rail can say it the same way. */
+  note?: string }
 export type Trade = { id: number; key: string; side: 'LONG' | 'SHORT'; qty: number; entry: number; exit: number; pnl: number; charges: number; open: number; close: number; product: string; tag?: string; via: Via; sample?: boolean; exitReason?: string }
 export type Holding = { sym: string; qty: number; avg: number; since: string }
 export type Sip = { id: number; sym: string; amount: number; day: number; active: boolean; runs: number }
 export type Risk = { maxLoss: number; maxProfit: number; maxTrades: number; cooloffAfter: number; killed: boolean; reason?: string; cooloffUntil?: number }
 export type Audit = { ts: number; source: 'ai' | 'user' | 'system'; text: string }
 export type Msg = {
+  /** Bookkeeping (an order moved, cancelled or filled): shown as a one-line note, not a full reply. */
+  kind?: 'activity'
   id: number; role: 'user' | 'ai'; text: string; pending?: Action[]; state?: 'pending' | 'confirmed' | 'dismissed'; scan?: Filter[]
   /** Live cards shown under the reply. */
   cards?: Card[]
@@ -73,6 +80,8 @@ type S = {
   /** Session day on which intraday positions were auto squared off; no new intraday entries that day. */
   misClosed?: string
   triggers: Trigger[]; trades: Trade[]; holdings: Holding[]; sips: Sip[]; risk: Risk; rules: Rules; audit: Audit[]
+  /** Who this desk is set up for (onboarding). Null until set up, or after Skip. */
+  profile: Profile | null
   fnoAck: boolean; needAck: boolean; instant: boolean
   chart: ChartCfg; drawings: Record<string, number[]>; aiLevels: Record<string, boolean>
   scan: { filters: Filter[]; name: string; sort: string }
@@ -106,9 +115,12 @@ type S = {
   watchOp: (op: 'add' | 'remove', sym: string) => void
   addTrigger: (t: Omit<Trigger, 'id' | 'created'>) => void
   removeTrigger: (id: number) => void
+  pauseTrigger: (id: number, paused: boolean) => void
   setRisk: (r: Partial<Risk>) => void
   /** Turn rules on (values) or off (undefined). Persisted, and logged like risk settings. */
   setRules: (r: Partial<Rules>) => void
+  setProfile: (p: Profile | null) => void
+  setWatch: (w: string[]) => void
   setChart: (c: Partial<ChartCfg>) => void
   toggleDrawing: (sym: string, price: number) => void
   setScan: (s: Partial<S['scan']>) => void
@@ -289,6 +301,7 @@ export const useStore = create<S>((set, get) => ({
   sips: [{ id: sid++, sym: 'NIFTYBEES', amount: 10000, day: 5, active: true, runs: 28 }, { id: sid++, sym: 'GOLDBEES', amount: 3000, day: 10, active: true, runs: 19 }],
   risk: loadJSON('risk', DEFAULT_RISK),
   rules: loadJSON('rules', DEFAULT_RULES),
+  profile: loadJSON<Profile | null>('profile', null),
   audit: [],
   fnoAck: loadJSON('fnoAck', false), needAck: false, instant: false,
   chart: { ...DEFAULT_CHART, ...loadJSON('chart2', {}) },
@@ -296,7 +309,9 @@ export const useStore = create<S>((set, get) => ({
   scan: { filters: [], name: '', sort: 'chg' },
   palette: false,
   // 'cockpit-panels': a new key, so the cockpit opens with every panel showing instead of the old Terminal's folds.
-  panels: { ...DEFAULT_PANELS, ...loadJSON('cockpit-panels', {}), focus: false },
+  // A first visit (no desk set up, no saved layout) opens in Chat with the empty positions panel folded, so setup has
+  // room; the Terminal is one tap away.
+  panels: { ...DEFAULT_PANELS, ...(!loadJSON('cockpit-panels', null) && !loadJSON('profile', null) ? { chatFull: true, bottom: false } : {}), ...loadJSON('cockpit-panels', {}), focus: false },
   setPanels: (p) => { const panels = { ...get().panels, ...p }; saveJSON('cockpit-panels', panels); set({ panels }) },
   togglePanel: (k) => {
     const pn = get().panels
@@ -387,7 +402,7 @@ export const useStore = create<S>((set, get) => ({
       else if (pl.net <= -r.maxLoss * 0.8 && !warned) { warned = true; get().event(`**You're at ${Math.round(-pl.net / r.maxLoss * 100)}% of today's loss limit.** At ₹${r.maxLoss.toLocaleString('en-IN')} I close everything automatically.`, 'attention', [{ k: 'positions' }], ['square off all', 'tighten my stops']) }
     }
     // Alerts and GTTs.
-    for (const t of get().triggers.filter((t) => !t.done)) {
+    for (const t of get().triggers.filter((t) => !t.done && !t.paused)) {
       const l = p[t.sym].ltp
       if ((t.dir === 'above' && l >= t.price) || (t.dir === 'below' && l <= t.price)) {
         set({ triggers: get().triggers.map((x) => (x.id === t.id ? { ...x, done: true } : x)) })
@@ -471,6 +486,9 @@ export const useStore = create<S>((set, get) => ({
   watchOp: (op, sym) => { const w = op === 'add' ? (get().watch.includes(sym) ? get().watch : [...get().watch, sym]) : get().watch.filter((x) => x !== sym); saveJSON('watch', w); set({ watch: w }) },
   addTrigger: (t) => set({ triggers: [{ ...t, id: ++tid, created: Date.now() }, ...get().triggers] }),
   removeTrigger: (id) => set({ triggers: get().triggers.filter((t) => t.id !== id) }),
+  pauseTrigger: (id, paused) => { set({ triggers: get().triggers.map((t) => (t.id === id ? { ...t, paused } : t)) }); get().log('user', `${paused ? 'Paused' : 'Resumed'} watch #${id}`) },
+  setProfile: (profile) => { saveJSON('profile', profile); set({ profile }) },
+  setWatch: (w) => { saveJSON('watch', w); set({ watch: w }) },
   setRules: (r) => { const rules = Object.fromEntries(Object.entries({ ...get().rules, ...r }).filter(([, v]) => v != null && v !== false)) as Rules; saveJSON('rules', rules); set({ rules }); get().log('user', `Rules: ${JSON.stringify(r)}`) },
   setRisk: (r) => { const risk = { ...get().risk, ...r }; saveJSON('risk', { ...risk, cooloffUntil: undefined }); set({ risk }); get().log('user', `Risk settings: ${JSON.stringify(r)}`) },
   setChart: (c) => { const chart = { ...get().chart, ...c }; saveJSON('chart2', chart); set({ chart }) },
@@ -500,7 +518,7 @@ export const useStore = create<S>((set, get) => ({
       case 'squareoff': { const n = s.squareoff(a.key); return n ? `Closed ${n} position${n > 1 ? 's' : ''} at market` : 'No open positions' }
       case 'nav': { if (a.sym && bySym(a.sym)) set({ sym: a.sym.toUpperCase() }); if (a.view) set({ view: a.view }); if (a.expiryIdx != null) set({ expiryIdx: a.expiryIdx }); return '' }
       case 'watch': s.watchOp(a.op, a.sym.toUpperCase()); return `${a.op === 'add' ? 'Added' : 'Removed'} ${a.sym}`
-      case 'trigger': s.addTrigger({ sym: a.sym, dir: a.dir, price: a.price, then: a.then }); return a.then ? `GTT set: when ${a.sym} goes ${a.dir} ${a.price}, ${a.then.side.toLowerCase()} ${a.then.qty}` : `Alert set: ${a.sym} ${a.dir} ${a.price}`
+      case 'trigger': s.addTrigger({ sym: a.sym, dir: a.dir, price: a.price, then: a.then, note: a.note }); return a.then ? `GTT set: when ${a.sym} goes ${a.dir} ${a.price}, ${a.then.side.toLowerCase()} ${a.then.qty}` : `Alert set: ${a.sym} ${a.dir} ${a.price}`
       case 'bracket': { if (!s.positions[a.key]?.qty) return 'No open position to protect'; s.setBracket(a.key, { sl: a.sl, tgt: a.tgt, trail: a.trail, peak: undefined }); return `Exit plan on ${labelOf(a.key)}:${a.sl ? ' stop ' + a.sl : ''}${a.tgt ? ' target ' + a.tgt : ''}${a.trail ? ' trailing ' + a.trail : ''}` }
       case 'risk': {
         if (a.kill) { const n = s.squareoff(undefined, 'kill switch'); s.setRisk({ killed: true, reason: 'Kill switch turned on' }); return `Kill switch on. Closed ${n} position(s); new trades are blocked for today.` }
