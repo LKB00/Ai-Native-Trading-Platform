@@ -1,7 +1,7 @@
 // The AI agent, docked in the cockpit. You say what you want; it answers with live cards (quotes, charts,
 // chains, scans, positions) and drafts every trade as an editable ticket you approve in place. It also speaks
 // first when something happens to your money. The chart, watchlist and positions stay in view around it.
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowUp, Bell, SquarePen, CircleAlert, CircleCheck, Mic, PanelRightClose, Square, Crosshair, ChevronDown, SquareSlash, CornerDownRight, Check } from 'lucide-react'
 import { AIMark, Badge, IconButton, Markdown, TypingIndicator, KeyHint, cn } from '../ds'
 import { useStore, type Msg } from '../store'
@@ -57,14 +57,27 @@ export function ChatPanel({ overlay, resize, full = false }: { overlay: boolean;
   )
 }
 
+/** Where the thread was scrolled, kept across remounts (switching Agent/Terminal views). */
+const saved: { pinned: boolean; top: number | null } = { pinned: true, top: null }
+
 function Thread({ full = false }: { full?: boolean }) {
   const msgs = useStore((s) => s.msgs); const busy = useStore((s) => s.busy)
   const real = msgs.filter((m) => m.id !== 0)
-  const scroller = useRef<HTMLDivElement>(null); const pinned = useRef(true)
+  const scroller = useRef<HTMLDivElement>(null); const pinned = useRef(saved.pinned)
+  // Switching views remounts the thread. Put it back where you left it before the first paint, with no animation:
+  // at the bottom if you were following along, otherwise at the exact spot you were reading.
+  const mounted = useRef(false)
+  useLayoutEffect(() => {
+    const el = scroller.current; if (!el) return
+    el.scrollTop = saved.pinned || saved.top == null ? el.scrollHeight : saved.top
+    // Cards with charts grow after the first frame; keep the bottom in view while they settle.
+    if (saved.pinned) { const t = setTimeout(() => { el.scrollTop = el.scrollHeight }, 120); return () => clearTimeout(t) }
+  }, [])
   // Follow the conversation when you just asked something, or when you were already at the bottom.
   // An event while you're reading further up doesn't yank the page; the toast and positions panel tell you instead.
   useEffect(() => {
     const el = scroller.current; const last = real[real.length - 1]; if (!el || !last) return
+    if (!mounted.current) { mounted.current = true; return }
     const userTurn = last.role === 'user' || real[real.length - 2]?.role === 'user'
     if (!userTurn && !pinned.current) return
     const go = () => el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
@@ -74,7 +87,7 @@ function Thread({ full = false }: { full?: boolean }) {
   const lastAi = [...real].reverse().find((m) => m.role === 'ai')
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Conversation">
-      <div ref={scroller} onScroll={(e) => { const el = e.currentTarget; pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120 }} className="scroll-thin min-h-0 flex-1 overflow-auto">
+      <div ref={scroller} onScroll={(e) => { const el = e.currentTarget; pinned.current = saved.pinned = el.scrollHeight - el.scrollTop - el.clientHeight < 120; saved.top = el.scrollTop }} className="scroll-thin min-h-0 flex-1 overflow-auto">
         <div className={cn('@container mx-auto w-full max-w-[800px] px-4 pb-8', full ? 'pt-8' : 'pt-5')}>
           {real.length === 0 ? <Hero /> : <div>{real.map((m, i) => <Fragment key={m.id}>
               <div className={i === 0 ? undefined : gap(real[i - 1], m)}><MsgView m={m} /></div>
