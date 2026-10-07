@@ -36,6 +36,7 @@ export type Action =
  */
 export type Card =
   | { k: 'quote'; sym: string }
+  | { k: 'depth'; sym: string }
   | { k: 'chart'; sym: string; tf?: TF; levels?: boolean }
   | { k: 'brief' }
   | { k: 'positions' }

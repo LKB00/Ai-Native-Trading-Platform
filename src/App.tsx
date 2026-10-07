@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { useStore, resetBook, type View } from './store'
-import { usePendingCount, useEntryGate, opensPosition, GateNote } from './gate'
+import { usePendingCount, useEntryGate, entryGate, opensPosition, GateNote, GateIcon } from './gate'
 import { INSTS, bySym, labelOf, parseKey } from './market'
 import { ask } from './ai'
 import type { Action } from './actions'
 import { AIMark, Badge, Button, IconButton, MeterBar, Popover, SegmentedControl, KeyHint, cn } from './ds'
-import { ChevronIcon, EyeIcon, MoonIcon, SunIcon, SettingsIcon, SearchIcon, XIcon, PlusIcon, CheckIcon, ShieldIcon, ArrowRightIcon } from './ds/lib/icons'
+import { ChevronIcon, MoonIcon, SunIcon, SettingsIcon, SearchIcon, XIcon, PlusIcon, CheckIcon, ShieldIcon, ArrowRightIcon } from './ds/lib/icons'
 import { inr, pct, Chg, Money, LabeledSwitch } from './ui'
 import { FlashPrice, TickerTape } from './cockpit/live'
 import Chart from './Chart'
@@ -19,6 +19,8 @@ import Journal from './Journal'
 import { ChatPanel, ChatTopActions } from './chat/Chat'
 import { DeskRail } from './agent/Desk'
 import { CostLine, LevelInput, priceBand, useOrderCost } from './ticket'
+import { DepthView } from './depth'
+import { Briefcase, GripVertical, Layers, Rows3, Trash2 } from 'lucide-react'
 
 export { inr, Chg, Money }
 
@@ -203,10 +205,8 @@ export function TopBar({ left, extras }: { left?: ReactNode; extras?: ReactNode 
   const apiKey = useStore((s) => s.apiKey); const setApiKey = useStore((s) => s.setApiKey); const theme = useStore((s) => s.theme)
   return (
     <header className="relative z-40 col-span-full flex h-14 min-w-0 items-center gap-3 border-b border-line bg-surface px-3 [view-transition-name:topbar] sm:px-4">
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="inline-flex size-7 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
-        <span className="whitespace-nowrap font-serif text-[17px] tracking-tight max-lg:hidden">Prompt Terminal</span>
-      </div>
+      {/* The mark alone; the name stays for screen readers and the tooltip. */}
+      <span role="img" aria-label="Prompt Terminal" title="Prompt Terminal" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
       <SegmentedControl size="sm" label="Layout" className="max-md:hidden" value={chatFull ? 'chat' : 'terminal'} onChange={(v) => switchLayout(v === 'chat')} options={[{ value: 'chat', label: 'Agent' }, { value: 'terminal', label: 'Terminal' }]} />
       <span aria-hidden className="h-5 w-px shrink-0 bg-line max-md:hidden" />
       <div className="flex min-w-0 shrink-0 items-center gap-2 max-md:hidden">{left}</div>
@@ -232,7 +232,7 @@ export function TopBar({ left, extras }: { left?: ReactNode; extras?: ReactNode 
 }
 
 function Top() {
-  const { setView, view } = useStore(); const chatFull = useStore((s) => s.panels.chatFull)
+  const { setView, view } = useStore()
   const nav = NAV.find((n) => n.views.includes(view))?.value ?? 'chart'
   return (
     <TopBar
@@ -240,15 +240,8 @@ function Top() {
       extras={<>
         <button onClick={() => useStore.setState({ palette: true })} className="flex h-8 items-center gap-2 rounded-full border border-line bg-sunken px-3 text-[12px] text-fg-subtle hover:border-line-strong max-2xl:hidden" aria-label="Open command palette">
           <SearchIcon width={13} height={13} />Search<KeyHint>⌘K</KeyHint></button>
-        {!chatFull && <FocusToggle />}
       </>} />
   )
-}
-
-/** Focus mode: hide watchlist, copilot and positions in one go; restores the previous layout when turned off. */
-function FocusToggle() {
-  const focus = useStore((s) => s.panels.focus)
-  return <IconButton label={focus ? 'Leave focus mode (Shift+F)' : 'Focus mode: hide side panels (Shift+F)'} active={focus} onClick={() => useStore.getState().togglePanel('focus')}><EyeIcon /></IconButton>
 }
 
 /** Daily risk limits, kill switch and cool-off: the controls traders said they need most. */
@@ -326,33 +319,114 @@ const INDICES = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY']
  * One watchlist row, 32px: symbol (with your position, if any), price and change in aligned columns. Buy and sell
  * appear on hover. The company name is in the tooltip, not the row: the list is for scanning numbers.
  */
-function WatchRow({ w, sel, pick, onTrade, onRemove }: { w: string; sel: boolean; pick: () => void; onTrade?: (side: 'BUY' | 'SELL') => void; onRemove?: () => void }) {
+type RowAct = 'BUY' | 'SELL' | 'chart' | 'depth' | 'chain' | 'remove'
+
+/**
+ * One watchlist row. Hovering it, or moving to it with the arrow keys, swaps the price for an action bar: Buy, Sell,
+ * chart, depth, option chain (F&O names) and remove, each with its shortcut in the tooltip. While entries are paused
+ * Buy and Sell stay put, greyed with the reason in the corner; a side that only closes what you hold stays live.
+ */
+function WatchRow({ w, sel, active, first, depthOpen, onAct, drag }: {
+  w: string; sel: boolean; active: boolean; first: boolean; depthOpen: boolean; onAct: (a: RowAct) => void
+  drag: { onDragStart: () => void; onDragOver: (e: React.DragEvent) => void; onDragEnd: () => void; dragging: boolean }
+}) {
   const p = useStore((s) => s.prices[w]); const pos = useStore((s) => s.positions[w])
+  const hold = useStore((s) => s.holdings.find((h) => h.sym === w && h.qty > 0))
+  const gate = useEntryGate(); const inst = bySym(w)!
+  const allowed = (side: 'BUY' | 'SELL') => !gate || !opensPosition(w, side, 1, 'MIS') || !opensPosition(w, side, 1, 'CNC')
+  const tip = (label: string, key?: string) => (
+    <span role="tooltip" className={cn('pointer-events-none absolute left-1/2 z-40 hidden -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md bg-[var(--fg)] px-2 py-1 text-[11px] font-medium text-[var(--bg)] shadow-md group-hover/b:flex', first ? 'top-full mt-1.5' : 'bottom-full mb-1.5')}>
+      {label}{key && <kbd className="num rounded bg-[color-mix(in_srgb,var(--bg)_18%,transparent)] px-1 text-[10px]">{key}</kbd>}
+    </span>
+  )
+  const tradeBtn = (side: 'BUY' | 'SELL') => { const ok = allowed(side); const buy = side === 'BUY'
+    return <button type="button" tabIndex={-1} aria-label={ok ? `${buy ? 'Buy' : 'Sell'} ${w}` : `${buy ? 'Buy' : 'Sell'} ${w}: ${gate!.short}`} aria-disabled={!ok || undefined}
+      onClick={() => ok && onAct(side)}
+      className={cn('group/b relative h-6 w-6 rounded text-[11px] font-semibold', ok ? (buy ? 'bg-success' : 'bg-danger') + ' text-white dark:text-[var(--bg)]' : 'cursor-not-allowed bg-sunken text-fg-subtle')}>{buy ? 'B' : 'S'}
+      {!ok && <span aria-hidden className="absolute -bottom-1 -right-1 flex size-3.5 items-center justify-center rounded-full border border-line bg-raised text-fg-muted"><GateIcon g={gate!} size={8} /></span>}
+      {ok ? tip(gate ? (pos?.qty ? `Close your ${w} position` : `Sell from your holding`) : buy ? 'Buy' : 'Sell', buy ? 'B' : 'S') : tip(`${gate!.short} · exits still work`)}
+    </button> }
+  const iconBtn = (a: RowAct, label: string, icon: ReactNode, key?: string, on?: boolean) => (
+    <button type="button" tabIndex={-1} aria-label={`${label}: ${w}`} aria-pressed={on || undefined} onClick={() => onAct(a)}
+      className={cn('group/b relative flex size-[22px] items-center justify-center rounded transition-colors hover:bg-[var(--surface)] hover:text-fg', on ? 'bg-[var(--surface)] text-fg' : 'text-fg-muted')}>{icon}{tip(label, key)}</button>
+  )
   const chg = pct(p.ltp, p.prev); const up = chg >= 0
+  const showBar = active || depthOpen
   return (
-    <li className={cn('group relative flex h-8 items-center gap-1.5 border-l-2 pl-3 pr-3 text-[12px]', sel ? 'border-[var(--lime)] bg-sunken' : 'border-transparent hover:bg-hover')}>
-      <button className="flex min-w-0 flex-1 items-center gap-1.5 text-left" onClick={pick} aria-current={sel || undefined} title={bySym(w)!.name}>
+    <li data-row={w} draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; drag.onDragStart() }} onDragOver={drag.onDragOver} onDragEnd={drag.onDragEnd}
+      className={cn('group relative flex h-8 items-center gap-1.5 border-l-2 pl-3 pr-3 text-[12px]', sel ? 'border-[var(--lime)] bg-sunken' : 'border-transparent', !sel && (showBar ? 'bg-hover' : 'hover:bg-hover'), drag.dragging && 'opacity-40')}>
+      {/* Grip: drag to reorder. Shown on hover, in the gutter, so the symbol never moves. */}
+      <span aria-hidden className="absolute left-0 top-1/2 hidden -translate-y-1/2 cursor-grab text-fg-subtle group-hover:block"><GripVertical size={11} strokeWidth={1.5} /></span>
+      <button type="button" tabIndex={-1} className="flex min-w-0 flex-1 items-center gap-1 text-left" onClick={() => onAct('chart')} aria-current={sel || undefined} title={inst.name}>
         <span className="truncate font-medium text-fg">{w}</span>
-        {pos?.qty ? <span className={cn('num shrink-0 rounded px-1 text-[10px] font-medium leading-4', pos.qty > 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')} title={`Your position: ${pos.qty > 0 ? 'long' : 'short'} ${Math.abs(pos.qty)}`}>{pos.qty > 0 ? '+' : ''}{pos.qty}</span> : null}
+        {pos?.qty ? <span className={cn('num shrink-0 rounded px-1 text-[10px] font-medium leading-4', pos.qty > 0 ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')} title={`Open position: ${pos.qty > 0 ? 'long' : 'short'} ${Math.abs(pos.qty)}`}>{pos.qty > 0 ? '+' : ''}{pos.qty}</span> : null}
+        {hold && <span className="flex shrink-0 text-fg-subtle" title={`In your holdings: ${hold.qty} shares`} aria-label={`Held: ${hold.qty} shares`}><Briefcase size={11} strokeWidth={1.75} aria-hidden /></span>}
       </button>
-      {onTrade && <div className="absolute right-[118px] hidden gap-1 group-hover:flex group-focus-within:flex">
-        <button aria-label={`Buy ${w}`} onClick={() => onTrade('BUY')} className="h-6 w-6 rounded bg-success text-[11px] font-semibold text-white dark:text-[var(--bg)]">B</button>
-        <button aria-label={`Sell ${w}`} onClick={() => onTrade('SELL')} className="h-6 w-6 rounded bg-danger text-[11px] font-semibold text-white dark:text-[var(--bg)]">S</button>
-      </div>}
-      <FlashPrice v={p.ltp} className="w-16 shrink-0 text-right text-fg" />
-      <span className={cn('num w-12 shrink-0 text-right text-[11px]', up ? 'text-up' : 'text-down')}>{up ? '+' : '−'}{Math.abs(chg).toFixed(2)}%</span>
-      {onRemove && <button aria-label={`Remove ${w} from watchlist`} onClick={onRemove} className="absolute -right-0 hidden size-5 items-center justify-center text-fg-subtle hover:text-fg group-hover:flex"><XIcon width={9} height={9} /></button>}
+      <FlashPrice v={p.ltp} className="w-[60px] shrink-0 text-right text-fg" />
+      <span className={cn('num w-11 shrink-0 text-right text-[11px]', up ? 'text-up' : 'text-down')}>{up ? '+' : '−'}{Math.abs(chg).toFixed(2)}%</span>
+      {/* The bar covers the price while you act; the chart header shows it anyway. */}
+      <div className={cn('absolute inset-y-0 right-0 items-center gap-0.5 pl-4 pr-1.5', showBar ? 'flex' : 'hidden group-hover:flex')}
+        // Solid row colour so the price underneath doesn't show through; fades in from the left.
+        style={{ backgroundImage: `linear-gradient(to right, transparent, var(${sel ? '--surface-sunken' : '--surface-hover'}) 14px)` }}>
+        {tradeBtn('BUY')}{tradeBtn('SELL')}
+        <span className="mx-0.5 h-4 w-px bg-[var(--border)]" aria-hidden />
+        {iconBtn('depth', 'Market depth', <Rows3 size={13} strokeWidth={1.75} />, 'D', depthOpen)}
+        {inst.fno && iconBtn('chain', 'Option chain', <Layers size={13} strokeWidth={1.75} />, 'C')}
+        {iconBtn('remove', 'Remove', <Trash2 size={13} strokeWidth={1.75} />, 'Del')}
+      </div>
     </li>
   )
 }
 
-/** Search, list and quick ticket. Shared by the open panel and the peek from the folded rail. */
+/**
+ * Search, list, quick ticket and depth. Shared by the open panel and the peek from the folded rail.
+ * Keyboard, once you click into the list: ↑ ↓ move, B / S trade, D depth, C option chain, Enter chart, Delete removes.
+ */
 function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => void }) {
-  const { watch, sym, setSym, watchOp, setView, view } = useStore()
+  const { watch, sym, setSym, watchOp, setWatch, setView, view } = useStore()
   const list = watch.filter((w) => !INDICES.includes(w))
   const pick = (w: string) => { setSym(w); if (!TRADING.includes(view)) setView('chart'); onPicked?.() }
-  const [q, setQ] = useState(''); const [ticket, setTicket] = useState<{ sym: string; side: 'BUY' | 'SELL' } | null>(null); const gate = useEntryGate()
+  const [q, setQ] = useState(''); const [ticket, setTicket] = useState<{ sym: string; side: 'BUY' | 'SELL'; px?: number } | null>(null)
+  const [depthFor, setDepthFor] = useState<string | null>(null)
+  const [hover, setHover] = useState<string | null>(null); const [cursor, setCursor] = useState<string | null>(null)
+  // Keyboard or mouse, whichever moved last, decides which row shows its actions.
+  const [kb, setKb] = useState(false)
+  const [dragging, setDragging] = useState<string | null>(null)
+  const ul = useRef<HTMLUListElement>(null)
   const results = q ? INSTS.filter((i) => (i.sym + i.name).toLowerCase().includes(q.toLowerCase()) && !watch.includes(i.sym)).slice(0, 8) : []
+  const allowed = (w: string, side: 'BUY' | 'SELL') => { const g = entryGate(useStore.getState()); return !g || !opensPosition(w, side, 1, 'MIS') || !opensPosition(w, side, 1, 'CNC') }
+  const act = (w: string, a: RowAct) => {
+    setCursor(w)
+    if (a === 'BUY' || a === 'SELL') { if (!allowed(w, a)) return; setDepthFor(null); setTicket({ sym: w, side: a }) }
+    else if (a === 'chart') pick(w)
+    else if (a === 'depth') { setTicket(null); setDepthFor((d) => (d === w ? null : w)) }
+    else if (a === 'chain') { if (bySym(w)?.fno) { setSym(w); setView('chain'); onPicked?.() } }
+    else { if (depthFor === w) setDepthFor(null); const i = list.indexOf(w); watchOp('remove', w); setCursor(list[i + 1] ?? list[i - 1] ?? null) }
+  }
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    const cur = cursor && list.includes(cursor) ? cursor : null; const i = cur ? list.indexOf(cur) : -1
+    const k = e.key.toLowerCase(); let handled = true
+    if (k === 'arrowdown' || k === 'arrowup') {
+      const n = list[k === 'arrowdown' ? Math.min(i + 1, list.length - 1) : Math.max(i - 1, 0)]
+      if (n) { setCursor(n); setKb(true); if (depthFor) setDepthFor(n); ul.current?.querySelector(`[data-row="${CSS.escape(n)}"]`)?.scrollIntoView({ block: 'nearest' }) }
+    } else if (k === 'escape') { setDepthFor(null); setTicket(null) }
+    else if (!cur) handled = false
+    else if (k === 'enter') act(cur, 'chart')
+    else if (k === 'b' && !e.shiftKey) act(cur, 'BUY')
+    else if (k === 's' && !e.shiftKey) act(cur, 'SELL')
+    else if (k === 'd') act(cur, 'depth')
+    else if (k === 'c') act(cur, 'chain')
+    else if (k === 'delete' || k === 'backspace') act(cur, 'remove')
+    else handled = false
+    // Keys used here stay here, so B / S / D don't also reach the chart.
+    if (handled) { e.preventDefault(); e.stopPropagation() }
+  }
+  const reorder = (over: string) => {
+    if (!dragging || dragging === over) return
+    const next = list.filter((x) => x !== dragging); next.splice(next.indexOf(over) + (list.indexOf(dragging) < list.indexOf(over) ? 1 : 0), 0, dragging)
+    setWatch([...watch.filter((x) => INDICES.includes(x)), ...next])
+  }
   return (
     <>
       <div className="flex h-12 shrink-0 items-center gap-1 border-b border-line pl-3 pr-1.5">
@@ -368,21 +442,41 @@ function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => v
       </ul>}
       {/* Indices live in the market strip above, so the list is only your names. Column labels line up with the rows. */}
       <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-line pl-3.5 pr-3 text-[11px] text-fg-subtle">
-        <span className="flex-1">Watchlist <span className="num">{list.length}</span></span><span className="w-16 text-right">Price</span><span className="w-12 text-right">Chg</span>
+        <span className="flex-1">Watchlist <span className="num">{list.length}</span></span><span className="w-[60px] text-right">Price</span><span className="w-11 text-right">Chg</span>
       </div>
-      <ul className="scroll-thin min-h-0 flex-1 overflow-auto">
-        {list.map((w) => <WatchRow key={w} w={w} sel={w === sym} pick={() => pick(w)} onTrade={gate ? undefined : (side) => setTicket({ sym: w, side })} onRemove={() => watchOp('remove', w)} />)}
+      <ul ref={ul} tabIndex={0} aria-label="Watchlist. Arrow keys move; B buy, S sell, D depth, Enter chart" onKeyDown={onKey}
+        onMouseLeave={() => setHover(null)} onMouseMove={() => kb && setKb(false)} onBlur={() => setKb(false)} className="scroll-thin min-h-0 flex-1 overflow-auto outline-none">
+        {list.map((w, i) => <div key={w} onMouseEnter={() => setHover(w)} onMouseDown={() => setCursor(w)}>
+          <WatchRow w={w} sel={w === sym} first={i === 0} active={kb ? cursor === w : hover === w} depthOpen={depthFor === w}
+            onAct={(a) => { ul.current?.focus({ preventScroll: true }); act(w, a) }}
+            drag={{ dragging: dragging === w, onDragStart: () => setDragging(w), onDragOver: (e) => { e.preventDefault(); reorder(w) }, onDragEnd: () => setDragging(null) }} />
+        </div>)}
       </ul>
-      {ticket && <Ticket {...ticket} close={() => setTicket(null)} />}
+      {ticket && <Ticket key={ticket.sym + ticket.side + (ticket.px ?? '')} {...ticket} close={() => setTicket(null)} />}
+      {depthFor && list.includes(depthFor) && bySym(depthFor)?.seg === 'EQ' && (
+        <div role="dialog" aria-label={`${depthFor} market depth`} className="absolute left-full top-16 z-30 ml-2 w-[340px] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise max-md:left-3 max-md:ml-0">
+          <div className="mb-2.5 flex items-center justify-between"><p className="text-[13px] font-semibold text-fg">{depthFor} · Market depth</p>
+            <IconButton size="sm" label="Close depth" onClick={() => setDepthFor(null)}><XIcon width={12} height={12} /></IconButton></div>
+          <DepthView sym={depthFor} onPrice={(side, price) => { if (allowed(depthFor, side)) { setTicket({ sym: depthFor, side, px: price }); setDepthFor(null) } }} />
+          <p className="mt-2.5 text-[11px] text-fg-subtle">Click a price to open the ticket at that limit. ↑ ↓ moves to the next stock.</p>
+        </div>
+      )}
     </>
   )
 }
 
-function Ticket({ sym, side: s0, close }: { sym: string; side: 'BUY' | 'SELL'; close: () => void }) {
+function Ticket({ sym, side: s0, px: px0, close }: { sym: string; side: 'BUY' | 'SELL'; px?: number; close: () => void }) {
   const { prices, place, setToast, setView, setSym } = useStore(); const inst = bySym(sym)!
   const ltp = prices[sym].ltp
-  const [side, setSide] = useState(s0); const [qty, setQty] = useState(1); const [ot, setOt] = useState<'MARKET' | 'LIMIT' | 'SL-M'>('MARKET')
-  const [px, setPx] = useState(+ltp.toFixed(1)); const [prod, setProd] = useState<'MIS' | 'CNC'>('MIS')
+  // Opened on the side that closes what you hold: start from that size and product, so an exit is one click.
+  const exit = useMemo(() => {
+    const st = useStore.getState(); const pos = st.positions[sym]
+    if (pos?.qty && (pos.qty > 0) === (s0 === 'SELL')) return { qty: Math.abs(pos.qty), prod: (pos.product === 'CNC' ? 'CNC' : 'MIS') as 'MIS' | 'CNC' }
+    const h = s0 === 'SELL' ? st.holdings.find((x) => x.sym === sym && x.qty > 0) : undefined
+    return h ? { qty: h.qty, prod: 'CNC' as const } : null
+  }, [sym, s0])
+  const [side, setSide] = useState(s0); const [qty, setQty] = useState(exit?.qty ?? 1); const [ot, setOt] = useState<'MARKET' | 'LIMIT' | 'SL-M'>(px0 != null ? 'LIMIT' : 'MARKET')
+  const [px, setPx] = useState(px0 ?? +ltp.toFixed(1)); const [prod, setProd] = useState<'MIS' | 'CNC'>(exit?.prod ?? 'MIS')
   const gate = useEntryGate(); const held = gate && opensPosition(sym, side, qty, prod)
   const [sl, setSl] = useState<number | null>(null); const [tg, setTg] = useState<number | null>(null)
   const box = 'absolute left-full top-16 z-30 ml-2 w-[320px] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise max-md:left-3 max-md:ml-0'

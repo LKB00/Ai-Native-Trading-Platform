@@ -1,20 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { bySym, labelOf, parseKey, keyOf, nextExpiries, INSTS, TF_LABEL, fmtIST, simNow, marketOpenNow, type TF } from '../market'
 import { LabeledSwitch } from '../ui'
 import { useStore, type ChartLayout, type ChartType } from '../store'
-import { useEntryGate, GateIcon } from '../gate'
+import { useEntryGate, opensPosition, GateIcon } from '../gate'
 import { Badge, Button, IconButton, KeyHint, Popover, cn } from '../ds'
 import { SearchIcon, XIcon } from '../ds/lib/icons'
 import Pane, { paneApi, type TicketReq } from './Pane'
 import { INDICATOR_DEFS, newInstance, type IndCategory } from './indicators'
 import type { Tool } from './drawings'
 import * as I from './icons'
+import { DepthView, useDepth } from '../depth'
 
 /** Where full-screen dialogs mount: the page body, or the chart itself while it is in browser full screen
  *  (only the full-screen element and its children are visible then). */
 const portalRoot = () => (document.fullscreenElement as HTMLElement | null) ?? document.body
-import { ChevronRight, Columns2, Grid2x2, LayoutPanelLeft, Rows2, Sparkles, Square } from 'lucide-react'
+import { ChevronRight, Columns2, Grid2x2, LayoutPanelLeft, MoreHorizontal, Rows2, Sparkles, Square } from 'lucide-react'
 
 const TFS: TF[] = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '1D', '1W', '1M']
 const TYPES: { v: ChartType; label: string; icon: (p: { width?: number; height?: number }) => ReactNode }[] = [
@@ -62,7 +63,21 @@ export default function Workspace() {
   const pane = charts.panes[active]; const k = parseKey(pane.k); const inst = bySym(k.und)!
   const aiOn = !!aiLevels[pane.k]
   const ltp = useStore((s) => s.ltp(pane.k))
-  const spread = Math.max(0.05, +(ltp * 0.0002).toFixed(2))
+  // Equities quote the best bid and offer from the order book; options keep a simple spread around the model price.
+  const eq = inst.seg === 'EQ' && !k.strike
+  const book = useDepth(eq ? k.und : 'NIFTY').d
+  const half = Math.max(0.05, +(ltp * 0.0002).toFixed(2))
+  const bid = eq ? book.bids[0].price : ltp - half, offer = eq ? book.asks[0].price : ltp + half
+  const [depthOpen, setDepthOpen] = useState(false)
+  useEffect(() => {
+    if (!eq) return
+    const h = (e: KeyboardEvent) => {
+      const tg = document.activeElement?.tagName
+      if (e.key.toLowerCase() !== 'd' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT') return
+      e.preventDefault(); setDepthOpen((o) => !o)
+    }
+    addEventListener('keydown', h); return () => removeEventListener('keydown', h)
+  }, [eq])
   const gate = useEntryGate()
   const h = history[pane.k]
   useEffect(() => { const f = () => setFull(!!document.fullscreenElement); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f) }, [])
@@ -74,7 +89,9 @@ export default function Workspace() {
   return (
     <div ref={root} className="flex h-full flex-col bg-surface">
       {/* Top toolbar */}
-      <div role="toolbar" aria-label="Chart toolbar" className="flex flex-wrap items-center gap-0.5 border-b border-line px-2 py-1">
+      {/* One line at any width. As the chart narrows, the least-used controls fold into More, in this order:
+            Indicators label, undo/redo, layout/settings/snapshot/full screen, spread, then alert and AI levels. */}
+      <div role="toolbar" aria-label="Chart toolbar" className="@container flex flex-nowrap items-center gap-0.5 border-b border-line px-2 py-1">
         <button className={cn(tb, 'font-bold text-fg')} onClick={() => setSearch('')} aria-label={`Symbol: ${labelOf(pane.k)}. Change symbol`}><SearchIcon width={14} height={14} />{labelOf(pane.k)}</button>
         {sep}
         <Popover label="Interval" trigger={({ toggle, triggerProps }) => <button className={tb} onClick={toggle} {...triggerProps} aria-label={`Interval: ${TF_LABEL[pane.tf]}`}>{pane.tf}<I.ChevronDownIcon width={12} height={12} /></button>}>
@@ -85,13 +102,14 @@ export default function Workspace() {
         <Popover label="Chart type" trigger={({ toggle, triggerProps }) => <button className={tb} onClick={toggle} {...triggerProps} aria-label={`Chart type: ${typeDef.label}`}>{typeDef.icon({ width: 18, height: 18 })}</button>}>
           {({ close }) => <div className="w-48 p-1" role="listbox" aria-label="Chart type">{TYPES.map((t) => <button key={t.v} role="option" aria-selected={t.v === cfg.type} onClick={() => { setChart({ type: t.v }); close() }} className={cn('flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] hover:bg-hover', t.v === cfg.type && 'bg-sunken font-bold')}>{t.icon({ width: 18, height: 18 })}{t.label}</button>)}</div>}
         </Popover>
-        <button className={tb} onClick={() => setIndOpen(true)}><I.IndicatorsIcon width={18} height={18} />Indicators</button>
-        <button className={tb} onClick={() => setTool(tool === 'alert' ? 'cross' : 'alert')} aria-pressed={tool === 'alert'} title="Add alert (Alt+A)"><I.BellIcon width={18} height={18} /><span className="max-xl:hidden">Alert</span></button>
-        {!k.strike && <button className={cn(tb, aiOn && 'bg-sunken text-fg')} aria-pressed={aiOn} onClick={() => useStore.getState().set({ aiLevels: { ...aiLevels, [pane.k]: !aiOn } })} title="AI support and resistance, and candlestick patterns"><Sparkles size={18} strokeWidth={1.5} aria-hidden /><span className="max-xl:hidden">AI levels</span></button>}
-        {sep}
+        <button className={tb} onClick={() => setIndOpen(true)}><I.IndicatorsIcon width={18} height={18} /><span className="@max-[760px]:hidden">Indicators</span></button>
+        <button className={cn(tb, '@max-[560px]:hidden')} onClick={() => setTool(tool === 'alert' ? 'cross' : 'alert')} aria-pressed={tool === 'alert'} title="Add alert (Alt+A)"><I.BellIcon width={18} height={18} /><span className="max-xl:hidden">Alert</span></button>
+        {!k.strike && <button className={cn(tb, '@max-[560px]:hidden', aiOn && 'bg-sunken text-fg')} aria-pressed={aiOn} onClick={() => useStore.getState().set({ aiLevels: { ...aiLevels, [pane.k]: !aiOn } })} title="AI support and resistance, and candlestick patterns"><Sparkles size={18} strokeWidth={1.5} aria-hidden /><span className="max-xl:hidden">AI levels</span></button>}
+        <span className="contents @max-[700px]:hidden">{sep}
         <IconButton size="sm" label="Undo (⌘Z)" disabled={!h?.undo.length} onClick={() => useStore.getState().undo(pane.k)}><I.UndoIcon /></IconButton>
-        <IconButton size="sm" label="Redo (⇧⌘Z)" disabled={!h?.redo.length} onClick={() => useStore.getState().redo(pane.k)}><I.RedoIcon /></IconButton>
-        <div className="ml-auto flex items-center gap-0.5">
+        <IconButton size="sm" label="Redo (⇧⌘Z)" disabled={!h?.redo.length} onClick={() => useStore.getState().redo(pane.k)}><I.RedoIcon /></IconButton></span>
+        <div className="ml-auto flex shrink-0 items-center gap-0.5">
+          <div className="flex items-center gap-0.5 @max-[640px]:hidden">
           <Popover label="Chart layout" align="end" trigger={({ toggle, triggerProps }) => <IconButton size="sm" label={`Layout: ${layout.label}`} onClick={toggle} {...triggerProps}><LayoutGlyph l={layout.value} /></IconButton>}>
             {({ close }) => (
               <div className="w-64 space-y-2 p-2">
@@ -111,12 +129,49 @@ export default function Workspace() {
           </Popover>
           <IconButton size="sm" label="Take a snapshot (downloads a PNG)" onClick={shot}><I.CameraIcon /></IconButton>
           <IconButton size="sm" label={full ? 'Exit full screen' : 'Full screen'} onClick={() => (full ? document.exitFullscreen() : root.current?.requestFullscreen())}>{full ? <I.ExitFullscreenIcon /> : <I.FullscreenIcon />}</IconButton>
-          {(inst.seg === 'EQ' || !!k.strike) && gate && <span className="ml-1 inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-sunken px-2.5 text-[12px] font-medium text-fg-muted" title={`${gate.why} Exits still work: close from the position line or the positions panel.`}><GateIcon g={gate} />{gate.short}</span>}
-          {(inst.seg === 'EQ' || !!k.strike) && !gate && <div className="ml-1 flex items-center gap-1">
-            <button onClick={() => setReq({ side: 'SELL', n: Date.now() })} className="flex h-8 flex-col items-center justify-center rounded-lg bg-danger-soft px-3 leading-none text-danger-fg" aria-label={`Sell ${labelOf(pane.k)} at ${(ltp - spread).toFixed(2)}`}><span className="text-[10px]">Sell</span><span className="num text-[12px] font-bold">{(ltp - spread).toFixed(2)}</span></button>
-            <span className="num text-[10px] text-fg-subtle">{(spread * 2).toFixed(2)}</span>
-            <button onClick={() => setReq({ side: 'BUY', n: Date.now() })} className="flex h-8 flex-col items-center justify-center rounded-lg bg-success-soft px-3 leading-none text-success-fg" aria-label={`Buy ${labelOf(pane.k)} at ${(ltp + spread).toFixed(2)}`}><span className="text-[10px]">Buy</span><span className="num text-[12px] font-bold">{(ltp + spread).toFixed(2)}</span></button>
+          </div>
+          <div className="hidden @max-[640px]:block">
+            <Popover label="More chart controls" align="end" trigger={({ toggle, triggerProps }) => <IconButton size="sm" label="More" onClick={toggle} {...triggerProps}><MoreHorizontal size={16} strokeWidth={1.5} /></IconButton>}>
+              {({ close }) => <div className="w-64 space-y-1 p-2 text-[13px]">
+                <div className="hidden flex-col @max-[560px]:flex">
+                  <button className="flex h-8 items-center gap-2 rounded-md px-2 text-left hover:bg-hover" onClick={() => { setTool(tool === 'alert' ? 'cross' : 'alert'); close() }}><I.BellIcon width={16} height={16} />Add alert<KeyHint className="ml-auto">⌥A</KeyHint></button>
+                  {!k.strike && <button className="flex h-8 items-center gap-2 rounded-md px-2 text-left hover:bg-hover" aria-pressed={aiOn} onClick={() => useStore.getState().set({ aiLevels: { ...aiLevels, [pane.k]: !aiOn } })}><Sparkles size={16} strokeWidth={1.5} />AI levels and patterns<span className="ml-auto text-[11px] text-fg-subtle">{aiOn ? 'On' : 'Off'}</span></button>}
+                  <span className="my-1 h-px bg-line" aria-hidden />
+                </div>
+                <button className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover" onClick={() => { shot(); close() }}><I.CameraIcon width={16} height={16} />Snapshot</button>
+                <button className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left hover:bg-hover" onClick={() => { (full ? document.exitFullscreen() : root.current?.requestFullscreen()); close() }}>{full ? <I.ExitFullscreenIcon width={16} height={16} /> : <I.FullscreenIcon width={16} height={16} />}{full ? 'Exit full screen' : 'Full screen'}</button>
+                <p className="px-2 pb-1 pt-2 text-[11px] text-fg-subtle">Layout</p>
+                <div role="radiogroup" aria-label="Layout" className="grid grid-cols-5 gap-1 px-1">
+                  {LAYOUTS.map((l) => <button key={l.value} role="radio" aria-checked={l.value === layout.value} aria-label={l.label} title={l.label} onClick={() => { setLayout(l.value); close() }}
+                    className={cn('flex h-9 items-center justify-center rounded-lg border', l.value === layout.value ? 'border-fg bg-sunken' : 'border-line hover:bg-hover')}><LayoutGlyph l={l.value} /></button>)}
+                </div>
+                <p className="px-2 pb-1 pt-2 text-[11px] text-fg-subtle">Chart settings</p>
+                <LabeledSwitch label="Symbol watermark" checked={cfg.watermark} onChange={(watermark) => setChart({ watermark })} />
+                <LabeledSwitch label="Pivot points (CPR)" checked={cfg.pivots} onChange={(pivots) => setChart({ pivots })} />
+              </div>}
+            </Popover>
+          </div>
+          {(inst.seg === 'EQ' || !!k.strike) && <div className="ml-1 flex items-center gap-1">
+            {/* While entries are paused the pair stays, greyed, with a lock saying why; a side that only closes what you hold stays live. */}
+            {gate && <span className="flex size-7 items-center justify-center text-fg-subtle @max-[500px]:hidden" title={`${gate.short}. ${gate.why} Exits still work.`} aria-label={gate.short}><GateIcon g={gate} /></span>}
+            {(['SELL', 'BUY'] as const).map((side, i) => { const buy = side === 'BUY'; const px = buy ? offer : bid
+              const ok = !gate || !opensPosition(pane.k, side, 1, 'MIS') || !opensPosition(pane.k, side, 1, 'CNC')
+              return <Fragment key={side}>
+                {i === 1 && <span className="num text-[10px] text-fg-subtle @max-[600px]:hidden" title="Spread">{(offer - bid).toFixed(2)}</span>}
+                <button onClick={() => ok && setReq({ side, n: Date.now() })} aria-disabled={!ok || undefined}
+                  title={ok ? (gate ? (useStore.getState().positions[pane.k]?.qty ? `Close your ${labelOf(pane.k)} position` : `Sell from your ${labelOf(pane.k)} holding`) : undefined) : `${gate!.short}. ${gate!.why} Exits still work.`}
+                  className={cn('flex h-8 flex-col items-center justify-center rounded-lg px-3 leading-none @max-[500px]:px-2', ok ? (buy ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg') : 'cursor-not-allowed bg-sunken text-fg-subtle')}
+                  aria-label={`${buy ? 'Buy' : 'Sell'} ${labelOf(pane.k)} at ${px.toFixed(2)}${ok ? '' : `: ${gate!.short}`}`}><span className="text-[10px]">{buy ? 'Buy' : 'Sell'}</span><span className="num text-[12px] font-bold">{px.toFixed(2)}</span></button>
+              </Fragment> })}
           </div>}
+          {eq && <Popover label={`${k.und} market depth`} align="end" open={depthOpen} onOpenChange={setDepthOpen} trigger={({ toggle, triggerProps }) => (
+            <button type="button" onClick={toggle} {...triggerProps} title="Market depth (D)" className={cn('ml-1 inline-flex h-7 @max-[500px]:ml-0 @max-[500px]:px-1.5 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium transition-colors hover:bg-hover hover:text-fg', depthOpen ? 'bg-hover text-fg' : 'text-fg-muted')}>Depth</button>)}>
+            {({ close }) => <div className="w-[340px] p-3">
+              <div className="mb-2.5 flex items-baseline justify-between"><p className="text-[13px] font-semibold text-fg">{k.und} · Market depth</p><span className="text-[11px] text-fg-subtle">Spread <span className="num">{book.spread.toFixed(2)}</span></span></div>
+              <DepthView sym={k.und} onPrice={gate ? undefined : (side, price) => { setReq({ side, entry: price, limit: true, n: Date.now() }); close() }} />
+              {!gate && <p className="mt-2.5 text-[11px] text-fg-subtle">Click a price to open the ticket at that limit.</p>}
+            </div>}
+          </Popover>}
         </div>
       </div>
 

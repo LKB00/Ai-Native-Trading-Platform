@@ -1,4 +1,4 @@
-import { SQUARE_OFF, secOfDay, sessionDay, INSTS, bySym, history, chain, nextExpiries, STRATEGIES, SECTORS, levels, atr, rsiSeries, ema, payoff, isExpiryDay, labelOf, parseKey, type Leg, type TF } from './market'
+import { SQUARE_OFF, secOfDay, sessionDay, INSTS, bySym, history, chain, nextExpiries, STRATEGIES, SECTORS, levels, atr, rsiSeries, ema, payoff, isExpiryDay, labelOf, parseKey, depth, depthRead, type Leg, type TF } from './market'
 import { useStore } from './store'
 import { allMetrics, applyFilters, metricsFor, FIELDS, describeFilter } from './scan'
 import { patterns } from './Chart'
@@ -241,6 +241,11 @@ export function localAI(input: string): AIResult {
     if (late) { let h = +late[1]; if (late[3] === 'pm' && h < 12) h += 12; else if (!late[3] && h < 8) h += 12; return on('noEntryAfter', { t: 'rules', noEntryAfter: h * 3600 + (+(late[2] ?? 0)) * 60 }) }
     const rp = t.match(/risk (?:at most |max(?:imum)? |only )?(\d+(?:\.\d+)?) ?% (?:of (?:my )?capital )?(?:per|a|each) trade/)
     if (rp) return on('maxRiskPct', { t: 'rules', maxRiskPct: +rp[1] })
+  }
+  if (/\b(market )?depth\b|order ?book|bid.?(and|&|\/)?.?ask|bids? and offers?|buyers (vs|or|and) sellers/.test(t)) {
+    if (bySym(sym)!.seg !== 'EQ') return { reply: `${sym} is an index, so it has no order book of its own. It trades through futures and options; ask for the ${sym.toLowerCase()} option chain instead.`, actions: [], follow: [`${sym.toLowerCase()} option chain`] }
+    const q = s.prices[sym]; const d = depth(sym, q.ltp, q.prev, q.avgVol)
+    return { reply: `**${sym} order book.** ${depthRead(d, q.ltp)}`, actions: [], cards: [{ k: 'depth', sym }], follow: [`analyse ${sym.toLowerCase()}`, `${sym.toLowerCase()} chart`] }
   }
   if (/review (my )?(today|day)|debrief|what went wrong today|today'?s review/.test(t)) return { reply: debrief(), actions: [], follow: ['show my positions', 'review my trades', 'my rules'] }
   if (/review (my )?trades|journal|how am i doing|my (trading )?mistakes|win rate/.test(t)) return { reply: reviewTrades(), actions: [{ t: 'nav', view: 'journal' }], cards: [{ k: 'journal' }], follow: ['my rules', 'set max loss 5000'] }

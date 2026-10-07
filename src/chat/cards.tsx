@@ -19,6 +19,7 @@ import { allMetrics, applyFilters, describeFilter, metricsFor } from '../scan'
 import { legsMargin } from '../store'
 import { ask, confirm, dismiss, editDraft, misClosedNow, propose } from '../ai'
 import { Chg, Dir, Money, inr, inrShort } from '../ui'
+import { DepthView, useDepth } from '../depth'
 
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
 /** Hex colour with transparency, for chart fills (the chart library can't read color-mix). */
@@ -219,6 +220,29 @@ function draftEquity(sym: string, side: 'BUY' | 'SELL') {
   const delivery = misClosedNow() || ['swing', 'investing'].includes(styleOf(s.profile) ?? '')
   const a: OrderAction = { t: 'order', und: sym, side, qty, otype: 'MARKET', product: delivery ? 'CNC' : 'MIS' }
   propose(`${side === 'BUY' ? 'Buy' : 'Sell'} ${sym}`, `Draft below, sized at about ${inr(qty * ltp)}. ${s.rules.stopRequired ? 'Your rule added a stop and target; change anything, then place it.' : 'Change anything, add a stop, then place it.'}`, [a])
+}
+
+/**
+ * Market depth in chat. The book is the picture; the agent's read sits above it. Tapping a price drafts a limit
+ * order there, and the foot offers the two prices you'd most likely use: the best offer to buy, the best bid to sell.
+ */
+export function DepthCard({ sym }: { sym: string }) {
+  const { d } = useDepth(sym); const gate = useEntryGate(); const open = marketOpenNow()
+  const draft = (side: 'BUY' | 'SELL', price: number) => {
+    const s = useStore.getState(); const free = s.pnl().avail
+    const qty = Math.max(1, Math.floor(Math.min(100000, free * 0.1) / price))
+    const delivery = misClosedNow() || ['swing', 'investing'].includes(styleOf(s.profile) ?? '')
+    propose(`${side === 'BUY' ? 'Buy' : 'Sell'} ${sym} at ${fmt(price)}`, `Limit draft at ${fmt(price)}, sized at about ${inr(qty * price)}. ${s.rules.stopRequired ? 'Your rule added a stop and target; change anything, then place it.' : 'Change anything, add a stop, then place it.'}`,
+      [{ t: 'order', und: sym, side, qty, otype: 'LIMIT', price, product: delivery ? 'CNC' : 'MIS' }])
+  }
+  return (
+    <Shell title={<>{sym} <span className="font-normal text-fg-subtle">· Market depth</span></>}
+      meta={<><span>Spread <span className="num">{d.spread.toFixed(2)}</span></span><span className="flex items-center gap-1.5"><span className={cn('size-1.5 rounded-full', open ? 'bg-success animate-pulse' : 'bg-[var(--border-strong)]')} aria-hidden />{open ? 'Live' : 'Simulated'}</span></>}
+      foot={gate ? <span className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-sunken px-2.5 text-[12px] font-medium text-fg-muted" title={gate.why}><GateIcon g={gate} />{gate.short}</span>
+        : <><Act onClick={() => draft('BUY', d.asks[0].price)}>Buy at <span className="num">{fmt(d.asks[0].price)}</span></Act><Act onClick={() => draft('SELL', d.bids[0].price)}>Sell at <span className="num">{fmt(d.bids[0].price)}</span></Act></>}>
+      <DepthView sym={sym} onPrice={gate ? undefined : draft} />
+    </Shell>
+  )
 }
 
 /** Change as a soft pill with an arrow: green up, red down, never colour alone. */
@@ -1165,6 +1189,7 @@ export function SetupsCard() {
 export function CardView({ c }: { c: Card }) {
   switch (c.k) {
     case 'quote': return <QuoteCard sym={c.sym} />
+    case 'depth': return <DepthCard sym={c.sym} />
     case 'chart': return <ChartCard sym={c.sym} tf={c.tf} levels={c.levels} />
     case 'brief': return <BriefCard />
     case 'positions': return <PositionsCard />

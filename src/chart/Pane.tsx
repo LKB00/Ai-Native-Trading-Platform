@@ -21,8 +21,8 @@ const SWATCHES = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5
 
 type Kind = 'position' | 'order' | 'sl' | 'tgt' | 'alert' | 'draw' | 'ai' | 'pivot' | 'g-entry' | 'g-sl' | 'g-tgt'
 type LineSpec = { id: string; price: number; kind: Kind; label: string; color: string; style: 0 | 1 | 2 | 3; drag: boolean; ref?: number | string }
-type Ticket = { side: 'BUY' | 'SELL'; entry: number; sl: number; tgt: number; market: boolean }
-export type TicketReq = { side: 'BUY' | 'SELL'; n: number; entry?: number; sl?: number; tgt?: number } | null
+type Ticket = { side: 'BUY' | 'SELL'; entry: number; sl: number; tgt: number; market: boolean; /** Opened from a price in the order book: a limit at that price even when it would fill now. */ lmt?: boolean }
+export type TicketReq = { side: 'BUY' | 'SELL'; n: number; entry?: number; sl?: number; tgt?: number; limit?: boolean } | null
 /** Imperative handles the workspace uses: screenshot, reset view, date ranges. */
 export const paneApi: Record<number, { chart: IChartApi; reset: () => void; range: (bars: number) => void } | undefined> = {}
 
@@ -347,13 +347,13 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
   useEffect(() => { if (!isDrawTool(tool)) setDraft(null) }, [tool])
 
   // ---- Ticket ----
-  const openTicket = (side: 'BUY' | 'SELL', price?: number, plan?: { sl: number; tgt: number }) => {
+  const openTicket = (side: 'BUY' | 'SELL', price?: number, plan?: { sl: number; tgt: number }, lmt?: boolean) => {
     if (!tradable) { s.setToast('Indices trade through options. Pick the ATM call or put from the symbol search, or open the option chain.'); return }
     const a = atr(dataRef.current).at(-1)! * 1.5 || ltp * 0.01
     const market = price == null; const entry = +(price ?? ltp).toFixed(2); const dir = side === 'BUY' ? 1 : -1
-    setTicket({ side, entry, market, sl: plan?.sl ?? +Math.max(0.05, entry - dir * a).toFixed(2), tgt: plan?.tgt ?? +Math.max(0.05, entry + dir * 2 * a).toFixed(2) })
+    setTicket({ side, entry, market, lmt, sl: plan?.sl ?? +Math.max(0.05, entry - dir * a).toFixed(2), tgt: plan?.tgt ?? +Math.max(0.05, entry + dir * 2 * a).toFixed(2) })
   }
-  useEffect(() => { if (req) openTicket(req.side, req.entry, req.sl != null && req.tgt != null ? { sl: req.sl, tgt: req.tgt } : undefined) }, [req?.n]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (req) openTicket(req.side, req.entry, req.sl != null && req.tgt != null ? { sl: req.sl, tgt: req.tgt } : undefined, req.limit) }, [req?.n]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Keyboard (active pane only), TradingView-style ----
   useEffect(() => {
@@ -561,15 +561,21 @@ function DrawingToolbar({ sh, k, onDelete, onTrade, onAlert }: { sh: Drawing; k:
 
 /** Order ticket on the chart: entry, stop and target are lines you can drag; size comes from the rupees you are willing to risk. */
 function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Ticket; ltp: number; lot: number; onChange: (t: Ticket) => void; onClose: () => void }) {
-  const st = useStore(); const [risk, setRisk] = useState(2000); const [product, setProduct] = useState<'MIS' | 'CNC'>('MIS'); const [trail, setTrail] = useState(false)
-  const opt = lot > 1; const gate = useEntryGate()
+  const st = useStore(); const gate = useEntryGate()
+  // Selling stock you hold while entries are paused is an exit from delivery: start there.
+  const holding = t.side === 'SELL' && !st.positions[k]?.qty ? st.holdings.find((h) => h.sym === k && h.qty > 0) : undefined
+  const [risk, setRisk] = useState(2000); const [product, setProduct] = useState<'MIS' | 'CNC'>(gate && holding ? 'CNC' : 'MIS'); const [trail, setTrail] = useState(false)
+  const opt = lot > 1
   const entry = t.market ? ltp : t.entry; const dir = t.side === 'BUY' ? 1 : -1
   const perUnit = Math.abs(entry - t.sl)
-  const qty = Math.max(lot, Math.floor(risk / Math.max(perUnit, 0.05) / lot) * lot)
+  const sized = Math.max(lot, Math.floor(risk / Math.max(perUnit, 0.05) / lot) * lot)
+  // While entries are paused only exits go through, so a closing ticket never asks for more than you hold.
+  const pos = st.positions[k]; const closing = !!pos?.qty && (pos.qty > 0) === (t.side === 'SELL')
+  const qty = gate && closing ? Math.min(sized, Math.abs(pos.qty)) : gate && holding && product === 'CNC' ? Math.min(sized, holding.qty) : sized
   const reward = Math.abs(t.tgt - entry) * qty; const rr = Math.abs(t.tgt - entry) / Math.max(perUnit, 0.05)
   const held = gate && opensPosition(k, t.side, qty, opt ? 'NRML' : product)
   const valid = (t.sl - entry) * dir < 0 && (t.tgt - entry) * dir > 0
-  const otype: OType = t.market ? 'MARKET' : (t.side === 'BUY') === (entry < ltp) ? 'LIMIT' : 'SL-M'
+  const otype: OType = t.market ? 'MARKET' : t.lmt || (t.side === 'BUY') === (entry < ltp) ? 'LIMIT' : 'SL-M'
   const field = 'num h-8 w-28 rounded-md border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
   const cost = useOrderCost(k, t.side, qty, entry, opt ? 'NRML' : product)
   const [lo, hi] = priceBand(ltp); const outBand = !t.market && !opt && (t.entry < lo || t.entry > hi)

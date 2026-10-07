@@ -648,9 +648,11 @@ export { START }
 export function orderCost(key: string, side: 'BUY' | 'SELL', qty: number, ref: number, product: string) {
   const s = useStore.getState(); const k = parseKey(key); const pos = s.positions[key]
   const signed = side === 'BUY' ? qty : -qty
-  const next = { ...s.positions, [key]: { key, qty: (pos?.qty ?? 0) + signed, avg: ref, realized: 0, product, charges: 0, openedAt: 0 } }
   const now = marginReq(s.positions, s)
-  const needs = signed * ref + marginReq(next, s) - now
+  // Selling delivery shares you hold is a sale, not a short: it frees the full value and needs no margin.
+  const fromHoldings = !k.strike && product === 'CNC' && side === 'SELL' && !pos?.qty && s.holdings.some((h) => h.sym === key && h.qty >= qty)
+  const next = { ...s.positions, [key]: { key, qty: (pos?.qty ?? 0) + signed, avg: ref, realized: 0, product, charges: 0, openedAt: 0 } }
+  const needs = fromHoldings ? -qty * ref : signed * ref + marginReq(next, s) - now
   const kind = k.strike ? 'OPTION' : product === 'CNC' ? 'DELIVERY' : 'INTRADAY'
   const turnover = ref * qty
   const a = charges(kind, side, turnover), b = charges(kind, side === 'BUY' ? 'SELL' : 'BUY', turnover)

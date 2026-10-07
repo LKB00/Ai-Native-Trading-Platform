@@ -350,3 +350,46 @@ export function optionHistory(key: string, tf: TF, n: number, spot: number): Can
     return { time: c.time, open: o, close: cl, high: Math.max(hi, o, cl), low: Math.min(lo, o, cl), volume: Math.round(c.volume * 0.8) }
   })
 }
+
+// ---- Market depth (simulated) ----
+// Five price levels a side around the last price, in 0.05 ticks. Sizes scale with the stock's normal volume, lean
+// toward the day's direction, and now and then one level carries a large resting order (a "wall") that stays put for a
+// minute, the way real books show them. Sizes refresh every two seconds; prices follow every tick.
+export type DepthLevel = { price: number; qty: number; orders: number }
+export type Depth = { bids: DepthLevel[]; asks: DepthLevel[]; totalBid: number; totalAsk: number; spread: number }
+const TICK = 0.05
+const toTick = (p: number) => +(Math.round(p / TICK) * TICK).toFixed(2)
+
+export function depth(sym: string, ltp: number, prev: number, avgVol: number, t = simNow()): Depth {
+  const h = hash(sym); const r = rng(h + Math.floor(t / 2)); const rw = rng(h * 7 + Math.floor(t / 60))
+  const lean = Math.max(-0.22, Math.min(0.22, (ltp / prev - 1) * 8))
+  const unit = Math.max(10, avgVol / 3000)
+  const bid0 = toTick(Math.floor(ltp / TICK) * TICK); const ask0 = toTick(bid0 + TICK * (r() < 0.7 ? 1 : 2))
+  const wallSide = rw() < 0.45 ? (rw() < 0.5 ? 'bid' : 'ask') : null; const wallAt = 1 + Math.floor(rw() * 4)
+  const side = (start: number, dir: 1 | -1, bias: number, isWall: boolean): DepthLevel[] => {
+    let p = start
+    return Array.from({ length: 5 }, (_, i) => {
+      if (i) p = toTick(p + dir * TICK * (r() < 0.6 ? 1 : 2))
+      const qty = Math.max(1, Math.round(unit * (0.4 + i * 0.25) * Math.exp(gauss(r) * 0.45) * (1 + bias) * (isWall && i === wallAt ? 3 + rw() * 2 : 1)))
+      return { price: p, qty, orders: Math.max(1, Math.round(qty / (unit * 0.08) * (0.6 + r() * 0.8))) }
+    })
+  }
+  const bids = side(bid0, -1, lean, wallSide === 'bid'), asks = side(ask0, 1, -lean, wallSide === 'ask')
+  // The full book runs much deeper than the five levels shown.
+  const deep = 6 + r() * 3
+  const sum = (x: DepthLevel[]) => x.reduce((a, l) => a + l.qty, 0)
+  return { bids, asks, totalBid: Math.round(sum(bids) * deep * (0.9 + r() * 0.2)), totalAsk: Math.round(sum(asks) * deep * (0.9 + r() * 0.2)), spread: +(ask0 - bid0).toFixed(2) }
+}
+
+/** The agent's one-line read of a book: who's heavier, any outsized order, and whether the spread is costly. */
+export function depthRead(d: Depth, ltp: number) {
+  const ratio = d.totalBid / Math.max(1, d.totalAsk)
+  const lines: string[] = []
+  lines.push(ratio >= 1.4 ? `Buyers outweigh sellers ${ratio.toFixed(1)} to 1 across the book.` : ratio <= 1 / 1.4 ? `Sellers outweigh buyers ${(1 / ratio).toFixed(1)} to 1 across the book.` : 'The book is balanced between buyers and sellers.')
+  const all = [...d.bids.map((l) => ({ ...l, side: 'bid' as const })), ...d.asks.map((l) => ({ ...l, side: 'ask' as const }))]
+  const med = [...all].sort((a, b) => a.qty - b.qty)[Math.floor(all.length / 2)].qty
+  const wall = all.filter((l) => l.qty >= med * 3).sort((a, b) => b.qty - a.qty)[0]
+  if (wall) lines.push(`Large ${wall.side === 'bid' ? 'buyer' : 'seller'} at ${wall.price.toFixed(2)}, about ${Math.round(wall.qty / med)}× the usual size: it ${wall.side === 'bid' ? 'may cushion dips' : 'may cap moves up'}, though orders like this can be pulled.`)
+  if (d.spread / ltp > 0.001) lines.push(`The spread is wide (${d.spread.toFixed(2)}); use a limit order.`)
+  return lines.join(' ')
+}
