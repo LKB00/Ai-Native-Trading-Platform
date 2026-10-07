@@ -640,3 +640,20 @@ function fill(id: number, price: number) {
 }
 
 export { START }
+
+/**
+ * What an order would cost before you place it, using the same margin maths as the pre-trade check in `place`:
+ * the funds it takes (negative when it frees them), the funds free right now, and round-trip charges at this price.
+ */
+export function orderCost(key: string, side: 'BUY' | 'SELL', qty: number, ref: number, product: string) {
+  const s = useStore.getState(); const k = parseKey(key); const pos = s.positions[key]
+  const signed = side === 'BUY' ? qty : -qty
+  const next = { ...s.positions, [key]: { key, qty: (pos?.qty ?? 0) + signed, avg: ref, realized: 0, product, charges: 0, openedAt: 0 } }
+  const now = marginReq(s.positions, s)
+  const needs = signed * ref + marginReq(next, s) - now
+  const kind = k.strike ? 'OPTION' : product === 'CNC' ? 'DELIVERY' : 'INTRADAY'
+  const turnover = ref * qty
+  const a = charges(kind, side, turnover), b = charges(kind, side === 'BUY' ? 'SELL' : 'BUY', turnover)
+  const parts = (['brokerage', 'stt', 'exch', 'gst', 'stamp', 'sebi'] as const).map((p) => [p, a[p] + b[p]] as const)
+  return { needs, free: Math.max(s.cash - now, 0), charges: a.total + b.total, parts }
+}

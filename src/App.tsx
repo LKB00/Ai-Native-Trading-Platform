@@ -18,6 +18,7 @@ import Portfolio from './Portfolio'
 import Journal from './Journal'
 import { ChatPanel, ChatTopActions } from './chat/Chat'
 import { DeskRail } from './agent/Desk'
+import { CostLine, LevelInput, priceBand, useOrderCost } from './ticket'
 
 export { inr, Chg, Money }
 
@@ -383,33 +384,43 @@ function Ticket({ sym, side: s0, close }: { sym: string; side: 'BUY' | 'SELL'; c
   const [side, setSide] = useState(s0); const [qty, setQty] = useState(1); const [ot, setOt] = useState<'MARKET' | 'LIMIT' | 'SL-M'>('MARKET')
   const [px, setPx] = useState(+ltp.toFixed(1)); const [prod, setProd] = useState<'MIS' | 'CNC'>('MIS')
   const gate = useEntryGate(); const held = gate && opensPosition(sym, side, qty, prod)
-  const [sl, setSl] = useState(''); const [tg, setTg] = useState('')
-  const box = 'absolute left-full top-16 z-30 ml-2 w-[320px] rounded-2xl border border-line bg-raised p-4 shadow-lg animate-rise max-md:left-3 max-md:ml-0'
-  const field = 'h-9 rounded-full border border-line bg-surface px-3 text-[13px] num outline-none focus:border-fg-subtle'
+  const [sl, setSl] = useState<number | null>(null); const [tg, setTg] = useState<number | null>(null)
+  const box = 'absolute left-full top-16 z-30 ml-2 w-[320px] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise max-md:left-3 max-md:ml-0'
+  const field = 'num h-8 w-full rounded-md border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
+  const entry = ot === 'MARKET' ? ltp : px
+  const cost = useOrderCost(sym, side, qty, entry, prod)
   if (inst.seg === 'IDX') return <div role="dialog" aria-label="Index order" className={box}><p className="mb-3 text-[13px] text-fg-muted">Indices trade through options.</p><div className="flex gap-2"><Button size="sm" onClick={() => { setSym(sym); setView('chain'); close() }}>Open option chain</Button><Button size="sm" variant="ghost" onClick={close}>Cancel</Button></div></div>
-  const entry = ot === 'MARKET' ? ltp : px; const val = qty * entry
-  const risk = sl ? Math.abs(entry - +sl) * qty : 0
+  const [lo, hi] = priceBand(ltp); const outBand = ot !== 'MARKET' && (px < lo || px > hi)
+  const risk = sl != null ? Math.abs(entry - sl) * qty : 0
   return (
     <div role="dialog" aria-label={`${side} ${sym}`} className={box}>
-      <div className="flex items-baseline justify-between"><p className="font-serif text-lg">{side === 'BUY' ? 'Buy' : 'Sell'} {sym}</p><span className="num text-fg-muted">{ltp.toFixed(2)}</span></div>
-      <div className="mt-3 space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <SegmentedControl size="sm" label="Side" value={side} onChange={setSide} options={[{ value: 'BUY', label: 'Buy' }, { value: 'SELL', label: 'Sell' }]} />
-          <SegmentedControl size="sm" label="Product" value={prod} onChange={setProd} options={[{ value: 'MIS', label: 'Intraday' }, { value: 'CNC', label: 'Delivery' }]} />
-        </div>
+      <div className="flex items-center gap-2">
+        <SegmentedControl size="sm" label="Side" value={side} onChange={setSide} options={[{ value: 'BUY', label: 'Buy' }, { value: 'SELL', label: 'Sell' }]} />
+        <span className="text-[13px] font-semibold text-fg">{sym}</span>
+        <span className="num ml-auto text-[12px] text-fg-muted">{ltp.toFixed(2)}</span>
+        <IconButton size="sm" label="Close ticket" onClick={close}><XIcon width={12} height={12} /></IconButton>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <SegmentedControl size="sm" label="Product" value={prod} onChange={setProd} options={[{ value: 'MIS', label: 'Intraday' }, { value: 'CNC', label: 'Delivery' }]} />
         <SegmentedControl size="sm" label="Order type" value={ot} onChange={setOt} options={[{ value: 'MARKET', label: 'Market' }, { value: 'LIMIT', label: 'Limit' }, { value: 'SL-M', label: 'Stop entry' }]} />
-        <div className="grid grid-cols-2 gap-2 text-[12px] text-fg-subtle">
-          <label>Quantity<input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, +e.target.value))} className={cn(field, 'mt-1 w-full')} /></label>
-          {ot !== 'MARKET' && <label>{ot === 'LIMIT' ? 'Limit price' : 'Trigger price'}<input type="number" step={0.05} value={px} onChange={(e) => setPx(+e.target.value)} className={cn(field, 'mt-1 w-full')} /></label>}
-          <label className="text-down">Stop (optional)<input type="number" step={0.05} placeholder="—" value={sl} onChange={(e) => setSl(e.target.value)} className={cn(field, 'mt-1 w-full')} /></label>
-          <label className="text-up">Target (optional)<input type="number" step={0.05} placeholder="—" value={tg} onChange={(e) => setTg(e.target.value)} className={cn(field, 'mt-1 w-full')} /></label>
-        </div>
-        <p className="text-[12px] text-fg-subtle">Value <span className="num text-fg">{inr(val)}</span>{risk > 0 && <> · risk if stopped <span className="num text-down">{inr(risk)}</span></>}{risk > 0 && tg && <> · 1 : {(Math.abs(+tg - entry) / Math.abs(entry - +sl)).toFixed(1)}</>}</p>
-        {held && gate && <GateNote g={gate} />}
-        <div className="flex gap-2">
-          <Button size="sm" variant={side === 'BUY' ? 'primary' : 'danger'} disabled={!!held} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ? +sl : undefined, tgt: tg ? +tg : undefined })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
-          <Button size="sm" variant="ghost" onClick={close}>Cancel</Button>
-        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-[12px]">
+        <label htmlFor="qt-qty" className="text-fg-subtle">Quantity</label>
+        <input id="qt-qty" type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Math.floor(+e.target.value) || 1))} className={cn(field, 'w-28')} />
+        {ot !== 'MARKET' && <>
+          <label htmlFor="qt-px" className="text-fg-subtle">{ot === 'LIMIT' ? 'Limit price' : 'Trigger'}</label>
+          <input id="qt-px" type="number" step={0.05} value={px} onChange={(e) => setPx(+e.target.value)} className={cn(field, 'w-28', outBand && 'border-danger')} />
+          <span /><span className={cn('-mt-1 text-[11px]', outBand ? 'text-down' : 'text-fg-subtle')}>{outBand ? 'Outside the allowed range ' : 'Allowed '}<span className="num">{lo.toFixed(2)} – {hi.toFixed(2)}</span></span>
+        </>}
+        <span className="text-down">Stop</span><LevelInput label="Stop" kind="sl" side={side} entry={entry} value={sl} onChange={setSl} />
+        <span className="text-up">Target</span><LevelInput label="Target" kind="tgt" side={side} entry={entry} value={tg} onChange={setTg} />
+      </div>
+      {risk > 0 && <p className="mt-2 text-[11px] text-fg-subtle">Risk if stopped <span className="num text-down">{inr(risk)}</span>{tg != null && sl != null && Math.abs(entry - sl) > 0 && <> · reward <span className="num">1 : {(Math.abs(tg - entry) / Math.abs(entry - sl)).toFixed(1)}</span></>}</p>}
+      <CostLine cost={cost} className="mt-3 border-t border-line pt-2.5" />
+      {held && gate && <GateNote g={gate} className="mt-2" />}
+      <div className="mt-2.5 flex gap-2">
+        <Button size="sm" variant={side === 'BUY' ? 'primary' : 'danger'} disabled={!!held || cost.short > 0 || outBand} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ?? undefined, tgt: tg ?? undefined })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
+        <Button size="sm" variant="ghost" onClick={close}>Cancel</Button>
       </div>
     </div>
   )

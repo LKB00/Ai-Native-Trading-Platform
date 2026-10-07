@@ -9,6 +9,7 @@ import { useEntryGate, opensPosition, GateNote } from '../gate'
 import { Badge, Button, IconButton, SegmentedControl, cn } from '../ds'
 import { PlusIcon, XIcon } from '../ds/lib/icons'
 import { inr, LabeledSwitch } from '../ui'
+import { CostLine, LevelInput, priceBand, useOrderCost } from '../ticket'
 import { indDef, instanceTitle, type IndInstance } from './indicators'
 import { CLICKS, DEFAULT_COLOR, KIND_LABEL, applyHandle, hit, renderDrawing, translate, isDrawTool, type Mapper, type Tool } from './drawings'
 import { EyeIcon, EyeOffIcon, SettingsGearIcon, TrashIcon, LockIcon, UnlockIcon, CloneIcon, BellIcon } from './icons'
@@ -569,13 +570,15 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
   const held = gate && opensPosition(k, t.side, qty, opt ? 'NRML' : product)
   const valid = (t.sl - entry) * dir < 0 && (t.tgt - entry) * dir > 0
   const otype: OType = t.market ? 'MARKET' : (t.side === 'BUY') === (entry < ltp) ? 'LIMIT' : 'SL-M'
-  const field = 'num h-8 w-24 rounded-md border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
+  const field = 'num h-8 w-28 rounded-md border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
+  const cost = useOrderCost(k, t.side, qty, entry, opt ? 'NRML' : product)
+  const [lo, hi] = priceBand(ltp); const outBand = !t.market && !opt && (t.entry < lo || t.entry > hi)
   const place = () => {
     const msg = st.place(k, t.side, qty, otype, otype === 'LIMIT' ? entry : 0, opt ? 'NRML' : product, { trigger: otype === 'SL-M' ? entry : undefined, sl: t.sl, tgt: t.tgt, trail: trail ? +perUnit.toFixed(2) : undefined, via: 'chart' })
     st.setToast(msg); if (!msg.startsWith('Rejected')) onClose()
   }
   return (
-    <div data-overlay role="dialog" aria-label={`${t.side === 'BUY' ? 'Buy' : 'Sell'} ${labelOf(k)} from the chart`} className="absolute bottom-3 left-3 z-30 w-[300px] max-w-[calc(100%-24px)] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise">
+    <div data-overlay role="dialog" aria-label={`${t.side === 'BUY' ? 'Buy' : 'Sell'} ${labelOf(k)} from the chart`} className="absolute bottom-3 left-3 z-30 w-[328px] max-w-[calc(100%-24px)] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise">
       <div className="flex items-center gap-2">
         <SegmentedControl size="sm" label="Side" value={t.side} onChange={(side) => { const a = Math.abs(entry - t.sl) || ltp * 0.01; const d = side === 'BUY' ? 1 : -1; onChange({ ...t, side, sl: +Math.max(0.05, entry - d * a).toFixed(2), tgt: +Math.max(0.05, entry + d * 2 * a).toFixed(2) }) }} options={[{ value: 'BUY', label: 'Buy' }, { value: 'SELL', label: 'Sell' }]} />
         {!opt && <SegmentedControl size="sm" label="Product" value={product} onChange={setProduct} options={[{ value: 'MIS', label: 'Intraday' }, { value: 'CNC', label: 'Delivery' }]} />}
@@ -584,10 +587,11 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
       </div>
       <div className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-[12px]">
         <span className="text-fg-subtle">Entry</span>
-        <span className="flex items-center gap-2">{t.market ? <span className="num">Market · {ltp.toFixed(2)}</span> : <input aria-label="Entry price" type="number" step={0.05} className={field} value={t.entry} onChange={(e) => onChange({ ...t, entry: +e.target.value })} />}
+        <span className="flex items-center gap-2">{t.market ? <span className="num">Market · {ltp.toFixed(2)}</span> : <input aria-label="Entry price" type="number" step={0.05} className={cn(field, outBand && 'border-danger')} value={t.entry} onChange={(e) => onChange({ ...t, entry: +e.target.value })} />}
           <button className="text-[11px] text-fg-muted underline" onClick={() => onChange({ ...t, market: !t.market, entry: +ltp.toFixed(2) })}>{t.market ? 'Use a price' : 'Use market'}</button></span>
-        <span className="text-down">Stop</span><input aria-label="Stop price" type="number" step={0.05} className={field} value={t.sl} onChange={(e) => onChange({ ...t, sl: +e.target.value })} />
-        <span className="text-up">Target</span><input aria-label="Target price" type="number" step={0.05} className={field} value={t.tgt} onChange={(e) => onChange({ ...t, tgt: +e.target.value })} />
+        {!t.market && !opt && <><span /><span className={cn('-mt-1 text-[11px]', outBand ? 'text-down' : 'text-fg-subtle')}>{outBand ? 'Outside the allowed range ' : 'Allowed '}<span className="num">{lo.toFixed(2)} – {hi.toFixed(2)}</span></span></>}
+        <span className="text-down">Stop</span><LevelInput label="Stop" kind="sl" side={t.side} entry={entry} value={t.sl} onChange={(p) => p != null && onChange({ ...t, sl: p })} />
+        <span className="text-up">Target</span><LevelInput label="Target" kind="tgt" side={t.side} entry={entry} value={t.tgt} onChange={(p) => p != null && onChange({ ...t, tgt: p })} />
         <span className="text-fg-subtle">Risk ₹</span><input aria-label="Rupees to risk" type="number" step={500} className={field} value={risk} onChange={(e) => setRisk(Math.max(100, +e.target.value))} />
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-sunken p-2 text-center text-[11px]">
@@ -598,9 +602,10 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
       {opt && perUnit * lot > risk && <p className="mt-2 text-[11px] text-fg-muted">One lot already risks {inr(perUnit * lot)}, more than your {inr(risk)}.</p>}
       <div className="mt-2"><LabeledSwitch label="Trail the stop as price moves" checked={trail} onChange={setTrail} /></div>
       {!valid && <p className="mt-2 text-[11px] text-down">The stop must be on the losing side and the target on the winning side of the entry.</p>}
-      <div className="mt-3 flex items-center gap-2">
-        {held && gate && <GateNote g={gate} className="basis-full" />}
-        <Button size="sm" variant={t.side === 'BUY' ? 'primary' : 'danger'} disabled={!valid || !!held} onClick={place}>{t.side === 'BUY' ? 'Buy' : 'Sell'} {qty} · {otype === 'MARKET' ? 'market' : otype === 'LIMIT' ? 'limit' : 'stop entry'}</Button>
+      <CostLine cost={cost} className="mt-3 border-t border-line pt-2.5" />
+      {held && gate && <GateNote g={gate} className="mt-2" />}
+      <div className="mt-2.5 flex items-center gap-2">
+        <Button size="sm" variant={t.side === 'BUY' ? 'primary' : 'danger'} disabled={!valid || !!held || cost.short > 0 || outBand} onClick={place}>{t.side === 'BUY' ? 'Buy' : 'Sell'} {qty} · {otype === 'MARKET' ? 'market' : otype === 'LIMIT' ? 'limit' : 'stop entry'}</Button>
         <span className="text-[11px] text-fg-subtle">Drag the lines to adjust</span>
       </div>
     </div>
