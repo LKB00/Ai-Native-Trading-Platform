@@ -10,7 +10,17 @@ export type Rules = {
   maxRiskPct?: number
   /** No new entries after this time of day, in seconds since IST midnight. */
   noEntryAfter?: number
+  /** Setups (trade tags) you've paused because they keep losing. New entries tagged with one are refused. */
+  pausedSetups?: string[]
 }
+
+/** The setups offered when tagging a trade, before your own tags. Tags are stored lower-case. */
+export const SETUP_TAGS = ['breakout', 'pullback', 'bounce', 'momentum', 'reversal', 'scalp', 'gap', 'news']
+export const tagLabel = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+/** Tags that describe how a trade ended or was managed, not why it was taken. Never offered as setups. */
+const NOT_SETUPS = /^(stop|target|trailing stop|investment|auto square-off|risk|slice|daily loss|kill)/
+export const isSetupTag = (t?: string) => !!t && !NOT_SETUPS.test(t)
+const list = (xs: string[]) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
 export const DEFAULT_RULES: Rules = {}
 
 export type RuleId = keyof Rules
@@ -22,6 +32,7 @@ export function ruleText(id: RuleId, r: Rules): string {
     case 'stopRequired': return 'Every entry needs a stop'
     case 'maxRiskPct': return `Risk at most ${r.maxRiskPct}% of capital per trade`
     case 'noEntryAfter': return `No new entries after ${hhmm(r.noEntryAfter!)}`
+    case 'pausedSetups': return `No new ${list(r.pausedSetups ?? [])} entries`
   }
 }
 
@@ -83,6 +94,20 @@ export function insights(trades: Trade[], rules: Rules, capital: number): Insigh
         break
       }
     }
+  }
+  // A setup that keeps losing while the rest of your trading doesn't. Enough trades to be a pattern, and worse than
+  // your other setups, so the answer is "stop taking this one", not "stop trading".
+  const paused = rules.pausedSetups ?? []
+  const groups = new Map<string, Trade[]>()
+  for (const x of t) if (isSetupTag(x.tag) && !paused.includes(x.tag!)) groups.set(x.tag!, [...(groups.get(x.tag!) ?? []), x])
+  const worstSetup = [...groups.entries()].map(([tag, xs]) => ({ tag, xs, net: xs.reduce((a, x) => a + net(x), 0), wins: xs.filter((x) => net(x) > 0).length }))
+    .filter((g) => g.xs.length >= 4 && g.net < 0 && g.wins / g.xs.length < 0.5).sort((a, b) => a.net - b.net)[0]
+  if (worstSetup) {
+    const rest = t.filter((x) => x.tag !== worstSetup.tag); const restNet = rest.reduce((a, x) => a + net(x), 0)
+    if (avg(rest.map(net)) > avg(worstSetup.xs.map(net))) out.push({ id: 'pausedSetups', weight: -worstSetup.net,
+      lead: `${tagLabel(worstSetup.tag)} trades lost ${inr(worstSetup.net)} across ${worstSetup.xs.length} trades, with ${worstSetup.wins} ${worstSetup.wins === 1 ? 'win' : 'wins'}`,
+      detail: `Everything else ${restNet >= 0 ? `made ${inr(restNet)}` : `lost ${inr(restNet)}`} over ${rest.length} trades. Pausing ${worstSetup.tag} entries keeps the rest of your trading as it is; turn it back on any time.`,
+      rule: { pausedSetups: [...paused, worstSetup.tag] } })
   }
   return out.sort((a, b) => b.weight - a.weight)
 }

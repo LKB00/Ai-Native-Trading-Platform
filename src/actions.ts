@@ -8,6 +8,8 @@ export type OrderAction = {
   product: 'MIS' | 'CNC' | 'NRML'; expiryIdx?: number
   /** Exit plan attached at entry: absolute prices, and a trailing distance in points. */
   sl?: number; tgt?: number; trail?: number
+  /** Why the trade is taken (a setup such as "breakout"). Carried to the position and the journal. */
+  tag?: string
 }
 
 /** One scanner condition. Field names are the scanner's columns. */
@@ -25,7 +27,7 @@ export type Action =
   | { t: 'bracket'; key: string; sl?: number; tgt?: number; trail?: number }
   | { t: 'risk'; maxLoss?: number; maxProfit?: number; maxTrades?: number; kill?: boolean }
   /** Standing trading rules (see rules.ts). `off` turns one off. */
-  | { t: 'rules'; stopRequired?: boolean; maxRiskPct?: number; noEntryAfter?: number; off?: 'stopRequired' | 'maxRiskPct' | 'noEntryAfter' }
+  | { t: 'rules'; stopRequired?: boolean; maxRiskPct?: number; noEntryAfter?: number; pausedSetups?: string[]; off?: 'stopRequired' | 'maxRiskPct' | 'noEntryAfter' | 'pausedSetups' }
   | { t: 'scan'; filters: Filter[]; name?: string; sort?: string }
   | { t: 'chart'; sym?: string; tf?: TF; indicators?: string[]; levels?: boolean }
   | { t: 'sip'; sym: string; amount: number; day?: number }

@@ -18,8 +18,9 @@ import Portfolio from './Portfolio'
 import Journal from './Journal'
 import { ChatPanel, ChatTopActions } from './chat/Chat'
 import { DeskRail } from './agent/Desk'
-import { CostLine, LevelInput, priceBand, useOrderCost } from './ticket'
+import { CostLine, LevelInput, TagPicker, priceBand, useOrderCost } from './ticket'
 import { DepthView } from './depth'
+import { tagLabel } from './rules'
 import { Briefcase, GripVertical, Layers, Rows3, Trash2 } from 'lucide-react'
 
 export { inr, Chg, Money }
@@ -478,7 +479,7 @@ function Ticket({ sym, side: s0, px: px0, close }: { sym: string; side: 'BUY' | 
   const [side, setSide] = useState(s0); const [qty, setQty] = useState(exit?.qty ?? 1); const [ot, setOt] = useState<'MARKET' | 'LIMIT' | 'SL-M'>(px0 != null ? 'LIMIT' : 'MARKET')
   const [px, setPx] = useState(px0 ?? +ltp.toFixed(1)); const [prod, setProd] = useState<'MIS' | 'CNC'>(exit?.prod ?? 'MIS')
   const gate = useEntryGate(); const held = gate && opensPosition(sym, side, qty, prod)
-  const [sl, setSl] = useState<number | null>(null); const [tg, setTg] = useState<number | null>(null)
+  const [sl, setSl] = useState<number | null>(null); const [tg, setTg] = useState<number | null>(null); const [tag, setTag] = useState<string>()
   const box = 'absolute left-full top-16 z-30 ml-2 w-[320px] rounded-[10px] border border-line bg-raised p-3 shadow-lg animate-rise max-md:left-3 max-md:ml-0'
   const field = 'num h-8 w-full rounded-md border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
   const entry = ot === 'MARKET' ? ltp : px
@@ -510,10 +511,11 @@ function Ticket({ sym, side: s0, px: px0, close }: { sym: string; side: 'BUY' | 
         <span className="text-up">Target</span><LevelInput label="Target" kind="tgt" side={side} entry={entry} value={tg} onChange={setTg} />
       </div>
       {risk > 0 && <p className="mt-2 text-[11px] text-fg-subtle">Risk if stopped <span className="num text-down">{inr(risk)}</span>{tg != null && sl != null && Math.abs(entry - sl) > 0 && <> · reward <span className="num">1 : {(Math.abs(tg - entry) / Math.abs(entry - sl)).toFixed(1)}</span></>}</p>}
+      {!exit && <div className="mt-2.5"><TagPicker value={tag} onChange={setTag} /></div>}
       <CostLine cost={cost} className="mt-3 border-t border-line pt-2.5" />
       {held && gate && <GateNote g={gate} className="mt-2" />}
       <div className="mt-2.5 flex gap-2">
-        <Button size="sm" variant={side === 'BUY' ? 'primary' : 'danger'} disabled={!!held || cost.short > 0 || outBand} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ?? undefined, tgt: tg ?? undefined })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
+        <Button size="sm" variant={side === 'BUY' ? 'primary' : 'danger'} disabled={!!held || cost.short > 0 || outBand} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ?? undefined, tgt: tg ?? undefined, tag: exit ? undefined : tag })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
         <Button size="sm" variant="ghost" onClick={close}>Cancel</Button>
       </div>
     </div>
@@ -613,7 +615,7 @@ function Bottom() {
       <div className="scroll-thin min-h-0 flex-1 overflow-auto" hidden={!open_}>
         {tab === 'pos' && <table className="tbl"><thead><tr><th>Instrument</th><th>Product</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&amp;L</th><th>Exit plan</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
           {pos.map((x) => { const l = s.ltp(x.key); const pl = (l - x.avg) * x.qty + x.realized; return <tr key={x.key}>
-            <td className="!font-sans"><button className="hover:underline" onClick={() => { s.setSym(parseKey(x.key).und); s.setView(parseKey(x.key).strike ? 'chain' : 'chart') }}>{labelOf(x.key)}</button>{x.tag && <span className="ml-2 text-[11px] text-fg-subtle">{x.tag}</span>}</td><td className="text-fg-muted">{x.product}</td>
+            <td className="!font-sans"><button className="hover:underline" onClick={() => { s.setSym(parseKey(x.key).und); s.setView(parseKey(x.key).strike ? 'chain' : 'chart') }}>{labelOf(x.key)}</button>{x.qty ? <TagPicker value={x.tag} onChange={(t) => s.tagPosition(x.key, t)} className="ml-2 align-middle [&>button]:h-6 [&>button]:text-[11px]" /> : x.tag && <span className="ml-2 text-[11px] text-fg-subtle">{tagLabel(x.tag)}</span>}</td><td className="text-fg-muted">{x.product}</td>
             <td className={x.qty > 0 ? 'text-up' : x.qty < 0 ? 'text-down' : 'text-fg-subtle'}>{x.qty > 0 ? '+' : ''}{x.qty}</td>
             <td>{x.avg ? x.avg.toFixed(2) : '—'}</td><td>{l.toFixed(2)}</td><td><Money v={pl} /></td><td><ExitPlan k={x.key} /></td>
             <td>{x.qty !== 0 && <button type="button" className="h-6 rounded-md border border-line px-2 font-sans text-[11px] font-medium text-fg transition-colors hover:border-line-strong hover:bg-hover" onClick={() => s.setToast(s.place(x.key, x.qty > 0 ? 'SELL' : 'BUY', Math.abs(x.qty), 'MARKET', 0, x.product))}>Exit</button>}</td></tr> })}

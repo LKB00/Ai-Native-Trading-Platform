@@ -119,6 +119,8 @@ type S = {
   setRisk: (r: Partial<Risk>) => void
   /** Turn rules on (values) or off (undefined). Persisted, and logged like risk settings. */
   setRules: (r: Partial<Rules>) => void
+  /** Set or clear why an open position was taken; it carries to the journal when it closes. */
+  tagPosition: (key: string, tag?: string) => void
   setProfile: (p: Profile | null) => void
   setWatch: (w: string[]) => void
   setChart: (c: Partial<ChartCfg>) => void
@@ -406,7 +408,7 @@ export const useStore = create<S>((set, get) => ({
       const l = p[t.sym].ltp
       if ((t.dir === 'above' && l >= t.price) || (t.dir === 'below' && l <= t.price)) {
         set({ triggers: get().triggers.map((x) => (x.id === t.id ? { ...x, done: true } : x)) })
-        if (t.then) { const ro = get().resolveOrder(t.then); const msg = get().place(ro.key, t.then.side, ro.qty, t.then.otype, t.then.price ?? 0, t.then.product, { via: 'gtt', sl: t.then.sl, tgt: t.then.tgt, trail: t.then.trail, trigger: t.then.trigger }); get().event(`**GTT triggered:** ${t.sym} went ${t.dir} ${t.price}. ${msg}`, msg.startsWith('Rejected') ? 'bad' : 'good', get().positions[ro.key]?.qty ? [{ k: 'position', key: ro.key }] : undefined) }
+        if (t.then) { const ro = get().resolveOrder(t.then); const msg = get().place(ro.key, t.then.side, ro.qty, t.then.otype, t.then.price ?? 0, t.then.product, { via: 'gtt', sl: t.then.sl, tgt: t.then.tgt, trail: t.then.trail, trigger: t.then.trigger, tag: t.then.tag }); get().event(`**GTT triggered:** ${t.sym} went ${t.dir} ${t.price}. ${msg}`, msg.startsWith('Rejected') ? 'bad' : 'good', get().positions[ro.key]?.qty ? [{ k: 'position', key: ro.key }] : undefined) }
         else get().event(`**Alert: ${t.sym} is ${t.dir} ${t.price}** (now ${l.toFixed(2)}).`, 'attention', [{ k: 'quote', sym: t.sym }], [`buy ${t.sym.toLowerCase()}`, `analyse ${t.sym.toLowerCase()}`, `why is ${t.sym.toLowerCase()} moving`])
       }
     }
@@ -439,6 +441,7 @@ export const useStore = create<S>((set, get) => ({
       if (s.risk.cooloffUntil && Date.now() < s.risk.cooloffUntil) return reject(`Cool-off after ${s.risk.cooloffAfter} losses in a row, ${Math.ceil((s.risk.cooloffUntil - Date.now()) / 60000)} min left`)
       if (s.rules.noEntryAfter && secOfDay() >= s.rules.noEntryAfter) return reject(`Your rule: no new entries after ${hhmm(s.rules.noEntryAfter)}`)
       if (s.rules.stopRequired && !k.strike && opts.sl == null && via !== 'sip') return reject('Your rule: every entry needs a stop')
+      if (opts.tag && s.rules.pausedSetups?.includes(opts.tag)) return reject(`Your rule: ${opts.tag} trades are paused`)
       const today = s.orders.filter((o) => o.status === 'COMPLETE' && new Date(o.ts).toDateString() === new Date().toDateString() && o.via !== 'bracket' && o.via !== 'risk').length
       if (today >= s.risk.maxTrades) return reject(`Daily trade limit of ${s.risk.maxTrades} reached`)
       if (k.strike && !s.fnoAck) { set({ needAck: true }); return reject('Read and accept the F&O risk disclosure first') }
@@ -489,7 +492,8 @@ export const useStore = create<S>((set, get) => ({
   pauseTrigger: (id, paused) => { set({ triggers: get().triggers.map((t) => (t.id === id ? { ...t, paused } : t)) }); get().log('user', `${paused ? 'Paused' : 'Resumed'} watch #${id}`) },
   setProfile: (profile) => { saveJSON('profile', profile); set({ profile }) },
   setWatch: (w) => { saveJSON('watch', w); set({ watch: w }) },
-  setRules: (r) => { const rules = Object.fromEntries(Object.entries({ ...get().rules, ...r }).filter(([, v]) => v != null && v !== false)) as Rules; saveJSON('rules', rules); set({ rules }); get().log('user', `Rules: ${JSON.stringify(r)}`) },
+  tagPosition: (key, tag) => { const p = get().positions[key]; if (!p?.qty) return; set({ positions: { ...get().positions, [key]: { ...p, tag } } }) },
+  setRules: (r) => { const rules = Object.fromEntries(Object.entries({ ...get().rules, ...r }).filter(([, v]) => v != null && v !== false && !(Array.isArray(v) && !v.length))) as Rules; saveJSON('rules', rules); set({ rules }); get().log('user', `Rules: ${JSON.stringify(r)}`) },
   setRisk: (r) => { const risk = { ...get().risk, ...r }; saveJSON('risk', { ...risk, cooloffUntil: undefined }); set({ risk }); get().log('user', `Risk settings: ${JSON.stringify(r)}`) },
   setChart: (c) => { const chart = { ...get().chart, ...c }; saveJSON('chart2', chart); set({ chart }) },
   toggleDrawing: (sym, price) => {
@@ -507,7 +511,7 @@ export const useStore = create<S>((set, get) => ({
   run: (a, via = 'ai') => {
     const s = get()
     switch (a.t) {
-      case 'order': { const r = s.resolveOrder(a); return s.place(r.key, a.side, r.qty, a.otype, a.price ?? 0, a.product, { trigger: a.trigger, sl: a.sl, tgt: a.tgt, trail: a.trail, via }) }
+      case 'order': { const r = s.resolveOrder(a); return s.place(r.key, a.side, r.qty, a.otype, a.price ?? 0, a.product, { trigger: a.trigger, sl: a.sl, tgt: a.tgt, trail: a.trail, tag: a.tag, via }) }
       case 'legs': {
         const out: string[] = []; const inst = bySym(a.und)!; const ex = nextExpiries(a.und)[a.expiryIdx] ?? nextExpiries(a.und)[0]
         // Buy legs first so the hedge's margin benefit applies to the shorts.
@@ -609,7 +613,11 @@ function fill(id: number, price: number) {
     useStore.setState({ holdings: holdings.filter((x) => x.qty > 0), cash: s.cash + price * o.qty - ch, trades: [trade, ...s.trades], orders: s.orders.map((x) => (x.id === id ? { ...x, status: 'COMPLETE', fill: price } : x)) })
     return
   }
-  const pos = s.positions[o.key] ?? { key: o.key, qty: 0, avg: 0, realized: 0, product: o.product, charges: 0, openedAt: Date.now(), tag: o.tag }
+  const pos = s.positions[o.key] ?? { key: o.key, qty: 0, avg: 0, realized: 0, product: o.product, charges: 0, openedAt: Date.now() }
+  // The tag says why a position was opened, so it comes from the entry order only: never from an exit (whose tag is
+  // its reason, like "stop"), and never left over from an earlier position in the same name.
+  const entryTag = o.via === 'bracket' || o.via === 'risk' ? undefined : o.tag
+  let tag = pos.qty ? pos.tag : entryTag
   const signed = o.side === 'BUY' ? o.qty : -o.qty
   let { qty, avg, realized, openedAt } = pos; let cash = s.cash - ch
   cash += o.side === 'BUY' ? -price * o.qty : price * o.qty
@@ -626,15 +634,15 @@ function fill(id: number, price: number) {
     let streak = 0; for (const t of todays) { if (t.pnl - t.charges < 0) streak++; else break }
     if (streak >= risk.cooloffAfter && !risk.cooloffUntil) { risk = { ...risk, cooloffUntil: Date.now() + 15 * 60000 }; setTimeout(() => useStore.getState().setToast(`${streak} losses in a row. New entries pause for 15 minutes. Exits still work.`), 0) }
     qty += signed
-    if (qty !== 0 && Math.sign(qty) === Math.sign(signed)) { avg = price; openedAt = Date.now() }
-    if (qty === 0) avg = 0
+    if (qty !== 0 && Math.sign(qty) === Math.sign(signed)) { avg = price; openedAt = Date.now(); tag = entryTag }
+    if (qty === 0) { avg = 0; tag = undefined }
   }
   const brackets = { ...s.brackets }
   if (qty === 0) delete brackets[o.key]
   else if (o.sl || o.tgt || o.trail) brackets[o.key] = { sl: o.sl, tgt: o.tgt, trail: o.trail }
   useStore.setState({
     cash, risk, trades, brackets,
-    positions: { ...s.positions, [o.key]: { ...pos, qty, avg, realized, openedAt, charges: pos.charges + ch, tag: pos.tag ?? o.tag } },
+    positions: { ...s.positions, [o.key]: { ...pos, qty, avg, realized, openedAt, charges: pos.charges + ch, tag: tag ?? (qty ? entryTag : undefined) } },
     orders: s.orders.map((x) => (x.id === id ? { ...x, status: 'COMPLETE', fill: price } : x)),
   })
 }

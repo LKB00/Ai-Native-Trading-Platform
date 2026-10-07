@@ -9,7 +9,7 @@ import { useEntryGate, opensPosition, GateNote } from '../gate'
 import { Badge, Button, IconButton, SegmentedControl, cn } from '../ds'
 import { PlusIcon, XIcon } from '../ds/lib/icons'
 import { inr, LabeledSwitch } from '../ui'
-import { CostLine, LevelInput, priceBand, useOrderCost } from '../ticket'
+import { CostLine, LevelInput, TagPicker, priceBand, useOrderCost } from '../ticket'
 import { indDef, instanceTitle, type IndInstance } from './indicators'
 import { CLICKS, DEFAULT_COLOR, KIND_LABEL, applyHandle, hit, renderDrawing, translate, isDrawTool, type Mapper, type Tool } from './drawings'
 import { EyeIcon, EyeOffIcon, SettingsGearIcon, TrashIcon, LockIcon, UnlockIcon, CloneIcon, BellIcon } from './icons'
@@ -564,7 +564,7 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
   const st = useStore(); const gate = useEntryGate()
   // Selling stock you hold while entries are paused is an exit from delivery: start there.
   const holding = t.side === 'SELL' && !st.positions[k]?.qty ? st.holdings.find((h) => h.sym === k && h.qty > 0) : undefined
-  const [risk, setRisk] = useState(2000); const [product, setProduct] = useState<'MIS' | 'CNC'>(gate && holding ? 'CNC' : 'MIS'); const [trail, setTrail] = useState(false)
+  const [risk, setRisk] = useState(2000); const [product, setProduct] = useState<'MIS' | 'CNC'>(gate && holding ? 'CNC' : 'MIS'); const [trail, setTrail] = useState(false); const [tag, setTag] = useState<string>()
   const opt = lot > 1
   const entry = t.market ? ltp : t.entry; const dir = t.side === 'BUY' ? 1 : -1
   const perUnit = Math.abs(entry - t.sl)
@@ -572,6 +572,8 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
   // While entries are paused only exits go through, so a closing ticket never asks for more than you hold.
   const pos = st.positions[k]; const closing = !!pos?.qty && (pos.qty > 0) === (t.side === 'SELL')
   const qty = gate && closing ? Math.min(sized, Math.abs(pos.qty)) : gate && holding && product === 'CNC' ? Math.min(sized, holding.qty) : sized
+  // An exit doesn't need a reason; the position already has one.
+  const closingOnly = closing || (!!holding && product === 'CNC')
   const reward = Math.abs(t.tgt - entry) * qty; const rr = Math.abs(t.tgt - entry) / Math.max(perUnit, 0.05)
   const held = gate && opensPosition(k, t.side, qty, opt ? 'NRML' : product)
   const valid = (t.sl - entry) * dir < 0 && (t.tgt - entry) * dir > 0
@@ -580,7 +582,7 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
   const cost = useOrderCost(k, t.side, qty, entry, opt ? 'NRML' : product)
   const [lo, hi] = priceBand(ltp); const outBand = !t.market && !opt && (t.entry < lo || t.entry > hi)
   const place = () => {
-    const msg = st.place(k, t.side, qty, otype, otype === 'LIMIT' ? entry : 0, opt ? 'NRML' : product, { trigger: otype === 'SL-M' ? entry : undefined, sl: t.sl, tgt: t.tgt, trail: trail ? +perUnit.toFixed(2) : undefined, via: 'chart' })
+    const msg = st.place(k, t.side, qty, otype, otype === 'LIMIT' ? entry : 0, opt ? 'NRML' : product, { trigger: otype === 'SL-M' ? entry : undefined, sl: t.sl, tgt: t.tgt, trail: trail ? +perUnit.toFixed(2) : undefined, tag, via: 'chart' })
     st.setToast(msg); if (!msg.startsWith('Rejected')) onClose()
   }
   return (
@@ -607,6 +609,7 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
       </div>
       {opt && perUnit * lot > risk && <p className="mt-2 text-[11px] text-fg-muted">One lot already risks {inr(perUnit * lot)}, more than your {inr(risk)}.</p>}
       <div className="mt-2"><LabeledSwitch label="Trail the stop as price moves" checked={trail} onChange={setTrail} /></div>
+      {!closingOnly && <div className="mt-2"><TagPicker value={tag} onChange={setTag} /></div>}
       {!valid && <p className="mt-2 text-[11px] text-down">The stop must be on the losing side and the target on the winning side of the entry.</p>}
       <CostLine cost={cost} className="mt-3 border-t border-line pt-2.5" />
       {held && gate && <GateNote g={gate} className="mt-2" />}

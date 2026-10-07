@@ -4,7 +4,7 @@ import { allMetrics, applyFilters, metricsFor, FIELDS, describeFilter } from './
 import { patterns } from './Chart'
 import type { Action, Card, AIResult, Filter, OrderAction } from './actions'
 import { entryGate, isEntry, type Gate } from './gate'
-import { ruleText, type RuleId } from './rules'
+import { ruleText, SETUP_TAGS, tagLabel, isSetupTag, insights, type RuleId } from './rules'
 import { styleOf } from './setup'
 
 const ALIAS: Record<string, string> = {
@@ -23,6 +23,21 @@ function findSym(t: string): string | undefined {
 }
 const SECTOR_ALIAS: Record<string, string> = { bank: 'Banks', banks: 'Banks', banking: 'Banks', it: 'IT', tech: 'IT', software: 'IT', pharma: 'Pharma', auto: 'Auto', metal: 'Metals', metals: 'Metals', fmcg: 'FMCG', power: 'Power', energy: 'Energy', oil: 'Energy', defence: 'Defence', defense: 'Defence', cement: 'Cement', telecom: 'Telecom', retail: 'Retail', finance: 'Financials', nbfc: 'Financials', financials: 'Financials', 'capital goods': 'Capital Goods', infra: 'Infra', consumer: 'Consumer', etf: 'ETF', etfs: 'ETF' }
 const inr = (n: number) => (n < 0 ? '−' : '') + '₹' + Math.abs(Math.round(n)).toLocaleString('en-IN')
+
+/** Setup names the user might say: the standard ones plus any tag already on their trades. */
+const knownTags = () => [...new Set([...SETUP_TAGS, ...useStore.getState().trades.map((x) => x.tag).filter(isSetupTag) as string[]])].sort((a, b) => b.length - a.length)
+/** The setup named in a sentence ("as a breakout", "pullback trade", "bounces"), as its stored tag. */
+function tagIn(t: string): string | undefined {
+  for (const g of knownTags()) if (new RegExp(`\\b${esc(g)}(?:e?s)?\\b`).test(t)) return g
+}
+/** Results per setup over the last 30 days, best first. */
+function bySetup() {
+  const ts = useStore.getState().trades.filter((x) => x.close > Date.now() - 30 * 864e5)
+  const g = new Map<string, { n: number; wins: number; net: number }>()
+  for (const x of ts) { const k = isSetupTag(x.tag) ? x.tag! : ''; const r = g.get(k) ?? { n: 0, wins: 0, net: 0 }; r.n++; r.net += x.pnl - x.charges; if (x.pnl - x.charges > 0) r.wins++; g.set(k, r) }
+  // Best first; untagged trades last, since they say nothing about a setup.
+  return [...g.entries()].map(([tag, r]) => ({ tag, ...r })).sort((a, b) => (a.tag ? 0 : 1) - (b.tag ? 0 : 1) || b.net - a.net)
+}
 const sgn = (n: number, d = 2) => `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(d)}`
 const NOT_ADVICE = '*Educational analysis on simulated data, not investment advice.*'
 
@@ -230,6 +245,13 @@ export function localAI(input: string): AIResult {
   }
   if (/brief|morning|what.?s happening|market (today|summary|overview)|how.?s the market/.test(t)) return { reply: briefing(), actions: [{ t: 'nav', view: 'markets' }], cards: [{ k: 'brief' }], follow: ["today's setups", 'show my positions', 'stocks with volume 2x today', 'nifty option chain'] }
   if (/explain (my )?(p&?n?l|profit|loss)|why (am i|did i) (lose|losing|make|down|up)|where did .* (money|profit|loss)/.test(t)) return { reply: explainPnl(), actions: [], cards: [{ k: 'positions' }], follow: ['review my trades', 'tighten my stops'] }
+  if (/(how|which|what).{0,24}(setups?|tags?).{0,24}(doing|performing|working|best|worst|making|losing)|(setups?|tags?) (performance|results|stats|breakdown)|by (setup|tag)|my setups? (results|stats)/.test(t)) {
+    const rows = bySetup(); const tagged = rows.filter((r) => r.tag)
+    if (!tagged.length) return { reply: 'None of your recent trades carry a setup tag yet. Tag entries as you place them (the Setup field on the ticket, or say "buy tcs as a breakout") and I can show which setups make money.', actions: [], follow: ['review my trades'] }
+    const line = (r: (typeof rows)[number]) => `- **${r.tag ? tagLabel(r.tag) : 'Untagged'}**: ${r.n} trade${r.n > 1 ? 's' : ''}, ${r.wins} ${r.wins === 1 ? 'win' : 'wins'}, ${inr(r.net)} after charges`
+    const st = useStore.getState(); const tip = insights(st.trades, st.rules, st.cash).find((i) => i.id === 'pausedSetups')
+    return { reply: `**Your setups, last 30 days.**\n\n${rows.map(line).join('\n')}${tip ? `\n\n${tip.lead}. ${tip.detail}` : ''}`, actions: [], cards: tip ? [{ k: 'rules' }] : undefined, follow: tip ? ['my rules', 'review my trades'] : ['review my trades'] }
+  }
   if (/\bsetups?\b(?! (my )?desk)|trade ideas|ideas for today|what (should i|to) watch|morning plan|pre.?market/.test(t)) return { reply: s.mode === 'chat' ? '' : 'Setups from your watchlist.', actions: [], cards: [{ k: 'setups' }], follow: ['brief me', 'show my positions'] }
   if (/set ?up (my )?desk|onboard|change my (trading )?(style|setup)|start over setup/.test(t)) return { reply: 'Four quick questions, and I will set your limits, rules and watchlist to match. Nothing changes until you confirm.', actions: [], cards: [{ k: 'setup' }] }
   // Standing rules: show them, or set one in plain words.
@@ -239,6 +261,12 @@ export function localAI(input: string): AIResult {
     if (/always (use|put|add|set) a stop|every (trade|entry|order) (needs|gets|must have) a stop|stop on every (trade|entry)|no (trade|entry) without a stop/.test(t)) return on('stopRequired', { t: 'rules', stopRequired: true })
     const late = t.match(/no (?:new )?(?:trades|entries|trading|buying)(?: after| past) (\d{1,2})(?::(\d{2}))? ?(am|pm)?/)
     if (late) { let h = +late[1]; if (late[3] === 'pm' && h < 12) h += 12; else if (!late[3] && h < 8) h += 12; return on('noEntryAfter', { t: 'rules', noEntryAfter: h * 3600 + (+(late[2] ?? 0)) * 60 }) }
+    const named = tagIn(t); const paused = s.rules.pausedSetups ?? []
+    if (named && /\b(resume|unpause|allow|re-?enable|turn on|start (taking|trading))\b/.test(t)) {
+      const rest = paused.filter((x) => x !== named)
+      return { reply: paused.includes(named) ? `**${tagLabel(named)} trades are back on.** New entries tagged ${named} go through as usual.` : `${tagLabel(named)} trades weren't paused.`, actions: paused.includes(named) ? [rest.length ? { t: 'rules', pausedSetups: rest } : { t: 'rules', off: 'pausedSetups' }] : [], cards: [{ k: 'rules' }] }
+    }
+    if (named && /\b(pause|stop (taking|trading|doing)|no more|don'?t (let me )?take|avoid|block)\b/.test(t)) return on('pausedSetups', { t: 'rules', pausedSetups: [...new Set([...paused, named])] })
     const rp = t.match(/risk (?:at most |max(?:imum)? |only )?(\d+(?:\.\d+)?) ?% (?:of (?:my )?capital )?(?:per|a|each) trade/)
     if (rp) return on('maxRiskPct', { t: 'rules', maxRiskPct: +rp[1] })
   }
@@ -333,7 +361,7 @@ export function localAI(input: string): AIResult {
     if (!strikeM && rsM) qty = Math.max(1, Math.floor(+rsM[1] / s.prices[sym].ltp))
     if (strikeM && lotM) qty = parseInt(lotM[1])
     const limit = !isMkt && priceM ? +priceM[1] : undefined
-    const a: OrderAction = { t: 'order', und: sym, side, qty, otype: limit ? 'LIMIT' : 'MARKET', price: limit, product: strikeM ? 'NRML' : /deliver|cnc|hold|invest|swing/.test(t) || misClosedNow() || (['swing', 'investing'].includes(styleOf(s.profile) ?? '') && !/intraday|mis\b/.test(t)) ? 'CNC' : 'MIS', sl: slM ? +slM[1] : undefined, tgt: tgM ? +tgM[1] : undefined, trail: trM ? +trM[1] : undefined, ...(strikeM ? { strike: +strikeM[1], ot: /ce|call/.test(strikeM[2]) ? 'CE' as const : 'PE' as const, expiryIdx } : {}) }
+    const a: OrderAction = { t: 'order', und: sym, side, qty, otype: limit ? 'LIMIT' : 'MARKET', price: limit, product: strikeM ? 'NRML' : /deliver|cnc|hold|invest|swing/.test(t) || misClosedNow() || (['swing', 'investing'].includes(styleOf(s.profile) ?? '') && !/intraday|mis\b/.test(t)) ? 'CNC' : 'MIS', sl: slM ? +slM[1] : undefined, tgt: tgM ? +tgM[1] : undefined, trail: trM ? +trM[1] : undefined, ...(strikeM ? { strike: +strikeM[1], ot: /ce|call/.test(strikeM[2]) ? 'CE' as const : 'PE' as const, expiryIdx } : {}), tag: tagIn(t) }
     if (a.strike && (a.strike % inst.step)) return { reply: `${a.strike} isn't a valid ${sym} strike. Strikes are in steps of ${inst.step}.`, actions: [] }
     const ref = limit ?? s.prices[sym].ltp
     if (!strikeM && a.sl && (side === 'BUY' ? a.sl >= ref : a.sl <= ref)) return { reply: `A stop at ${a.sl} is on the wrong side of the ${ref.toFixed(2)} entry for a ${side.toLowerCase()}. Check the price.`, actions: [] }
@@ -380,10 +408,10 @@ export async function llmAI(input: string, apiKey: string): Promise<AIResult> {
   }
   const system = `You are the copilot inside an Indian (NSE/BSE) paper-trading terminal with simulated prices. Reply with JSON ONLY: {"reply": string (concise markdown), "actions": Action[]}.
 Action types (all trades are shown to the user for approval before running, so draft them):
-{"t":"order","und":SYM,"strike"?:n,"ot"?:"CE"|"PE","side":"BUY"|"SELL","qty":n (LOTS for options, SHARES for equity),"otype":"MARKET"|"LIMIT"|"SL-M","price"?:n,"trigger"?:n,"product":"MIS"|"CNC"|"NRML","expiryIdx"?:n,"sl"?:n,"tgt"?:n,"trail"?:n}
+{"t":"order","und":SYM,"strike"?:n,"ot"?:"CE"|"PE","side":"BUY"|"SELL","qty":n (LOTS for options, SHARES for equity),"otype":"MARKET"|"LIMIT"|"SL-M","price"?:n,"trigger"?:n,"product":"MIS"|"CNC"|"NRML","expiryIdx"?:n,"sl"?:n,"tgt"?:n,"trail"?:n,"tag"?:"breakout"|"pullback"|... (lowercase setup, only when the user names one)}
 {"t":"legs","und":SYM,"legs":[{"side","type":"CE"|"PE","strike":n,"lots":n}],"expiryIdx":n,"name":string}
 {"t":"bracket","key":positionKey,"sl"?:n,"tgt"?:n,"trail"?:n} {"t":"squareoff","key"?:string} {"t":"risk","maxLoss"?:n,"maxProfit"?:n,"maxTrades"?:n,"kill"?:true}
-{"t":"rules","stopRequired"?:true,"maxRiskPct"?:n,"noEntryAfter"?:secondsSinceISTMidnight,"off"?:"stopRequired"|"maxRiskPct"|"noEntryAfter"} (standing trading rules the user asks for)
+{"t":"rules","stopRequired"?:true,"maxRiskPct"?:n,"noEntryAfter"?:secondsSinceISTMidnight,"pausedSetups"?:[lowercase tags, the full list],"off"?:"stopRequired"|"maxRiskPct"|"noEntryAfter"|"pausedSetups"} (standing trading rules the user asks for)
 {"t":"trigger","sym":SYM,"dir":"above"|"below","price":n,"then"?:<order>} {"t":"scan","filters":[{"field":scanField,"op":">"|"<"|">="|"<="|"="|"in","value":n|string|string[]}],"name":string}
 {"t":"chart","sym"?:SYM,"tf"?:"1m"|"5m"|"15m"|"1h"|"1D"|"1W","indicators"?:string[],"levels"?:true} {"t":"nav","view":"chart"|"chain"|"strategy"|"scanner"|"markets"|"portfolio"|"journal"} {"t":"watch","op","sym"} {"t":"sip","sym","amount","day"}
 Rules: Never invent numbers — use only values in context (quotes, analysis, account); for screens output a scan action and let the engine compute results. Strikes must be multiples of strikeStep. Never give personalised buy/sell recommendations or price targets (SEBI: needs RIA/RA registration) — offer analysis and education instead and say so briefly. Mention risk plainly for F&O selling. Context: ${JSON.stringify(ctx)}`

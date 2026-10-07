@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useStore, type Trade } from './store'
 import { parseKey } from './market'
+import { isSetupTag, tagLabel } from './rules'
 import { ask } from './ai'
 import { inr, inrShort, Money, Section, SortMark, ViewHeader, AgentNote } from './ui'
 import { Badge, Button, EmptyState, LineChart, SegmentedControl, StatTile, cn } from './ds'
@@ -68,7 +69,7 @@ function insights(ts: T[], s: ReturnType<typeof stats>): string[] {
   const hold = (x: T[]) => x.length ? sum(x, (t) => t.close - t.open) / x.length : 0
   const hw = hold(s.wins), hl = hold(s.losses)
   if (hw > 0 && hl > hw * 1.3) out.push(`You hold losing trades ${(hl / hw).toFixed(1)}× longer than winners (${Math.round(hl / 60000)} vs ${Math.round(hw / 60000)} min). Cutting losers sooner is the usual fix.`)
-  const tags = group(ts.filter((t) => t.tag), (t) => t.tag!).filter((g) => g.n >= 3)
+  const tags = group(ts.filter((t) => isSetupTag(t.tag)), (t) => tagLabel(t.tag!)).filter((g) => g.n >= 3)
   if (tags.length >= 2 && tags[tags.length - 1].net < 0) out.push(`Best setup: "${tags[0].k}" (${sign(tags[0].net)} over ${tags[0].n} trades). Weakest: "${tags[tags.length - 1].k}" (${sign(tags[tags.length - 1].net)} over ${tags[tags.length - 1].n}).`)
   return out
 }
@@ -89,7 +90,7 @@ export default function Journal() {
   const flags = useMemo(() => insights(ts, s), [ts, s])
   const br = useMemo(() => ({
     weekday: group(ts, (t) => WD[new Date(t.close).getDay()], WD.slice(1).concat('Sun')),
-    tag: group(ts, (t) => t.tag ?? 'untagged'),
+    tag: group(ts, (t) => (isSetupTag(t.tag) ? tagLabel(t.tag!) : 'Untagged')),
     via: group(ts, (t) => t.via),
     exit: group(ts, (t) => t.exitReason ?? 'unknown'),
     kind: group(ts, kind),

@@ -20,6 +20,7 @@ import { legsMargin } from '../store'
 import { ask, confirm, dismiss, editDraft, misClosedNow, propose } from '../ai'
 import { Chg, Dir, Money, inr, inrShort } from '../ui'
 import { DepthView, useDepth } from '../depth'
+import { TagPicker } from '../ticket'
 
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
 /** Hex colour with transparency, for chart fills (the chart library can't read color-mix). */
@@ -112,8 +113,9 @@ function Facts({ items, cols = 4, top = true }: { items: Fact[]; cols?: 2 | 3 | 
 }
 
 /** Does this draft break a standing rule? Same numbers the order draft shows, so the reason and the disabled Place agree. */
-function ruleBreak(a: Action): { kind: 'stop' } | { kind: 'risk'; risk: number; cap: number; fit: number } | null {
+function ruleBreak(a: Action): { kind: 'stop' } | { kind: 'risk'; risk: number; cap: number; fit: number } | { kind: 'setup'; tag: string } | null {
   const s = useStore.getState(); if (a.t !== 'order' || !isEntry(a, s)) return null
+  if (a.tag && s.rules.pausedSetups?.includes(a.tag)) return { kind: 'setup', tag: a.tag }
   if (s.rules.stopRequired && !a.strike && a.sl == null) return { kind: 'stop' }
   if (s.rules.maxRiskPct && a.sl != null) {
     const { key, qty } = s.resolveOrder(a); const ref = a.otype === 'LIMIT' && a.price ? a.price : s.ltp(key)
@@ -805,7 +807,9 @@ function OrderDraft({ msgId, i, a, live }: { msgId: number; i: number; a: OrderA
         ].map((c) => <li key={c.t} className={cn('flex items-center gap-1', c.muted ? 'text-fg-subtle' : c.ok ? 'text-fg-muted' : c.warn ? 'text-[var(--attention-fg)]' : 'text-danger-fg')}>
           {c.ok ? <Check size={12} strokeWidth={2.25} className={c.muted ? 'text-fg-subtle' : 'text-up'} aria-hidden /> : <X size={12} strokeWidth={2.25} aria-hidden />}{c.t}</li>)}
       </ul>
-      {brk?.kind === 'stop'
+      {brk?.kind === 'setup'
+        ? <Read tone="attention"><b>Your rule: {brk.tag} trades are paused.</b> You paused them because they kept losing. Tag this as something else if it's a different setup, or turn the pause off in your rules.</Read>
+        : brk?.kind === 'stop'
         ? <Read tone="attention"><b>Your rule: every entry needs a stop.</b> Add one to place this.
             <span className="mt-2 flex flex-wrap items-center gap-2"><button type="button" onClick={addPlan} className="inline-flex h-7 items-center rounded-md bg-fg px-2.5 text-[12px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">Add stop ₹{fmt(long ? ref - atrPts : ref + atrPts, 1)} · target ₹{fmt(long ? ref + 2 * atrPts : ref - 2 * atrPts, 1)}</button></span></Read>
         : brk?.kind === 'risk'
@@ -822,6 +826,7 @@ function OrderDraft({ msgId, i, a, live }: { msgId: number; i: number; a: OrderA
         <button type="button" className={chip} onClick={() => setAdjust(true)}>{opt ? 'F&O carry' : a.product === 'CNC' ? 'Delivery' : 'Intraday'}</button>
         <button type="button" className={chip} onClick={() => setAdjust(true)}>{a.otype === 'LIMIT' && a.price ? `Limit ₹${fmt(a.price)}` : 'Market'}</button>
         {a.sl != null && <button type="button" className={chip} onClick={() => setAdjust(true)}><span className="text-down">Stop ₹{fmt(a.sl)}</span>{a.tgt != null && <><span className="text-fg-subtle">·</span><span className="text-up">Target ₹{fmt(a.tgt)}</span></>}{a.trail ? <span className="text-fg-subtle"> · trails {a.trail}</span> : null}</button>}
+        {isEntry(a, useStore.getState()) && <TagPicker value={a.tag} onChange={(tag) => set({ tag })} className="[&>button]:h-8" />}
         <button type="button" aria-expanded={open} onClick={() => setAdjust(!adjust)} disabled={slBad || tgBad} className="ml-auto inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg disabled:opacity-60">
           Adjust<ChevronDown size={13} strokeWidth={1.75} className={cn('transition-transform', open && 'rotate-180')} /></button>
       </div>
@@ -1165,7 +1170,7 @@ export function SetupsCard() {
       <div className="px-3.5 pb-3"><Read><b>{list.length ? `${list.length} of your ${watch.length} watchlist names are at a decision point.` : 'Nothing on your watchlist is at a decision point right now.'}</b> {list.length ? `Price structure only, not advice. Quantities risk about ${inr(budget)} each (${pct}% of capital) if the stop is hit.` : 'Add names to your watchlist, or ask again later in the session.'}</Read></div>
       {list.length > 0 && <ul className="divide-y divide-line border-t border-line">{list.map((x) => {
         const qty = Math.max(1, Math.floor(budget / Math.max(x.entry - x.stop, 0.05)))
-        const order: OrderAction = { t: 'order', und: x.sym, side: 'BUY', qty, otype: 'MARKET', product: 'CNC', sl: x.stop, tgt: x.target }
+        const order: OrderAction = { t: 'order', und: x.sym, side: 'BUY', qty, otype: 'MARKET', product: 'CNC', sl: x.stop, tgt: x.target, tag: x.kind.toLowerCase() }
         return (
           <li key={x.sym} className="px-3.5 py-2.5">
             <div className="flex items-center gap-2">
