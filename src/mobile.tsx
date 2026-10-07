@@ -2,8 +2,8 @@
 // Sell and Buy in a bar at the bottom edge, and everything that isn't a main tab lives under More.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, ChevronsRight, X, BookOpen, Briefcase, Layers, MessageSquare, Moon, MoreHorizontal, Rows3, ScanSearch, Sun, TrendingUp, Workflow, List, Wallet } from 'lucide-react'
-import { useStore, type View } from './store'
+import { ChevronLeft, ChevronsRight, X, Rows3 } from 'lucide-react'
+import { useStore } from './store'
 import { bySym } from './market'
 import { cn } from './ds'
 import { DepthView, useDepth } from './depth'
@@ -68,47 +68,6 @@ export function DepthSheet({ sym, onClose, onPrice }: { sym: string | null; onCl
     </Sheet>
   )
 }
-
-const PAGES: { v: View; label: string; sub: string; icon: ReactNode }[] = [
-  { v: 'markets', label: 'Markets', sub: 'Indices, breadth, sectors', icon: <TrendingUp size={18} strokeWidth={1.75} /> },
-  { v: 'scanner', label: 'Scanner', sub: 'Find stocks by conditions', icon: <ScanSearch size={18} strokeWidth={1.75} /> },
-  { v: 'chain', label: 'Option chain', sub: 'Strikes, OI and Greeks', icon: <Layers size={18} strokeWidth={1.75} /> },
-  { v: 'strategy', label: 'Strategy builder', sub: 'Multi-leg payoffs', icon: <Workflow size={18} strokeWidth={1.75} /> },
-  { v: 'journal', label: 'Journal', sub: 'Every closed trade, and what it says', icon: <BookOpen size={18} strokeWidth={1.75} /> },
-]
-
-/** Everything that isn't a main tab: the other workspaces, then settings. */
-export function MoreSheet({ open, onClose, onPage }: { open: boolean; onClose: () => void; onPage: (v: View) => void }) {
-  const theme = useStore((s) => s.theme)
-  const row = 'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-hover'
-  return (
-    <Sheet open={open} onClose={onClose} label="More">
-      <nav aria-label="Workspaces" className="px-2">
-        {PAGES.map((p) => <button key={p.v} type="button" className={row} onClick={() => onPage(p.v)}>
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sunken text-fg-muted">{p.icon}</span>
-          <span className="min-w-0"><span className="block text-[14px] font-medium text-fg">{p.label}</span><span className="block text-[12px] text-fg-subtle">{p.sub}</span></span>
-        </button>)}
-      </nav>
-      <div className="mx-4 my-2 h-px bg-line" />
-      <div className="px-2">
-        <button type="button" className={row} onClick={() => useStore.getState().toggleTheme()}>
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sunken text-fg-muted">{theme === 'dark' ? <Sun size={18} strokeWidth={1.75} /> : <Moon size={18} strokeWidth={1.75} />}</span>
-          <span className="text-[14px] font-medium text-fg">{theme === 'dark' ? 'Light theme' : 'Dark theme'}</span>
-        </button>
-      </div>
-    </Sheet>
-  )
-}
-
-export type PhoneTab = 'watch' | 'positions' | 'agent' | 'portfolio' | 'more'
-/** Five destinations, navigation only (no actions in the tab bar). A stock's chart opens from the stock, not a tab. */
-export const PHONE_TABS: { id: PhoneTab; label: string; icon: ReactNode }[] = [
-  { id: 'watch', label: 'Watchlist', icon: <List size={20} strokeWidth={1.75} /> },
-  { id: 'positions', label: 'Positions', icon: <Wallet size={20} strokeWidth={1.75} /> },
-  { id: 'agent', label: 'Agent', icon: <MessageSquare size={20} strokeWidth={1.75} /> },
-  { id: 'portfolio', label: 'Portfolio', icon: <Briefcase size={20} strokeWidth={1.75} /> },
-  { id: 'more', label: 'More', icon: <MoreHorizontal size={20} strokeWidth={1.75} /> },
-]
 
 /* ------------------------------------------------------------------ screens and the back button */
 

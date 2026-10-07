@@ -21,7 +21,9 @@ import { DeskRail } from './agent/Desk'
 import { CostLine, LevelInput, TagPicker, priceBand, useOrderCost } from './ticket'
 import { DepthView } from './depth'
 import { Drawer, PhonePositions, PositionActions, statusOf, type DrawerTarget } from './positions'
-import { DepthSheet, MoreSheet, PHONE_TABS, Screen, useBackStack, type PhoneTab } from './mobile'
+import { DepthSheet, Screen, useBackStack } from './mobile'
+import { AskButton, NotificationsSheet, PhoneHome, PhoneProfile, PhoneTools, PhoneTop, SearchScreen, type Tool } from './phonehome'
+import { House, LayoutGrid, List as ListIcon, UserRound, Wallet } from 'lucide-react'
 import { OrderPad, StockScreen } from './phone'
 import { useShallow } from 'zustand/react/shallow'
 import { isSetupTag, tagLabel } from './rules'
@@ -110,81 +112,90 @@ function Cockpit() {
 }
 
 type Layer = { t: 'stock'; sym: string } | { t: 'order'; sym: string; side: 'BUY' | 'SELL'; px?: number } | { t: 'chart' } | { t: 'page'; view: View }
-  | { t: 'pos'; target: DrawerTarget } | { t: 'depth'; sym: string } | { t: 'more' }
+  | { t: 'pos'; target: DrawerTarget } | { t: 'depth'; sym: string } | { t: 'agent' } | { t: 'search' } | { t: 'bell' }
 const PAGE: Partial<Record<View, { label: string; el: () => ReactNode }>> = {
   markets: { label: 'Markets', el: () => <Markets /> }, scanner: { label: 'Scanner', el: () => <Scanner /> }, chain: { label: 'Option chain', el: () => <Chain /> },
-  strategy: { label: 'Strategy builder', el: () => <Strategy /> }, journal: { label: 'Journal', el: () => <Journal /> }, portfolio: { label: 'Portfolio', el: () => <Portfolio /> },
+  strategy: { label: 'Strategy builder', el: () => <Strategy /> }, journal: { label: 'Journal', el: () => <Journal /> }, portfolio: { label: 'Holdings', el: () => <Portfolio /> },
 }
+type PhoneTab = 'home' | 'watch' | 'positions' | 'tools' | 'profile'
+const TABS: { id: PhoneTab; label: string; icon: ReactNode }[] = [
+  { id: 'home', label: 'Home', icon: <House size={22} strokeWidth={1.75} /> },
+  { id: 'watch', label: 'Watchlist', icon: <ListIcon size={22} strokeWidth={1.75} /> },
+  { id: 'positions', label: 'Positions', icon: <Wallet size={22} strokeWidth={1.75} /> },
+  { id: 'tools', label: 'Tools', icon: <LayoutGrid size={22} strokeWidth={1.75} /> },
+  { id: 'profile', label: 'Profile', icon: <UserRound size={22} strokeWidth={1.75} /> },
+]
+const SEEN = 'notif-seen'
 
 /**
- * The phone, built for how phones are used: short sessions to check, react and adjust, mostly one-handed.
- * - Five tabs at the bottom, navigation only. The agent sits in the middle as home.
- * - A stock is a page you open (from the list, a position or the agent), with Sell and Buy fixed at the bottom edge.
- * - Orders get a full-screen pad with a slide to confirm, so a mis-tap can't place a trade.
- * - Every layer (page, pad, sheet) is a history entry, so the Back gesture closes it.
- * - Sheets never stack; the tab bar steps aside while the keyboard is up.
+ * The phone app. Not the terminal made small: the structure Indian brokers' apps share, because that's what people
+ * already know.
+ * - Bottom bar: Home, Watchlist, Positions, Tools, Profile. Navigation only.
+ * - Top bar: where you are, then Search and Notifications.
+ * - The agent is one tap away on every tab (the Ask button in the thumb zone) instead of taking a tab.
+ * - A stock is a page; orders get a full-screen pad with slide to confirm. Every layer is a Back step.
  */
 function PhoneCockpit() {
-  const [tab, setTab] = useState<PhoneTab>('agent')
+  const [tab, setTab] = useState<PhoneTab>('home')
   const nav = useBackStack<Layer>(); const { push, pop, replace, top } = nav
   const { sym, setView, setSym } = useStore(useShallow((s) => ({ sym: s.sym, setView: s.setView, setSym: s.setSym })))
-  const net = useStore((s) => s.pnl().net)
-  const open = useStore((s) => Object.values(s.positions).filter((p) => p.qty).length); const pending = usePendingCount()
-  // The keyboard takes half the screen; the tab bar steps aside while you type.
+  const msgs = useStore((s) => s.msgs); const pending = usePendingCount()
+  const [seen, setSeen] = useState(() => { try { return +(localStorage.getItem(SEEN) ?? 0) } catch { return 0 } })
+  const unread = msgs.filter((m) => m.event && (m.ts ?? 0) > seen).length
+  // The keyboard takes half the screen; the bottom bar and Ask button step aside while you type.
   const [typing, setTyping] = useState(false)
   useEffect(() => {
-    const on = (e: FocusEvent) => setTyping(!!(e.target as HTMLElement)?.matches?.('input:not([type=checkbox]):not([type=radio]),textarea'))
-    const off = () => setTimeout(() => setTyping(!!document.activeElement?.matches('input:not([type=checkbox]):not([type=radio]),textarea')), 0)
+    const field = (el: Element | null) => !!el?.matches?.('input:not([type=checkbox]):not([type=radio]),textarea')
+    const on = (e: FocusEvent) => setTyping(field(e.target as Element)); const off = () => setTimeout(() => setTyping(field(document.activeElement)), 0)
     addEventListener('focusin', on); addEventListener('focusout', off); return () => { removeEventListener('focusin', on); removeEventListener('focusout', off) }
   }, [])
-  // Agent cards and commands still move the desktop's view (open a chart, the chain, the journal). On the phone those
-  // become pages, so follow the store and push the matching one.
-  const view = useStore((s) => s.view); const seen = useRef(view)
+  // Agent cards still move the desktop's view (open a chart, the chain, the journal). On the phone those become pages.
+  const view = useStore((s) => s.view); const seenView = useRef(view)
   useEffect(() => {
-    if (view === seen.current) return; seen.current = view
+    if (view === seenView.current) return; seenView.current = view
     if (view === 'chart') push({ t: 'stock', sym: useStore.getState().sym })
-    else if (view === 'portfolio') setTab('portfolio')
     else if (PAGE[view]) push({ t: 'page', view })
   }, [view]) // eslint-disable-line react-hooks/exhaustive-deps
-  const go = (v: View) => { seen.current = v; setView(v) }
-  const openStock = (w: string) => { setSym(w); push({ t: 'stock', sym: w }) }
+  const go = (v: View) => { seenView.current = v; setView(v) }
+  const openStock = (w: string) => { setSym(w); if (top?.t === 'search') replace({ t: 'stock', sym: w }); else push({ t: 'stock', sym: w }) }
   const order = (w: string, side: 'BUY' | 'SELL', px?: number) => { if (top?.t === 'depth' || top?.t === 'pos') replace({ t: 'order', sym: w, side, px }); else push({ t: 'order', sym: w, side, px }) }
-  const toAgent = (q: string) => { nav.clear(nav.stack.length); setTab('agent'); setTimeout(() => ask(q), 50) }
-  const title = PHONE_TABS.find((t) => t.id === tab)?.label ?? ''
-  const badge = (t: PhoneTab) => (t === 'agent' ? pending : t === 'positions' ? open : 0)
+  const openAgent = (q?: string) => { if (top?.t !== 'agent') { if (top?.t === 'search' || top?.t === 'bell') replace({ t: 'agent' }); else push({ t: 'agent' }) } if (q) setTimeout(() => ask(q), 60) }
+  const openTool = (t: Tool) => { if (t.run === 'ask') openAgent(t.q); else if (t.run === 'tab' && t.tab) { nav.clear(nav.stack.length); setTab(t.tab) } else if (t.view) { if (t.view === 'chain' || t.view === 'strategy') setSym(bySym(sym)?.fno ? sym : 'NIFTY'); go(t.view); push({ t: 'page', view: t.view }) } }
+  const openBell = () => { push({ t: 'bell' }); const now = Date.now(); setSeen(now); try { localStorage.setItem(SEEN, String(now)) } catch { /* storage unavailable */ } }
+  const title = TABS.find((t) => t.id === tab)!.label
   return (
-    <div className="grid h-[100dvh] grid-cols-1 grid-rows-[auto_30px_minmax(0,1fr)_auto]">
-      <header className="flex h-12 min-w-0 items-center gap-2 border-b border-line bg-surface px-3 pt-[env(safe-area-inset-top)] box-content">
-        <span role="img" aria-label="Prompt Terminal" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
-        <h1 className="min-w-0 truncate text-[16px] font-semibold text-fg">{title}</h1>
-        <div className="ml-auto flex shrink-0 items-center gap-1">{tab === 'agent' && <ChatTopActions />}<RiskCenter net={net} /></div>
-      </header>
-      <TickerTape />
+    <div className="grid h-[100dvh] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto]">
+      <PhoneTop title={tab === 'home' ? 'Prompt Terminal' : title} onSearch={() => push({ t: 'search' })} onBell={openBell} unread={unread} />
       <div className="min-h-0 overflow-hidden">
-        {tab === 'agent' && <div className="flex h-full flex-col [&>aside]:h-full [&>aside]:border-0"><ChatPanel overlay={false} /></div>}
-        {tab === 'watch' && <div className="flex h-full flex-col overflow-hidden bg-surface"><WatchBody header={null} onOpen={openStock} /></div>}
-        {tab === 'positions' && <PhonePositions onOpen={(t) => push({ t: 'pos', target: t })} onStock={openStock} onOrder={order} />}
-        {tab === 'portfolio' && <div className="scroll-thin h-full overflow-y-auto bg-surface"><Portfolio /></div>}
+        {tab === 'home' && <div className="scroll-thin h-full overflow-y-auto overscroll-contain bg-surface"><PhoneHome onStock={openStock} onTool={openTool} onAsk={openAgent} onTab={(t) => setTab(t)} /></div>}
+        {tab === 'watch' && <div className="flex h-full flex-col overflow-hidden bg-surface"><TickerTape /><WatchBody header={null} onOpen={openStock} /></div>}
+        {tab === 'positions' && <PhonePositions onOpen={(t) => push({ t: 'pos', target: t })} onStock={openStock} onOrder={order} holdings={<Portfolio />} />}
+        {tab === 'tools' && <div className="scroll-thin h-full overflow-y-auto bg-surface"><PhoneTools onTool={openTool} /></div>}
+        {tab === 'profile' && <div className="scroll-thin h-full overflow-y-auto bg-surface"><PhoneProfile onHoldings={() => { go('portfolio'); push({ t: 'page', view: 'portfolio' }) }} onAsk={openAgent} /></div>}
       </div>
       <nav aria-label="Sections" className={cn('grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]', typing ? 'hidden' : 'grid')}>
-        {PHONE_TABS.map((t) => { const on = t.id === tab || (t.id === 'more' && top?.t === 'more'); const n = badge(t.id)
-          return <button key={t.id} type="button" aria-current={on ? 'page' : undefined} onClick={() => { if (t.id === 'more') push({ t: 'more' }); else { nav.clear(nav.stack.length); setTab(t.id) } }}
-            className={cn('relative flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium', on ? 'text-fg' : 'text-fg-subtle')}>
-            <span className={cn('flex h-7 w-12 items-center justify-center rounded-full transition-colors', on && 'bg-sunken')}>{t.icon}</span>{t.label}
-            {n ? <span className="num absolute left-1/2 top-1 ml-2 min-w-4 rounded-full bg-attention px-1 text-center text-[10px] font-bold leading-4 text-[var(--ref-charcoal)]">{n}</span> : null}
+        {TABS.map((t) => { const on = t.id === tab; const n = t.id === 'positions' ? Object.values(useStore.getState().positions).filter((p) => p.qty).length : 0
+          return <button key={t.id} type="button" aria-current={on ? 'page' : undefined} onClick={() => { nav.clear(nav.stack.length); setTab(t.id) }}
+            className={cn('relative flex h-16 flex-col items-center justify-center gap-1 text-[11px]', on ? 'font-semibold text-fg' : 'font-medium text-fg-subtle')}>
+            {t.icon}{t.label}
+            {n ? <span className="num absolute left-1/2 top-2 ml-2.5 min-w-4 rounded-full bg-fg px-1 text-center text-[10px] font-bold leading-4 text-[var(--bg)]">{n}</span> : null}
           </button> })}
       </nav>
-      {/* Pushed layers, newest on top. Pages and pads are screens; depth and More are single sheets. */}
+      {!typing && !nav.stack.length && tab !== 'profile' && <AskButton onClick={() => openAgent()} />}
+      {/* Pushed layers, newest on top. Pages and pads are screens; depth and notifications are single sheets. */}
       {nav.stack.map((l, i) => <Fragment key={i}>
         {l.t === 'stock' && <StockScreen sym={l.sym} onBack={pop} onOrder={(side) => order(l.sym, side)} onDepth={() => push({ t: 'depth', sym: l.sym })}
-          onOptions={() => { setSym(l.sym); go('chain'); push({ t: 'page', view: 'chain' }) }} onFullChart={() => { setSym(l.sym); go('chart'); push({ t: 'chart' }) }} onAsk={toAgent} />}
+          onOptions={() => { setSym(l.sym); go('chain'); push({ t: 'page', view: 'chain' }) }} onFullChart={() => { setSym(l.sym); go('chart'); push({ t: 'chart' }) }} onAsk={openAgent} />}
         {l.t === 'chart' && <Screen title={sym} sub="Full chart" onBack={pop}><div className="grid h-full min-h-[70dvh] grid-rows-[minmax(0,1fr)]"><Chart /></div></Screen>}
         {l.t === 'page' && <Screen title={PAGE[l.view]?.label ?? ''} onBack={pop}>{PAGE[l.view]?.el()}</Screen>}
         {l.t === 'order' && <OrderPad key={l.sym + l.side + (l.px ?? '')} sym={l.sym} side={l.side} px={l.px} onBack={pop} onPlaced={pop} />}
+        {l.t === 'agent' && <Screen title="Agent" sub={pending ? `${pending} waiting for you` : 'Trade, analyse or ask anything'} onBack={pop} right={<div className="flex items-center pr-1"><ChatTopActions /></div>}>
+          <div className="flex h-full flex-col [&>aside]:h-full [&>aside]:border-0"><ChatPanel overlay={false} /></div></Screen>}
+        {l.t === 'search' && <SearchScreen onBack={pop} onStock={openStock} onAsk={openAgent} />}
         {l.t === 'pos' && i === nav.stack.length - 1 && <Drawer target={l.target} onClose={pop} onOpen={(t) => replace({ t: 'pos', target: t })} onAdd={(k) => { const p = useStore.getState().positions[k]; if (p?.qty) order(k, p.qty > 0 ? 'BUY' : 'SELL') }} />}
       </Fragment>)}
       <DepthSheet sym={top?.t === 'depth' ? top.sym : null} onClose={pop} onPrice={(side, px) => top?.t === 'depth' && order(top.sym, side, px)} />
-      <MoreSheet open={top?.t === 'more'} onClose={pop} onPage={(v) => { go(v); replace({ t: 'page', view: v }) }} />
+      <NotificationsSheet open={top?.t === 'bell'} onClose={pop} onOpen={() => openAgent()} />
       <Toast /><Palette /><FnoDisclosure />
     </div>
   )

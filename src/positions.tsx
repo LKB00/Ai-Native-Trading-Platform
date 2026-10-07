@@ -215,8 +215,8 @@ function PositionDetail({ k, focus, onClose, onOpen, onAdd }: { k: string; focus
  * Tapping a card opens it in place with the actions you'd take from here (exit, stop and target, add, chart), the
  * way broker apps' expanded position views work; Details opens everything about it.
  */
-export function PhonePositions({ onOpen, onStock, onOrder }: { onOpen: (t: DrawerTarget) => void; onStock: (sym: string) => void; onOrder: (key: string, side: 'BUY' | 'SELL') => void }) {
-  const s = useStore(); const [tab, setTab] = useState<'pos' | 'ord'>('pos'); const gate = useEntryGate()
+export function PhonePositions({ onOpen, onStock, onOrder, holdings }: { onOpen: (t: DrawerTarget) => void; onStock: (sym: string) => void; onOrder: (key: string, side: 'BUY' | 'SELL') => void; holdings?: ReactNode }) {
+  const s = useStore(); const [tab, setTab] = useState<'pos' | 'ord' | 'hold'>('pos'); const gate = useEntryGate()
   const [openKey, setOpenKey] = useState<string | null>(null); const [confirm, setConfirm] = useState<string | null>(null)
   const pos = Object.values(s.positions).filter((p) => p.qty || p.realized).sort((a, b) => Math.abs(b.qty) - Math.abs(a.qty))
   const open = pos.filter((p) => p.qty).length; const p = s.pnl()
@@ -235,7 +235,7 @@ export function PhonePositions({ onOpen, onStock, onOrder }: { onOpen: (t: Drawe
           <button type="button" className="h-9 rounded-md bg-danger px-3 font-semibold text-white dark:text-[var(--bg)]" onClick={() => { s.setToast(`Closed ${s.squareoff()} position(s)`); setConfirm(null) }}>Exit all</button>
         </div>}
         <div role="tablist" aria-label="Positions or orders" className="mt-3 flex rounded-lg bg-sunken p-1">
-          {([['pos', `Positions ${open}`], ['ord', `Orders ${s.orders.length}`]] as const).map(([v, l]) => <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => setTab(v)}
+          {([['pos', `Positions ${open}`], ['ord', `Orders ${s.orders.length}`], ['hold', `Holdings ${s.holdings.length}`]] as const).map(([v, l]) => <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => setTab(v)}
             className={cn('h-9 flex-1 rounded-md text-[14px] font-medium', tab === v ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted')}>{l}</button>)}
         </div>
       </div>
@@ -273,6 +273,7 @@ export function PhonePositions({ onOpen, onStock, onOrder }: { onOpen: (t: Drawe
             </div>}
           </li> })}</ul>
           : <p className="px-4 py-10 text-center text-[14px] text-fg-subtle">No positions today. Tap a stock in your watchlist, or ask the agent.</p>)}
+        {tab === 'hold' && holdings}
         {tab === 'ord' && (s.orders.length ? <ul className="divide-y divide-[var(--border)]">{s.orders.map((o) => <li key={o.id}><button type="button" className={card} onClick={() => onOpen({ kind: 'order', id: o.id })}>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[15px] font-semibold text-fg"><span className={o.side === 'BUY' ? 'text-up' : 'text-down'}>{o.side === 'BUY' ? 'Buy' : 'Sell'}</span> {labelOf(o.key)}</span>
