@@ -5,20 +5,23 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from '
 import { ArrowUp, Bell, SquarePen, CircleAlert, CircleCheck, Mic, PanelRightClose, Square, Crosshair, ChevronDown, SquareSlash, CornerDownRight, Check } from 'lucide-react'
 import { AIMark, Badge, IconButton, Markdown, TypingIndicator, KeyHint, cn } from '../ds'
 import { useStore, type Msg } from '../store'
-import { INSTS, bySym, fmtIST } from '../market'
+import { actionablePending, usePendingCount, useEntryGate, GateIcon } from '../gate'
+import { INSTS, bySym, fmtIST, labelOf, parseKey } from '../market'
+import { progress } from '../watch'
+import { useShallow } from 'zustand/react/shallow'
 import { ask } from '../ai'
-import { Chg, pct } from '../ui'
+import { Chg, Money, pct } from '../ui'
 import { CardView, DraftCard, say } from './cards'
 
 /** Starting over drops drafts that are still waiting for approval, so say so first. */
 function confirmClear() {
-  const waiting = useStore.getState().msgs.filter((m) => m.state === 'pending').length
+  const waiting = actionablePending(useStore.getState())
   return confirm(waiting ? `Start a new conversation? ${waiting} draft${waiting > 1 ? 's' : ''} waiting for approval will be discarded. Positions and orders are not affected.` : 'Start a new conversation? Positions and orders are not affected.')
 }
 
 /** The agent panel on the right of the cockpit. `resize` is the drag handle the layout passes in. */
 export function ChatPanel({ overlay, resize, full = false }: { overlay: boolean; resize?: ReactNode; full?: boolean }) {
-  const pending = useStore((s) => s.msgs.filter((m) => m.state === 'pending').length)
+  const pending = usePendingCount()
   const hasChat = useStore((s) => s.msgs.length > 1)
   useEffect(() => { if (overlay) document.querySelector<HTMLTextAreaElement>('#chat-input')?.focus({ preventScroll: true }) }, [overlay])
   return (
@@ -134,6 +137,51 @@ function Hero() {
   )
 }
 
+/* ------------------------------------------------------------------ live position strip */
+
+/**
+ * Open positions, pinned where you type: total open P&L, then one chip per position with where price sits between
+ * its stop and target. Tap a chip for its exit controls. It is the at-a-glance half of the agent's watch; the other
+ * half is the check-in message when price nears a level (see watch.ts).
+ */
+function PositionStrip() {
+  const open = useStore(useShallow((s) => Object.values(s.positions).filter((p) => p.qty)))
+  const brackets = useStore((s) => s.brackets); const ltp = useStore((s) => s.ltp); useStore((s) => s.prices)
+  if (!open.length) return null
+  const total = open.reduce((a, p) => a + (ltp(p.key) - p.avg) * p.qty, 0)
+  return (
+    <div role="region" aria-label="Open positions" className="mb-2 flex items-center gap-2 overflow-hidden rounded-xl border border-line bg-surface py-1.5 pl-3 pr-1.5">
+      <div className="shrink-0 pr-1">
+        <p className="flex items-center gap-1.5 text-[11px] text-fg-subtle"><span className="size-1.5 animate-pulse rounded-full bg-success" aria-hidden />{open.length} open</p>
+        <Money v={total} className="text-[13px] font-semibold" />
+      </div>
+      <div className="scroll-thin flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+        {open.map((p) => {
+          const l = ltp(p.key); const long = p.qty > 0; const br = brackets[p.key]; const pl = (l - p.avg) * p.qty
+          const { toStop, toTarget } = progress(p.avg, l, long, br?.sl, br?.tgt)
+          const nearTgt = toTarget != null && toTarget >= 0.75
+          const near = toStop != null && toStop >= 0.7
+          const hedged = !!parseKey(p.key).strike && !!p.tag
+          // Marker between stop (0) and target (1); works for shorts too because the signs cancel.
+          const at = br?.sl != null && br?.tgt != null ? Math.min(1, Math.max(0, (l - br.sl) / (br.tgt - br.sl))) : undefined
+          return (
+            <button key={p.key} type="button" onClick={() => say(`manage ${parseKey(p.key).und.toLowerCase()}`)} title={`${labelOf(p.key)}: ${long ? 'long' : 'short'} ${Math.abs(p.qty)} at ₹${p.avg.toFixed(2)}, now ₹${l.toFixed(2)}${br?.sl != null ? `, stop ₹${br.sl}` : ''}${br?.tgt != null ? `, target ₹${br.tgt}` : ''}`}
+              className={cn('flex h-10 shrink-0 items-center gap-2.5 rounded-lg border px-2.5 text-left transition-colors hover:bg-hover', near ? 'border-[var(--attention)] bg-attention-soft' : 'border-line')}>
+              <span className="min-w-0">
+                <span className="block max-w-[140px] truncate text-[12px] font-medium leading-4 text-fg">{labelOf(p.key)}</span>
+                <span className={cn('block text-[11px] leading-4', near ? 'text-[var(--attention-fg)]' : 'text-fg-subtle')}>
+                  {nearTgt ? <span className="text-up">{(Math.abs(br!.tgt! - l) / l * 100).toFixed(1)}% to target</span> : br?.sl != null ? `${(Math.abs(l - br.sl) / l * 100).toFixed(1)}% to stop` : hedged ? 'hedged' : <span className="text-[var(--attention-fg)]">No stop</span>}</span>
+              </span>
+              {at != null && <span className="relative h-1 w-10 rounded-full" aria-hidden style={{ background: 'linear-gradient(to right, var(--danger), var(--border) 50%, var(--success))' }}>
+                <span className="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--surface)] bg-fg" style={{ left: `${at * 100}%` }} /></span>}
+              <Money v={pl} className="text-[12px] font-semibold" />
+            </button>)
+        })}
+      </div>
+    </div>
+  )
+}
+
 /* ------------------------------------------------------------------ composer with @symbol and /command */
 
 const COMMANDS: { cmd: string; text: string; desc: string }[] = [
@@ -158,6 +206,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
   const [text, setText] = useState(''); const [menu, setMenu] = useState<Menu>(null); const [listening, setListening] = useState(false)
   const ta = useRef<HTMLTextAreaElement>(null)
   const busy = useStore((s) => s.busy); const sym = useStore((s) => s.sym); const prices = useStore((s) => s.prices)
+  const gate = useEntryGate()
   useEffect(() => { const el = ta.current; if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 180) + 'px' } }, [text])
   const items = useMemo(() => {
     if (!menu) return []
@@ -198,6 +247,13 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
       <div className="relative mx-auto w-full max-w-[800px] px-3 pb-3">
         {/* Cards scroll away under a short fade instead of being cut off at a hard edge. */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-full h-6 bg-gradient-to-t from-bg to-transparent" />
+        <PositionStrip />
+        {/* Locked mode: the state of the day sits where you're about to type, with the way forward next to it. */}
+        {gate && <div role="status" className="mb-2 flex items-center gap-2.5 rounded-xl border border-line bg-sunken py-1.5 pl-3 pr-1.5 text-[12px] leading-5 text-fg-muted">
+          <span className="shrink-0 text-fg"><GateIcon g={gate} size={14} /></span>
+          <p className="min-w-0 flex-1"><b className="font-medium text-fg">{gate.kind === 'locked' ? 'Locked for today.' : gate.kind === 'cooloff' ? `Paused for ${gate.short.split('· ')[1]}.` : 'Trade limit reached.'}</b> <span className="max-sm:hidden">{gate.why} </span>Exits and stops still work.</p>
+          <button type="button" onClick={() => say('review today')} className="inline-flex h-7 shrink-0 items-center rounded-full border border-line-strong bg-surface px-3 text-[12px] font-medium text-fg shadow-xs transition-colors hover:bg-hover">Review today</button>
+        </div>}
         {chips}
         <div className="relative">
           {menu && items.length > 0 && <ul role="listbox" aria-label={menu.focus ? 'Change focus' : menu.kind === '@' ? 'Symbols' : 'Commands'} className="absolute bottom-full left-0 z-30 mb-2 max-h-80 w-full max-w-md overflow-auto rounded-2xl border border-line bg-raised p-1.5 shadow-lg animate-rise">
@@ -213,7 +269,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
           {/* One unit, the way AI composers work: what you type on top, and everything that acts on it in the box's
               own bottom row. Context on the left (the focus symbol, commands), input and send on the right. */}
           <div className="rounded-2xl border border-line bg-surface p-1.5 shadow-sm transition-colors focus-within:border-line-strong">
-            <textarea id="chat-input" ref={ta} rows={1} value={text} aria-label="Message the trading agent" placeholder={matchMedia('(max-width: 640px)').matches ? 'Trade, scan or ask' : 'Trade, scan or ask. @ for a symbol, / for commands'}
+            <textarea id="chat-input" ref={ta} rows={1} value={text} aria-label="Message the trading agent" placeholder={gate ? (matchMedia('(max-width: 640px)').matches ? 'Ask, review or exit' : 'Ask, review the day, or close a position') : matchMedia('(max-width: 640px)').matches ? 'Trade, scan or ask' : 'Trade, scan or ask. @ for a symbol, / for commands'}
                 onChange={(e) => { setText(e.target.value); if (!menu?.focus) detect(e.target.value, e.target.selectionStart) }}
                 onKeyDown={(e) => {
                   if (menu && items.length) {

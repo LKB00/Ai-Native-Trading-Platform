@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { useStore, resetBook, type View } from './store'
+import { usePendingCount, useEntryGate, opensPosition, GateNote } from './gate'
 import { INSTS, bySym, labelOf, parseKey } from './market'
 import { ask } from './ai'
 import type { Action } from './actions'
@@ -105,7 +106,7 @@ type PhoneTab = 'agent' | 'chart' | 'watch' | 'positions'
  */
 function PhoneCockpit() {
   const [tab, setTab] = useState<PhoneTab>('agent')
-  const open = useStore((s) => Object.values(s.positions).filter((p) => p.qty).length); const pending = useStore((s) => s.msgs.filter((m) => m.state === 'pending').length)
+  const open = useStore((s) => Object.values(s.positions).filter((p) => p.qty).length); const pending = usePendingCount()
   useEffect(() => { if (tab === 'positions' && !useStore.getState().panels.bottom) useStore.getState().setPanels({ bottom: true }) }, [tab])
   const tabs: { id: PhoneTab; label: string; badge?: number }[] = [{ id: 'agent', label: 'Agent', badge: pending || undefined }, { id: 'chart', label: 'Chart' }, { id: 'watch', label: 'Watchlist' }, { id: 'positions', label: 'Positions', badge: open || undefined }]
   return (
@@ -155,7 +156,7 @@ function Splitter({ dir, value, min, max, sign, label, onSize, onToggle, classNa
 
 /** The copilot when folded: a quiet rail that mirrors the watchlist rail, and still flags trades waiting for approval. */
 function CopilotRail() {
-  const pending = useStore((s) => s.msgs.filter((m) => m.state === 'pending').length); const busy = useStore((s) => s.busy)
+  const pending = usePendingCount(); const busy = useStore((s) => s.busy)
   const openIt = () => { useStore.getState().setPanels({ copilot: true, focus: false }); setTimeout(() => document.querySelector<HTMLTextAreaElement>('#chat-input')?.focus(), 50) }
   return (
     <aside aria-label="AI agent (folded)" className="flex min-h-0 flex-col items-center gap-3 border-l border-line bg-surface py-3 max-md:flex-row max-md:border-l-0 max-md:border-t max-md:px-3 max-md:py-2">
@@ -346,7 +347,7 @@ function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => v
   const { watch, sym, setSym, watchOp, setView, view } = useStore()
   const list = watch.filter((w) => !INDICES.includes(w))
   const pick = (w: string) => { setSym(w); if (!TRADING.includes(view)) setView('chart'); onPicked?.() }
-  const [q, setQ] = useState(''); const [ticket, setTicket] = useState<{ sym: string; side: 'BUY' | 'SELL' } | null>(null)
+  const [q, setQ] = useState(''); const [ticket, setTicket] = useState<{ sym: string; side: 'BUY' | 'SELL' } | null>(null); const gate = useEntryGate()
   const results = q ? INSTS.filter((i) => (i.sym + i.name).toLowerCase().includes(q.toLowerCase()) && !watch.includes(i.sym)).slice(0, 8) : []
   return (
     <>
@@ -364,7 +365,7 @@ function WatchBody({ header, onPicked }: { header: ReactNode; onPicked?: () => v
       <ul className="border-b border-line pb-1">{INDICES.map((w) => <WatchRow key={w} w={w} sel={w === sym} pick={() => pick(w)} />)}</ul>
       <div className="flex items-center px-4 pb-1 pt-2.5"><p className="flex-1 text-[11px] font-medium uppercase tracking-[0.08em] text-fg-subtle">Watchlist · {list.length}</p></div>
       <ul className="scroll-thin min-h-0 flex-1 overflow-auto">
-        {list.map((w) => <WatchRow key={w} w={w} sel={w === sym} pick={() => pick(w)} onTrade={(side) => setTicket({ sym: w, side })} onRemove={() => watchOp('remove', w)} />)}
+        {list.map((w) => <WatchRow key={w} w={w} sel={w === sym} pick={() => pick(w)} onTrade={gate ? undefined : (side) => setTicket({ sym: w, side })} onRemove={() => watchOp('remove', w)} />)}
       </ul>
       {ticket && <Ticket {...ticket} close={() => setTicket(null)} />}
     </>
@@ -376,6 +377,7 @@ function Ticket({ sym, side: s0, close }: { sym: string; side: 'BUY' | 'SELL'; c
   const ltp = prices[sym].ltp
   const [side, setSide] = useState(s0); const [qty, setQty] = useState(1); const [ot, setOt] = useState<'MARKET' | 'LIMIT' | 'SL-M'>('MARKET')
   const [px, setPx] = useState(+ltp.toFixed(1)); const [prod, setProd] = useState<'MIS' | 'CNC'>('MIS')
+  const gate = useEntryGate(); const held = gate && opensPosition(sym, side, qty, prod)
   const [sl, setSl] = useState(''); const [tg, setTg] = useState('')
   const box = 'absolute left-full top-16 z-30 ml-2 w-[320px] rounded-2xl border border-line bg-raised p-4 shadow-lg animate-rise max-md:left-3 max-md:ml-0'
   const field = 'h-9 rounded-full border border-line bg-surface px-3 text-[13px] num outline-none focus:border-fg-subtle'
@@ -398,8 +400,9 @@ function Ticket({ sym, side: s0, close }: { sym: string; side: 'BUY' | 'SELL'; c
           <label className="text-up">Target (optional)<input type="number" step={0.05} placeholder="—" value={tg} onChange={(e) => setTg(e.target.value)} className={cn(field, 'mt-1 w-full')} /></label>
         </div>
         <p className="text-[12px] text-fg-subtle">Value <span className="num text-fg">{inr(val)}</span>{risk > 0 && <> · risk if stopped <span className="num text-down">{inr(risk)}</span></>}{risk > 0 && tg && <> · 1 : {(Math.abs(+tg - entry) / Math.abs(entry - +sl)).toFixed(1)}</>}</p>
+        {held && gate && <GateNote g={gate} />}
         <div className="flex gap-2">
-          <Button size="sm" variant={side === 'BUY' ? 'primary' : 'danger'} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ? +sl : undefined, tgt: tg ? +tg : undefined })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
+          <Button size="sm" variant={side === 'BUY' ? 'primary' : 'danger'} disabled={!!held} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ? +sl : undefined, tgt: tg ? +tg : undefined })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
           <Button size="sm" variant="ghost" onClick={close}>Cancel</Button>
         </div>
       </div>

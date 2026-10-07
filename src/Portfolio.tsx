@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useStore, type Holding } from './store'
+import { useEntryGate } from './gate'
 import { INSTS, bySym } from './market'
 import { inr, inrShort, pct, Chg, Money, Section, ViewHeader } from './ui'
 import { Badge, Button, Callout, IconButton, StatTile, Switch, EmptyState, cn } from './ds'
@@ -26,6 +27,7 @@ const fmtDate = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', mon
 type Row = Holding & { name: string; sector: string; ltp: number; value: number; cost: number; pl: number; plPct: number; day: number; dayPct: number; text: string; long: boolean; lt: Date }
 
 export default function Portfolio() {
+  const gate = useEntryGate()
   const prices = useStore((s) => s.prices), holdings = useStore((s) => s.holdings), sips = useStore((s) => s.sips), positions = useStore((s) => s.positions)
   const { place, setToast, setSym, setView, pnl, cash } = useStore.getState()
   const p = pnl()
@@ -89,7 +91,7 @@ export default function Portfolio() {
                     <td className="!font-sans">{r.long ? <Badge tone="info">LTCG</Badge> : <Badge tone="neutral" title={`Long-term from ${fmtDate(r.lt)}`}>STCG</Badge>}</td>
                     <td className="!font-sans"><div className="flex justify-end gap-1">
                       <Button size="sm" variant="ghost" aria-label={`Chart ${r.sym}`} onClick={() => go(r.sym)}>Chart</Button>
-                      <Button size="sm" variant="secondary" aria-label={`Add more ${r.sym}`} onClick={() => setTicket({ sym: r.sym, side: 'BUY', qty: 1 })}>Add</Button>
+                      <Button size="sm" variant="secondary" aria-label={`Add more ${r.sym}`} disabled={!!gate} title={gate ? `${gate.short}. ${gate.why}` : undefined} onClick={() => setTicket({ sym: r.sym, side: 'BUY', qty: 1 })}>Add</Button>
                       <Button size="sm" variant="secondary" aria-label={`Sell ${r.sym}`} onClick={() => setTicket({ sym: r.sym, side: 'SELL', qty: r.qty })}>Sell</Button>
                     </div></td>
                   </tr>

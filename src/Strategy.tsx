@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore, legsMargin } from './store'
+import { useEntryGate, GateNote } from './gate'
 import { Button, IconButton, SegmentedControl, StatTile, EmptyState } from './ds'
 import { PlusIcon, XIcon } from './ds/lib/icons'
 import { bySym, nextExpiries, payoff, optQuote, STRATEGIES, INSTS, type Leg } from './market'
@@ -11,6 +12,7 @@ import { Section } from './ui'
 const inr = (n: number) => (n < 0 ? '−' : '') + '₹' + Math.abs(Math.round(n)).toLocaleString('en-IN')
 
 export default function Strategy() {
+  const gate = useEntryGate()
   const { sym: s0, legs, setLegs, stratName, expiryIdx, setExpiry, prices, run, setToast, setSym } = useStore()
   const sym = bySym(s0)?.fno ? s0 : 'NIFTY'
   const inst = bySym(sym)!; const spot = prices[sym].ltp; const ex = nextExpiries(sym); const ei = Math.min(expiryIdx, ex.length - 1); const T = ex[ei].T
@@ -116,8 +118,8 @@ export default function Strategy() {
         </figure>
         </Section>
         <div className="flex items-center gap-3">
-          <Button variant="lime" onClick={() => setToast(run({ t: 'legs', und: sym, legs, expiryIdx: ei, name: stratName }, 'manual'))}>Place {legs.length} orders</Button>
-          <span className="text-[12px] text-fg-subtle">Paper trade at market. Buy legs go first, so hedges cut the margin.</span>
+          <Button variant="lime" disabled={!!gate} onClick={() => setToast(run({ t: 'legs', und: sym, legs, expiryIdx: ei, name: stratName }, 'manual'))}>Place {legs.length} orders</Button>
+          {gate ? <GateNote g={gate} /> : <span className="text-[12px] text-fg-subtle">Paper trade at market. Buy legs go first, so hedges cut the margin.</span>}
         </div>
       </>}
     </div>

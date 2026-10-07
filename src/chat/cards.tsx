@@ -6,6 +6,7 @@ import { ArrowUpRight, Bell, ChevronDown, Maximize2, Minus, Plus, X } from 'luci
 import { AIMark, Badge, Button, MeterBar, cn } from '../ds'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore } from '../store'
+import { useEntryGate, isEntry, GatePill, GateIcon } from '../gate'
 import type { Action, Card, Filter, OrderAction, ViewName } from '../actions'
 import {
   SECTORS, STRATEGIES, bySym, chain, charges, history, levels, legPrice, nextExpiries, barStart, simNow, fmtIST,
@@ -179,6 +180,8 @@ function ChangePill({ pct, abs, className }: { pct: number; abs?: number; classN
 
 /** Solid Buy and Sell, the card's main actions. Labelled, so direction never rests on colour alone. */
 function TradeButtons({ sym }: { sym: string }) {
+  const g = useEntryGate()
+  if (g) return <GatePill g={g} onReview={() => say('review today')} />
   return (
     <div className="flex gap-2">
       <button type="button" onClick={() => draftEquity(sym, 'BUY')} className="h-9 min-w-24 rounded-full bg-success-fg px-5 text-[13px] font-semibold text-white shadow-sm transition-opacity hover:opacity-90 dark:bg-success dark:text-[var(--bg)]">Buy</button>
@@ -491,7 +494,7 @@ export function PositionCard({ k }: { k: string }) {
 export function ScanCard({ filters, name }: { filters: Filter[]; name?: string }) {
   useStore((s) => s.prices.NIFTY.ltp) // refresh with the market
   const rows = applyFilters(allMetrics(), filters).sort((a, b) => b.chg - a.chg)
-  const [n, setN] = useState(6)
+  const [n, setN] = useState(6); const gate = useEntryGate()
   const top = rows[0]
   const bySector = Object.entries(rows.reduce<Record<string, number>>((a, r) => ({ ...a, [r.sector]: (a[r.sector] ?? 0) + 1 }), {})).sort((a, b) => b[1] - a[1])[0]
   return (
@@ -508,7 +511,8 @@ export function ScanCard({ filters, name }: { filters: Filter[]; name?: string }
           <td><span className="flex items-center gap-2.5"><Tile sym={r.sym} size={30} /><span className="min-w-0"><span className="block text-[13px] font-semibold">{r.sym}</span><span className="block text-[11px] text-fg-subtle">{r.sector}</span></span></span></td>
           <td className="font-medium">₹{fmt(r.ltp)}</td><td><ChangePill pct={r.chg} /></td><td className="text-fg-muted">{r.volx.toFixed(1)}×</td>
           <td><span className="inline-flex items-center gap-2"><span className="relative h-1 w-10 rounded-full bg-sunken" aria-hidden><span className="absolute inset-y-0 left-0 rounded-full bg-[var(--fg-subtle)]" style={{ width: `${r.rsi}%` }} /></span><span className="w-5 text-right text-fg-muted">{r.rsi.toFixed(0)}</span></span></td>
-          <td><button type="button" className="h-7 rounded-full bg-success-soft px-3 text-[12px] font-semibold text-success-fg transition-colors hover:bg-success hover:text-white" onClick={(e) => { e.stopPropagation(); draftEquity(r.sym, 'BUY') }}>Buy</button></td>
+          <td>{gate ? <span className="inline-flex size-7 items-center justify-center text-fg-subtle" title={`${gate.short}. ${gate.why}`}><GateIcon g={gate} /><span className="sr-only">{gate.short}</span></span>
+            : <button type="button" className="h-7 rounded-full bg-success-soft px-3 text-[12px] font-semibold text-success-fg transition-colors hover:bg-success hover:text-white" onClick={(e) => { e.stopPropagation(); draftEquity(r.sym, 'BUY') }}>Buy</button>}</td>
         </tr>)}</tbody></table></div>}
       {rows.length === 0 && <p className="border-t border-line px-5 py-4 text-[13px] text-fg-muted">Nothing matches right now. Loosen a condition and ask again.</p>}
     </Shell>
@@ -523,7 +527,7 @@ function draftOption(und: string, strike: number, ot: 'CE' | 'PE', side: 'BUY' |
 }
 
 export function ChainCard({ und, expiryIdx: e0 }: { und: string; expiryIdx: number }) {
-  const q = useQuote(und); const spot = q.ltp; const [ei, setEi] = useState(e0); const [side, setSide] = useState<'BUY' | 'SELL'>('BUY')
+  const q = useQuote(und); const spot = q.ltp; const [ei, setEi] = useState(e0); const [side, setSide] = useState<'BUY' | 'SELL'>('BUY'); const gate = useEntryGate()
   const exps = nextExpiries(und).slice(0, 4); const ex = exps[ei] ?? exps[0]
   const rows = useMemo(() => chain(und, spot, ex.T, 13), [und, Math.round(spot / bySym(und)!.step * 4), ex.label]) // eslint-disable-line react-hooks/exhaustive-deps
   const all = useMemo(() => chain(und, spot, ex.T, 41), [und, Math.round(spot), ex.label]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -533,6 +537,7 @@ export function ChainCard({ und, expiryIdx: e0 }: { und: string; expiryIdx: numb
   const atmIv = rows.find((r) => r.atm)?.ce.iv
   const cell = (r: (typeof rows)[0], t: 'CE' | 'PE') => {
     const v = t === 'CE' ? r.ce : r.pe
+    if (gate) return <span className={cn('num block w-full px-2 py-1 font-medium', t === 'CE' ? 'text-right' : 'text-left')}>{fmt(v.ltp)}</span>
     return <button type="button" title={`${side === 'BUY' ? 'Buy' : 'Sell'} ${und} ${r.strike} ${t}`} onClick={() => draftOption(und, r.strike, t, side, ei)}
       className={cn('num w-full rounded-lg px-2 py-1 font-medium transition-colors', t === 'CE' ? 'text-right' : 'text-left', side === 'BUY' ? 'hover:bg-success-soft hover:text-success-fg' : 'hover:bg-danger-soft hover:text-danger-fg')}>{fmt(v.ltp)}</button>
   }
@@ -551,9 +556,9 @@ export function ChainCard({ und, expiryIdx: e0 }: { und: string; expiryIdx: numb
       ]} />
       <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3">
         <div role="radiogroup" aria-label="Expiry" className="flex h-8 gap-0.5 rounded-xl bg-sunken p-0.5">{exps.map((x, i) => <button key={x.label} type="button" role="radio" aria-checked={i === ei} onClick={() => setEi(i)} className={pill(i === ei)}>{x.label}</button>)}</div>
-        <div className="ml-auto flex items-center gap-2 text-[12px] text-fg-subtle">Tap a price to
+        {gate ? <span className="ml-auto flex items-center gap-1.5 text-[12px] text-fg-subtle" title={gate.why}><GateIcon g={gate} size={12} />View only · {gate.short.toLowerCase()}</span> : <div className="ml-auto flex items-center gap-2 text-[12px] text-fg-subtle">Tap a price to
           <div role="radiogroup" aria-label="Side" className="flex h-8 gap-0.5 rounded-xl bg-sunken p-0.5">{(['BUY', 'SELL'] as const).map((s) => <button key={s} type="button" role="radio" aria-checked={side === s} onClick={() => setSide(s)} className={pill(side === s, s === 'BUY' ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')}>{s === 'BUY' ? 'Buy' : 'Sell'}</button>)}</div>
-        </div>
+        </div>}
       </div>
       <table className="tbl-card chain">
         <thead><tr><th className="!text-left">Call OI</th><th>Call</th><th className="!text-center">Strike</th><th className="!text-left">Put</th><th>Put OI</th></tr></thead>
@@ -610,6 +615,7 @@ const LegChip = ({ l }: { l: Leg }) => (
 
 export function IdeasCard({ und, expiryIdx, view, maxLoss, picks }: { und: string; expiryIdx: number; view: string; maxLoss?: number; picks: string[] }) {
   const spot = useStore((s) => s.prices[und].ltp); const inst = bySym(und)!; const ex = nextExpiries(und)[expiryIdx] ?? nextExpiries(und)[0]
+  const gate = useEntryGate()
   const atm = Math.round(spot / inst.step) * inst.step
   const ideas = useMemo(() => picks.map((name) => {
     const one = STRATEGIES[name].build(atm, inst.step, 1); const c1 = curve(und, spot, ex.T, one)
@@ -621,7 +627,7 @@ export function IdeasCard({ und, expiryIdx, view, maxLoss, picks }: { und: strin
       {ideas.map((it, n) => { const over = !!maxLoss && (it.c.unlL || -it.c.maxL > maxLoss); return <Shell pad={false} key={it.name}
         title={<span className="capitalize">{it.name}</span>}
         meta={over ? <Badge tone="warning">Over your {inr(maxLoss!)} limit</Badge> : n === 0 ? <Badge tone="info">Closest fit</Badge> : undefined}
-        foot={<><Button size="sm" variant="primary" onClick={() => propose(`Draft the ${it.name} on ${und}`, `Here's the ${it.name}. Check the legs and payoff, change lots if you need to, then place it. Hedges go first.`, [{ t: 'legs', und, legs: it.legs, expiryIdx, name: it.name }])}>Draft this</Button>
+        foot={<>{gate ? <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-sunken px-3 text-[12px] font-medium text-fg-muted" title={gate.why}><GateIcon g={gate} />{gate.short}</span> : <Button size="sm" variant="primary" onClick={() => propose(`Draft the ${it.name} on ${und}`, `Here's the ${it.name}. Check the legs and payoff, change lots if you need to, then place it. Hedges go first.`, [{ t: 'legs', und, legs: it.legs, expiryIdx, name: it.name }])}>Draft this</Button>}
           <Act onClick={() => { const s = useStore.getState(); s.setSym(und); s.setLegs(it.legs, it.name); s.setExpiry(expiryIdx); openCanvas('strategy') }}>What-if</Act></>}>
         {/* Risk first: what you can lose is the answer, what you can make is next to it. */}
         <div className="grid grid-cols-2 gap-3 px-5">
@@ -642,14 +648,14 @@ export function IdeasCard({ und, expiryIdx, view, maxLoss, picks }: { und: strin
   )
 }
 
-function Stepper({ value, onChange, min = 1, label, unit }: { value: number; onChange: (n: number) => void; min?: number; label: string; unit?: string }) {
+/** Quantity as one compact pill, − n unit +. Lives in the draft's summary line, since it's the edit people make most. */
+function QtyPill({ value, onChange, unit, label }: { value: number; onChange: (n: number) => void; unit: string; label: string }) {
   return (
-    <div><p className="text-[11px] text-fg-subtle">{label}</p>
-      <div className="mt-1 flex h-10 items-center rounded-xl border border-line bg-surface focus-within:border-fg-subtle">
-        <button type="button" aria-label={`Fewer ${label.toLowerCase()}`} onClick={() => onChange(Math.max(min, value - 1))} className="flex h-full w-9 items-center justify-center rounded-l-xl text-fg-muted hover:bg-hover hover:text-fg"><Minus size={14} strokeWidth={1.75} /></button>
-        <input aria-label={label} inputMode="numeric" value={value} onChange={(e) => { const n = parseInt(e.target.value.replace(/\D/g, '')); if (!isNaN(n)) onChange(Math.max(min, n)) }} className="num w-full min-w-0 bg-transparent text-center text-[14px] font-medium outline-none" />
-        <button type="button" aria-label={`More ${label.toLowerCase()}`} onClick={() => onChange(value + 1)} className="flex h-full w-9 items-center justify-center rounded-r-xl text-fg-muted hover:bg-hover hover:text-fg"><Plus size={14} strokeWidth={1.75} /></button>
-      </div>{unit && <p className="mt-1 text-[11px] text-fg-subtle">{unit}</p>}</div>
+    <span className="inline-flex h-8 items-center rounded-full border border-line bg-surface">
+      <button type="button" aria-label={`Fewer ${label}`} onClick={() => onChange(Math.max(1, value - 1))} className="flex h-full w-8 items-center justify-center rounded-l-full text-fg-muted hover:bg-hover hover:text-fg"><Minus size={13} strokeWidth={1.75} /></button>
+      <span className="num min-w-8 px-1 text-center text-[13px] font-medium text-fg" aria-live="polite">{value}<span className="ml-1 font-sans text-[11px] font-normal text-fg-subtle">{unit}</span></span>
+      <button type="button" aria-label={`More ${label}`} onClick={() => onChange(value + 1)} className="flex h-full w-8 items-center justify-center rounded-r-full text-fg-muted hover:bg-hover hover:text-fg"><Plus size={13} strokeWidth={1.75} /></button>
+    </span>
   )
 }
 function Field({ label, value, onChange, step, placeholder, disabled }: { label: string; value: string; onChange: (v: string) => void; step?: number; placeholder?: string; disabled?: boolean }) {
@@ -687,36 +693,46 @@ function OrderDraft({ msgId, i, a, live }: { msgId: number; i: number; a: OrderA
   const atrPts = useMemo(() => opt ? ltp * 0.25 : atr(history(inst, '15m', 60, s.prices[a.und].ltp)).at(-1)! * 2, [a.und, opt]) // eslint-disable-line react-hooks/exhaustive-deps
   const short = margin > avail
   const tone = long ? 'bg-success text-white shadow-sm dark:text-[var(--bg)]' : 'bg-danger text-white shadow-sm dark:text-[var(--bg)]'
+  // Approve in one look: the summary is the decision; every field sits behind Adjust. Errors open it themselves.
+  const [adjust, setAdjust] = useState(false); const open = adjust || slBad || tgBad
+  const addPlan = () => set({ sl: +(long ? ref - atrPts : ref + atrPts).toFixed(1), tgt: +(long ? ref + 2 * atrPts : ref - 2 * atrPts).toFixed(1) })
+  const chip = 'inline-flex h-8 items-center gap-1 rounded-full border border-line bg-surface px-3 text-[12px] text-fg-muted transition-colors hover:border-line-strong hover:text-fg'
   if (!live) return null
   return (
     <div className="space-y-3">
-      <Hero label={<>Order value · {long ? 'buy' : 'sell'} {shares} {opt ? 'qty' : shares === 1 ? 'share' : 'shares'} {a.otype === 'LIMIT' && a.price ? `at ₹${fmt(a.price)} limit` : `at market, now ₹${fmt(ltp)}`}</>}
+      <Hero label={<>{long ? 'Buy' : 'Sell'} {shares} {opt ? 'qty' : shares === 1 ? 'share' : 'shares'} {a.otype === 'LIMIT' && a.price ? `at ₹${fmt(a.price)} limit` : 'at market'} · now ₹{fmt(ltp)}</>}
         sub={<span className="tabular-nums">Margin <span className={cn('font-medium text-fg', short && '!text-danger-fg')}>{inr(margin)}</span> of {inr(avail)} free · round-trip charges {inr(fees)}</span>}><Rs />{fmt(value, 0)}</Hero>
-      {a.sl == null ? <Read tone="attention"><b>No stop on this order.</b> If it moves against you, nothing limits the loss. Add one below; the default sits 2× ATR away with a 1 : 2 target.</Read>
+      {a.sl == null
+        ? <Read tone="attention"><b>No stop on this order.</b> If it moves against you, nothing limits the loss.
+            <span className="mt-2 flex flex-wrap items-center gap-2"><button type="button" onClick={addPlan} className="inline-flex h-8 items-center rounded-full bg-fg px-3.5 text-[12px] font-medium text-[var(--bg)] transition-opacity hover:opacity-90">Add stop ₹{fmt(long ? ref - atrPts : ref + atrPts, 1)} · target ₹{fmt(long ? ref + 2 * atrPts : ref - 2 * atrPts, 1)}</button><span className="text-[11px]">2× ATR away, 1 : 2</span></span></Read>
         : risk > 0 ? <Read><b>Risking {inr(risk)}{reward > 0 ? ` to make ${inr(reward)} (1 : ${(reward / risk).toFixed(1)})` : ''}.</b> That's {risk / Math.max(avail, 1) < 0.001 ? 'under 0.1' : (risk / Math.max(avail, 1) * 100).toFixed(1)}% of your free funds{risk / Math.max(avail, 1) > 0.02 ? ', above the usual 2% per trade' : ', inside the usual 2% per trade'}.</Read> : null}
-      <div className="grid grid-cols-2 gap-3 @lg:grid-cols-[1.2fr_1fr_1fr]">
-        <div className="@max-lg:col-span-2"><p className="text-[11px] text-fg-subtle">Side</p><div className="mt-0.5"><Seg label="Side" value={a.side} onChange={(side) => set({ side, sl: undefined, tgt: undefined })} options={[{ v: 'BUY', l: 'Buy', tone }, { v: 'SELL', l: 'Sell', tone }]} /></div></div>
-        <Stepper label={opt ? 'Lots' : 'Quantity'} value={a.qty} onChange={(qty) => set({ qty })} unit={opt ? `${shares} qty · lot ${inst.lot}` : undefined} />
-        <div><p className="text-[11px] text-fg-subtle">Type</p><div className="mt-1"><Seg label="Order type" value={a.otype === 'LIMIT' ? 'LIMIT' : 'MARKET'} onChange={(v) => set(v === 'LIMIT' ? { otype: 'LIMIT', price: +ltp.toFixed(opt ? 1 : 1) } : { otype: 'MARKET', price: undefined })} options={[{ v: 'MARKET', l: 'Market' }, { v: 'LIMIT', l: 'Limit' }]} /></div></div>
+
+      {/* The order in one line. Quantity is the edit people make most, so it stays live here; the rest opens Adjust. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <QtyPill value={a.qty} onChange={(qty) => set({ qty })} unit={opt ? (a.qty === 1 ? 'lot' : 'lots') : 'qty'} label={opt ? 'lots' : 'shares'} />
+        <button type="button" className={chip} onClick={() => setAdjust(true)}>{opt ? 'F&O carry' : a.product === 'CNC' ? 'Delivery' : 'Intraday'}</button>
+        <button type="button" className={chip} onClick={() => setAdjust(true)}>{a.otype === 'LIMIT' && a.price ? `Limit ₹${fmt(a.price)}` : 'Market'}</button>
+        {a.sl != null && <button type="button" className={chip} onClick={() => setAdjust(true)}><span className="text-down">Stop ₹{fmt(a.sl)}</span>{a.tgt != null && <><span className="text-fg-subtle">·</span><span className="text-up">Target ₹{fmt(a.tgt)}</span></>}{a.trail ? <span className="text-fg-subtle"> · trails {a.trail}</span> : null}</button>}
+        <button type="button" aria-expanded={open} onClick={() => setAdjust(!adjust)} disabled={slBad || tgBad} className="ml-auto inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg disabled:opacity-60">
+          Adjust<ChevronDown size={13} strokeWidth={1.75} className={cn('transition-transform', open && 'rotate-180')} /></button>
       </div>
-      <div className="grid gap-3 @lg:grid-cols-[1.2fr_1fr_1fr]">
-        {opt ? <Stat label="Product">F&O carry (NRML)</Stat>
-          : <div><p className="text-[11px] text-fg-subtle">Product</p><div className="mt-1"><Seg label="Product" value={a.product === 'CNC' ? 'CNC' : 'MIS'} onChange={(product) => set({ product })} options={[{ v: 'MIS', l: 'Intraday' }, { v: 'CNC', l: 'Delivery' }]} /></div></div>}
-        <Field label={a.otype === 'LIMIT' ? 'Limit price' : 'Price'} value={a.otype === 'LIMIT' ? String(a.price ?? '') : ''} placeholder={`Market · ${ltp.toFixed(2)}`} disabled={a.otype !== 'LIMIT'} onChange={(v) => set({ price: v ? +v : undefined })} step={0.05} />
-        <Stat label="Last price"><span className="text-[15px]">{ltp.toFixed(2)}</span></Stat>
-      </div>
-      <div className="rounded-2xl bg-sunken p-4">
-        <div className="flex items-center gap-2"><p className="text-[12px] font-medium text-fg">Exit plan</p>
-          {a.sl == null && a.tgt == null && <Badge tone="warning">No stop</Badge>}
-          {a.sl == null && <button type="button" className="ml-auto text-[12px] text-fg-muted underline-offset-2 hover:text-fg hover:underline" onClick={() => set({ sl: +(long ? ref - atrPts : ref + atrPts).toFixed(1), tgt: +(long ? ref + 2 * atrPts : ref - 2 * atrPts).toFixed(1) })}>Add stop and target (2× ATR, 1:2)</button>}
+
+      {open && <div className="space-y-3 rounded-2xl border border-line p-4 animate-rise">
+        <div className="grid grid-cols-2 gap-3 @lg:grid-cols-3">
+          <div className="@max-lg:col-span-2"><p className="text-[11px] text-fg-subtle">Side</p><div className="mt-1"><Seg label="Side" value={a.side} onChange={(side) => set({ side, sl: undefined, tgt: undefined })} options={[{ v: 'BUY', l: 'Buy', tone }, { v: 'SELL', l: 'Sell', tone }]} /></div></div>
+          {opt ? <Stat label="Product">F&O carry (NRML)</Stat>
+            : <div><p className="text-[11px] text-fg-subtle">Product</p><div className="mt-1"><Seg label="Product" value={a.product === 'CNC' ? 'CNC' : 'MIS'} onChange={(product) => set({ product })} options={[{ v: 'MIS', l: 'Intraday' }, { v: 'CNC', l: 'Delivery' }]} /></div></div>}
+          <div><p className="text-[11px] text-fg-subtle">Type</p><div className="mt-1"><Seg label="Order type" value={a.otype === 'LIMIT' ? 'LIMIT' : 'MARKET'} onChange={(v) => set(v === 'LIMIT' ? { otype: 'LIMIT', price: +ltp.toFixed(1) } : { otype: 'MARKET', price: undefined })} options={[{ v: 'MARKET', l: 'Market' }, { v: 'LIMIT', l: 'Limit' }]} /></div></div>
         </div>
-        <div className="mt-2 grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
+          <Field label={a.otype === 'LIMIT' ? 'Limit price' : 'Price'} value={a.otype === 'LIMIT' ? String(a.price ?? '') : ''} placeholder={`Market · ${ltp.toFixed(2)}`} disabled={a.otype !== 'LIMIT'} onChange={(v) => set({ price: v ? +v : undefined })} step={0.05} />
           <Field label="Stop" value={a.sl != null ? String(a.sl) : ''} placeholder="none" onChange={(v) => set({ sl: v ? +v : undefined })} step={0.05} />
           <Field label="Target" value={a.tgt != null ? String(a.tgt) : ''} placeholder="none" onChange={(v) => set({ tgt: v ? +v : undefined })} step={0.05} />
           <Field label="Trail (pts)" value={a.trail != null ? String(a.trail) : ''} placeholder="off" onChange={(v) => set({ trail: v ? +v : undefined })} step={0.05} />
         </div>
-        {(slBad || tgBad) && <p className="mt-2 text-[12px] text-danger-fg">{slBad ? 'The stop is on the wrong side of the entry.' : 'The target is on the wrong side of the entry.'}</p>}
-      </div>
+        {(slBad || tgBad) && <p className="text-[12px] text-danger-fg">{slBad ? `The stop is on the wrong side of the entry (₹${fmt(ref)}).` : `The target is on the wrong side of the entry (₹${fmt(ref)}).`}</p>}
+        {a.sl != null && <button type="button" onClick={() => set({ sl: undefined, tgt: undefined, trail: undefined })} className="text-[12px] text-fg-subtle underline-offset-2 hover:text-fg hover:underline">Remove the exit plan</button>}
+      </div>}
       {!opt && a.product !== 'CNC' && misClosedNow() && <p className="text-[12px] text-danger-fg">Intraday entries stop at 3:20 pm. Switch to Delivery to place this today.</p>}
       {short && <p className="text-[12px] text-danger-fg">Needs {inr(margin - avail)} more than your free funds ({inr(avail)}). Reduce the quantity.</p>}
     </div>
@@ -728,7 +744,7 @@ function StrategyDraft({ msgId, i, a }: { msgId: number; i: number; a: Extract<A
   const lots = a.legs[0]?.lots ?? 1; const base = a.legs.map((l) => ({ ...l, lots: Math.max(1, Math.round(l.lots / lots)) }))
   const c = useMemo(() => curve(a.und, spot, ex.T, a.legs), [a.legs, Math.round(spot / inst.step * 2), ex.label]) // eslint-disable-line react-hooks/exhaustive-deps
   const margin = useMemo(() => legsMargin(a.und, a.legs, a.expiryIdx), [a.legs, Math.round(spot)]) // eslint-disable-line react-hooks/exhaustive-deps
-  const avail = useStore((s) => s.pnl().avail)
+  const avail = useStore((s) => s.pnl().avail); const [legs, setLegs] = useState(false)
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -737,19 +753,20 @@ function StrategyDraft({ msgId, i, a }: { msgId: number; i: number; a: Extract<A
       </div>
       {c.unlL ? <Read tone="attention"><b>Loss is unlimited on one side.</b> Buy a wing further out to cap it.</Read>
         : c.be.length > 0 && <Read><b>Profitable at expiry {c.be.length === 2 ? `between ${c.be[0].toFixed(0)} and ${c.be[1].toFixed(0)}` : c.y[0] > 0 ? `below ${c.be[0].toFixed(0)}` : `above ${c.be[0].toFixed(0)}`}</b> ({c.be.map((b) => sgn((b / spot - 1) * 100, 1) + '%').join(' / ')} from spot ₹{fmt(spot)}).</Read>}
-      <div className="flex items-end gap-3">
-        <div className="w-36"><Stepper label="Lots" value={lots} onChange={(n) => editDraft(msgId, i, { ...a, legs: base.map((l) => ({ ...l, lots: l.lots * n })) })} unit={`${lots * inst.lot} qty per leg`} /></div>
-        <p className="ml-auto pb-6 text-[12px] text-fg-subtle">{a.und} {ex.label} expiry · spot <span className="num font-medium text-fg">₹{fmt(spot)}</span></p>
+      {/* One line for the structure: lots stay live, the legs fold into a chip row; the full table is behind Legs. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <QtyPill value={lots} onChange={(n) => editDraft(msgId, i, { ...a, legs: base.map((l) => ({ ...l, lots: l.lots * n })) })} unit={lots === 1 ? 'lot' : 'lots'} label="lots" />
+        {a.legs.map((l, j) => <LegChip key={j} l={l} />)}
+        <button type="button" aria-expanded={legs} onClick={() => setLegs(!legs)} className="ml-auto inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg">
+          Legs<ChevronDown size={13} strokeWidth={1.75} className={cn('transition-transform', legs && 'rotate-180')} /></button>
       </div>
-      <div className="-mx-5 border-y border-line">
+      {legs && <div className="overflow-hidden rounded-2xl border border-line animate-rise">
         <table className="tbl-card"><thead><tr><th>Leg</th><th>Strike</th><th>Type</th><th>Lots</th><th>Price</th></tr></thead>
           <tbody>{a.legs.map((l, j) => <tr key={j}><td><span className={cn('rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase', l.side === 'BUY' ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg')}>{l.side === 'BUY' ? 'Buy' : 'Sell'}</span></td><td className="font-medium">{l.strike}</td><td>{l.type}</td><td>{l.lots}</td><td>₹{fmt(c.entries[j])}</td></tr>)}</tbody></table>
-      </div>
+        <p className="border-t border-line px-4 py-2 text-[11px] text-fg-subtle">{a.und} {ex.label} expiry · {lots * inst.lot} qty per leg · buy legs are placed first, so hedges cut the margin</p>
+      </div>}
       <div className="rounded-2xl bg-sunken px-2 py-2"><Payoff c={c} spot={spot} /></div>
-      <div className="grid grid-cols-2 gap-3">
-        <Stat label={c.net >= 0 ? 'Net credit' : 'Net debit'}>{inr(Math.abs(c.net))}</Stat>
-        <Stat label="Margin"><span className={cn(margin > avail && 'text-danger-fg')}>{inr(Math.max(margin, c.net < 0 ? -c.net : 0))}</span><span className="ml-1.5 text-[11px] font-normal text-fg-subtle">of {inrShort(avail)} free</span></Stat>
-      </div>
+      <p className="text-[12px] tabular-nums text-fg-muted">{c.net >= 0 ? 'Net credit' : 'Net debit'} <span className="font-medium text-fg">{inr(Math.abs(c.net))}</span> · margin <span className={cn('font-medium text-fg', margin > avail && '!text-danger-fg')}>{inr(Math.max(margin, c.net < 0 ? -c.net : 0))}</span> of {inrShort(avail)} free · spot ₹{fmt(spot)}</p>
     </div>
   )
 }
@@ -808,21 +825,23 @@ function describeOther(a: Action) {
 
 /** The approval surface for everything the agent drafted in one message. */
 export function DraftCard({ msgId }: { msgId: number }) {
-  const m = useStore((s) => s.msgs.find((x) => x.id === msgId))!
+  const m = useStore((s) => s.msgs.find((x) => x.id === msgId))!; const gate = useEntryGate()
   const known = useStore((s) => !!m.orderIds?.some((id) => s.orders.some((o) => o.id === id)))
   if (!m.pending) return null
   const live = m.state === 'pending'
   const risky = m.pending.some((a) => (a.t === 'order' && a.side === 'SELL' && a.strike) || (a.t === 'squareoff' && !a.key) || (a.t === 'risk' && a.kill))
   const invalid = m.pending.some((a) => a.t === 'order' && ((a.sl != null && (a.side === 'BUY' ? a.sl >= useStore.getState().ltp(useStore.getState().resolveOrder(a).key) : a.sl <= useStore.getState().ltp(useStore.getState().resolveOrder(a).key))) || a.qty < 1))
+  const blocked = live && gate && m.pending.some((a) => isEntry(a))
   const verb = m.pending[0].t === 'order' ? 'Place order' : m.pending[0].t === 'legs' ? `Place ${m.pending[0].legs.length} orders` : m.pending[0].t === 'squareoff' ? 'Exit' : m.pending[0].t === 'risk' ? 'Turn on kill switch' : m.pending[0].t === 'sip' ? 'Start SIP' : 'Confirm'
   return (
-    <Shell className={cn(live && '!border-[var(--attention)] ring-1 ring-[var(--attention)]')}
+    <Shell className={cn(live && !blocked && '!border-[var(--attention)] ring-1 ring-[var(--attention)]', blocked && 'opacity-80')}
       title={m.pending.length === 1 ? draftTitle(m.pending[0]) : `${m.pending.length} actions`}
-      meta={live ? <Badge tone="warning">Needs your approval</Badge> : m.state === 'confirmed' ? <Badge tone="success">Approved</Badge> : <Badge tone="neutral">Cancelled</Badge>}
+      meta={blocked ? <Badge tone="neutral">On hold</Badge> : live ? <Badge tone="warning">Needs your approval</Badge> : m.state === 'confirmed' ? <Badge tone="success">Approved</Badge> : <Badge tone="neutral">Cancelled</Badge>}
       foot={live ? <>
-        <Button size="sm" variant={risky ? 'danger' : 'primary'} disabled={invalid} onClick={() => confirm(msgId)}>{verb}</Button>
+        <Button size="sm" variant={risky ? 'danger' : 'primary'} disabled={invalid || !!blocked} onClick={() => confirm(msgId)}>{verb}</Button>
         <Button size="sm" variant="ghost" leading={<X size={12} strokeWidth={1.5} />} onClick={() => dismiss(msgId)}>Discard</Button>
-        <span className="ml-auto text-[11px] text-fg-subtle">Paper trade · checks run again when you place it</span>
+        {blocked && gate ? <span className="ml-auto flex min-w-0 items-center gap-1.5 text-[12px] text-fg-muted" title={gate.why}><GateIcon g={gate} size={12} /><span className="truncate">{gate.short}. This draft can't be placed until entries reopen.</span></span>
+          : <span className="ml-auto text-[11px] text-fg-subtle">Paper trade · checks run again when you place it</span>}
       </> : undefined}>
       {live
         ? <div className="space-y-4">{m.pending.map((a, i) => a.t === 'order' ? <OrderDraft key={i} msgId={msgId} i={i} a={a} live /> : a.t === 'legs' ? <StrategyDraft key={i} msgId={msgId} i={i} a={a} /> : <p key={i} className="text-[13px] text-fg">{describeOther(a)}</p>)}</div>

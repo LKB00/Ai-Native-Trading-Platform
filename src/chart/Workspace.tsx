@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { bySym, labelOf, parseKey, keyOf, nextExpiries, INSTS, TF_LABEL, fmtIST, simNow, marketOpenNow, type TF } from '../market'
 import { LabeledSwitch } from '../ui'
 import { useStore, type ChartLayout, type ChartType } from '../store'
+import { useEntryGate, GateIcon } from '../gate'
 import { Badge, Button, IconButton, KeyHint, Popover, cn } from '../ds'
 import { SearchIcon, XIcon } from '../ds/lib/icons'
 import Pane, { paneApi, type TicketReq } from './Pane'
@@ -62,6 +63,7 @@ export default function Workspace() {
   const aiOn = !!aiLevels[pane.k]
   const ltp = useStore((s) => s.ltp(pane.k))
   const spread = Math.max(0.05, +(ltp * 0.0002).toFixed(2))
+  const gate = useEntryGate()
   const h = history[pane.k]
   useEffect(() => { const f = () => setFull(!!document.fullscreenElement); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f) }, [])
   const shot = () => { const api = paneApi[active]; if (!api) return; const c = api.chart.takeScreenshot(); const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `${labelOf(pane.k).replace(/\s+/g, '_')}_${pane.tf}.png`; a.click() }
@@ -109,7 +111,8 @@ export default function Workspace() {
           </Popover>
           <IconButton size="sm" label="Take a snapshot (downloads a PNG)" onClick={shot}><I.CameraIcon /></IconButton>
           <IconButton size="sm" label={full ? 'Exit full screen' : 'Full screen'} onClick={() => (full ? document.exitFullscreen() : root.current?.requestFullscreen())}>{full ? <I.ExitFullscreenIcon /> : <I.FullscreenIcon />}</IconButton>
-          {(inst.seg === 'EQ' || !!k.strike) && <div className="ml-1 flex items-center gap-1">
+          {(inst.seg === 'EQ' || !!k.strike) && gate && <span className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-sunken px-3 text-[12px] font-medium text-fg-muted" title={`${gate.why} Exits still work: close from the position line or the positions panel.`}><GateIcon g={gate} />{gate.short}</span>}
+          {(inst.seg === 'EQ' || !!k.strike) && !gate && <div className="ml-1 flex items-center gap-1">
             <button onClick={() => setReq({ side: 'SELL', n: Date.now() })} className="flex h-8 flex-col items-center justify-center rounded-lg bg-danger-soft px-3 leading-none text-danger-fg" aria-label={`Sell ${labelOf(pane.k)} at ${(ltp - spread).toFixed(2)}`}><span className="text-[10px]">Sell</span><span className="num text-[12px] font-bold">{(ltp - spread).toFixed(2)}</span></button>
             <span className="num text-[10px] text-fg-subtle">{(spread * 2).toFixed(2)}</span>
             <button onClick={() => setReq({ side: 'BUY', n: Date.now() })} className="flex h-8 flex-col items-center justify-center rounded-lg bg-success-soft px-3 leading-none text-success-fg" aria-label={`Buy ${labelOf(pane.k)} at ${(ltp + spread).toFixed(2)}`}><span className="text-[10px]">Buy</span><span className="num text-[12px] font-bold">{(ltp + spread).toFixed(2)}</span></button>

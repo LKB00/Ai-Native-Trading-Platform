@@ -3,6 +3,7 @@ import { useStore } from './store'
 import { allMetrics, applyFilters, metricsFor, FIELDS, describeFilter } from './scan'
 import { patterns } from './Chart'
 import type { Action, Card, AIResult, Filter, OrderAction } from './actions'
+import { entryGate, isEntry, type Gate } from './gate'
 
 const ALIAS: Record<string, string> = {
   'bank nifty': 'BANKNIFTY', banknifty: 'BANKNIFTY', 'nifty bank': 'BANKNIFTY', nifty: 'NIFTY', 'nifty 50': 'NIFTY', finnifty: 'FINNIFTY', 'fin nifty': 'FINNIFTY', sensex: 'SENSEX',
@@ -164,6 +165,37 @@ export function parseScan(t: string): Filter[] {
 const misClosedNow = () => secOfDay() >= SQUARE_OFF || useStore.getState().misClosed === sessionDay()
 const analysisFollow = (sym: string) => [`buy ${sym.toLowerCase()}`, `alert me if ${sym.toLowerCase()} crosses ${Math.ceil(useStore.getState().prices[sym].high)}`, ...(bySym(sym)?.fno ? [`${sym.toLowerCase()} option chain`] : []), `why is ${sym.toLowerCase()} moving`]
 
+/** Today's debrief: what happened, which rule stepped in, and one change for tomorrow. Used most when the day is locked. */
+function debrief(): string {
+  const s = useStore.getState(); const p = s.pnl(); const g = entryGate(s)
+  const day = new Date().toDateString()
+  const today = s.trades.filter((x) => !x.sample && new Date(x.close).toDateString() === day)
+  const net = (x: (typeof today)[0]) => x.pnl - x.charges
+  if (!today.length && !Object.values(s.positions).some((x) => x.qty || x.realized)) return 'No trades today, so there is nothing to review yet. Ask me to **review my trades** for your last 30 days.'
+  const wins = today.filter((x) => net(x) > 0); const worst = [...today].sort((a, b) => net(a) - net(b))[0]
+  const noStop = today.filter((x) => net(x) < 0 && !x.exitReason?.includes('stop'))
+  let o = `**Today: ${p.net >= 0 ? '+' : '−'}${inr(Math.abs(p.net)).replace('−', '')} after ${inr(p.charges)} of charges.** ${today.length} closed trade${today.length === 1 ? '' : 's'}, ${wins.length} won.`
+  if (worst && net(worst) < 0) o += `
+
+- **Biggest loss:** ${labelOf(worst.key)}, ${inr(net(worst))}${p.net < 0 ? `, ${Math.round((net(worst) / p.net) * 100)}% of the day's loss` : ''}.${worst.exitReason ? ` Closed by ${worst.exitReason}.` : ''}`
+  if (noStop.length) o += `
+- **${noStop.length} losing trade${noStop.length === 1 ? ' was' : 's were'} closed without a stop doing it**, so the loss ran until you or a rule stepped in.`
+  if (g) o += `
+- **${g.kind === 'locked' ? 'Your limit did its job' : g.kind === 'cooloff' ? 'The cool-off stepped in' : 'You used every trade for today'}:** ${g.why}`
+  o += `
+
+**For tomorrow:** ${noStop.length ? 'put a stop on every entry before you place it, so a rule exits a bad trade before the daily limit has to.' : worst && net(worst) < 0 && p.net < 0 && net(worst) / p.net > 0.6 ? `one trade made most of the loss. Consider a smaller size for ${labelOf(worst.key)}-type setups.` : 'keep the same limits; they held.'} Exits and stops still work today; new entries ${g?.kind === 'cooloff' ? 'come back when the pause ends' : g ? 'open again next session' : 'are open'}.`
+  return o
+}
+
+/** What the agent says instead of drafting an entry it knows will be rejected. */
+export function gatedReply(g: Gate): string {
+  const back = g.kind === 'cooloff' && g.until ? `New entries come back at ${new Date(g.until).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}.` : 'New entries open again next session.'
+  return `**I haven't drafted that: ${g.short.toLowerCase()}.** ${g.why} ${back}
+
+Closing positions, stops and targets still work. Want a quick review of today instead?`
+}
+
 export function localAI(input: string): AIResult {
   const s = useStore.getState(); const t = input.toLowerCase().replace(/[₹,]/g, '').replace(/\brs\.?\s*(?=\d)/g, '').replace(/\s+/g, ' ').trim()
   const named = findSym(t); const sym = named ?? s.sym
@@ -185,6 +217,7 @@ export function localAI(input: string): AIResult {
   }
   if (/brief|morning|what.?s happening|market (today|summary|overview)|how.?s the market/.test(t)) return { reply: briefing(), actions: [{ t: 'nav', view: 'markets' }], cards: [{ k: 'brief' }], follow: ['show my positions', 'stocks with volume 2x today', 'nifty option chain', 'mildly bullish on nifty, max loss 5000'] }
   if (/explain (my )?(p&?n?l|profit|loss)|why (am i|did i) (lose|losing|make|down|up)|where did .* (money|profit|loss)/.test(t)) return { reply: explainPnl(), actions: [], cards: [{ k: 'positions' }], follow: ['review my trades', 'tighten my stops'] }
+  if (/review (my )?(today|day)|debrief|what went wrong today|today'?s review/.test(t)) return { reply: debrief(), actions: [], cards: [{ k: 'positions' }], follow: ['review my trades', 'set max loss 5000'] }
   if (/review (my )?trades|journal|how am i doing|my (trading )?mistakes|win rate/.test(t)) return { reply: reviewTrades(), actions: [{ t: 'nav', view: 'journal' }], cards: [{ k: 'journal' }], follow: ['set max loss 5000', 'set max 5 trades'] }
   if (/p&?l|pnl|positions?|margin|funds|balance|holdings?|portfolio/.test(t) && !/\b(buy|sell|add|stop|sl)\b/.test(t)) return { reply: s.mode === 'chat' ? '' : portfolio(), actions: /holding|portfolio/.test(t) ? [{ t: 'nav', view: 'portfolio' }] : [], cards: /holding|portfolio/.test(t) ? [{ k: 'funds' }] : /margin|funds|balance/.test(t) ? [{ k: 'funds' }] : [{ k: 'positions' }], follow: ['explain my pnl', 'square off all'] }
   if (named && /why .*(up|down|moving|rally|fall|fell|jump|crash)|what.?s (up|happening) with/.test(t)) return { reply: whyMove(sym), actions: [{ t: 'chart', sym }], cards: [{ k: 'chart', sym, tf: '5m' }], follow: [`analyse ${sym.toLowerCase()}`, `buy ${sym.toLowerCase()}`, `alert me if ${sym.toLowerCase()} crosses ${Math.ceil(s.prices[sym].high)}`] }
@@ -195,7 +228,7 @@ export function localAI(input: string): AIResult {
 
   // Exit plan on an existing position.
   const posKey = Object.values(s.positions).find((p) => p.qty && parseKey(p.key).und === sym)?.key
-  const slM = t.match(/\b(?:sl|stop(?: ?loss)?)\s*(?:at|of|to)?\s*(\d+(?:\.\d+)?)/), tgM = t.match(/\b(?:target|tgt|tp)\s*(?:at|of|to)?\s*(\d+(?:\.\d+)?)/), trM = t.match(/trail(?:ing)?(?: (?:stop|sl))?(?: by| of)?\s*(\d+(?:\.\d+)?)/)
+  const slM = t.match(/\b(?:sl|stop(?: ?loss)?)\s*(?:at|of|to)?\s*(\d+(?:\.\d+)?)/), tgM = t.match(/\b(?:target|tgt|tp)\s*(?:at|of|to)?\s*(\d+(?:\.\d+)?)/), trM = t.match(/trail(?:ing)?\b[^\d]*?(\d+(?:\.\d+)?)/)
   if (posKey && !/\b(buy|sell|short|long)\b/.test(t) && (slM || tgM || trM)) return { reply: `Exit plan for your ${labelOf(posKey)} position: ${[slM && `stop ${slM[1]}`, tgM && `target ${tgM[1]}`, trM && `trailing ${trM[1]} points`].filter(Boolean).join(', ')}. Whichever is hit first closes it.`, actions: [{ t: 'bracket', key: posKey, sl: slM ? +slM[1] : undefined, tgt: tgM ? +tgM[1] : undefined, trail: trM ? +trM[1] : undefined }], cards: [{ k: 'position', key: posKey }] }
 
   // Protect or manage a position without numbers: show it with its exit-plan controls.
@@ -354,8 +387,11 @@ export async function ask(input: string) {
   const actions = res.actions.filter((a) => !validate(a))
   const legsAct = actions.find((a) => a.t === 'legs') as Extract<Action, { t: 'legs' }> | undefined
   const chat = s.mode === 'chat'
-  if (legsAct) { s.setSym(legsAct.und); s.setLegs(legsAct.legs, legsAct.name); s.setExpiry(legsAct.expiryIdx); if (!chat) s.setView('strategy') }
-  const instant = actions.filter((a) => !isTrade(a)); const trades = actions.filter(isTrade)
+  if (legsAct && !(entryGate(s))) { s.setSym(legsAct.und); s.setLegs(legsAct.legs, legsAct.name); s.setExpiry(legsAct.expiryIdx); if (!chat) s.setView('strategy') }
+  const instant = actions.filter((a) => !isTrade(a)); let trades = actions.filter(isTrade)
+  // Locked mode: entries that the store would reject are not drafted at all; exits still go through.
+  const gate = entryGate(s); const blocked = gate ? trades.filter((a) => isEntry(a, s)) : []
+  if (gate && blocked.length) { trades = trades.filter((a) => !blocked.includes(a)); res = { ...res, reply: trades.length ? `${res.reply}\n\n${gatedReply(gate)}` : gatedReply(gate), cards: trades.length ? res.cards : [{ k: 'risk' }], follow: ['review today', 'show my positions'] } }
   // In chat the reply's cards are the view, so actions that would switch screens only apply their side effects.
   const switches = (a: Action) => a.t === 'nav' || a.t === 'scan' || a.t === 'chart'
   instant.forEach((a) => {
@@ -394,8 +430,10 @@ export { misClosedNow }
 export function propose(userText: string, reply: string, actions: Action[], cards?: Card[], follow?: string[]) {
   const s = useStore.getState()
   s.addMsg({ role: 'user', text: userText }); s.log('user', `Asked: ${userText}`)
-  const ok = actions.filter((a) => !validate(a)); const trades = ok.filter(isTrade)
+  const ok = actions.filter((a) => !validate(a)); let trades = ok.filter(isTrade)
   ok.filter((a) => !isTrade(a)).forEach((a) => s.run(a))
+  const gate = entryGate(s)
+  if (gate && trades.some((a) => isEntry(a, s))) { trades = trades.filter((a) => !isEntry(a, s)); reply = gatedReply(gate); cards = [{ k: 'risk' }]; follow = ['review today', 'show my positions'] }
   s.addMsg({ role: 'ai', text: reply, pending: trades.length ? trades : undefined, state: trades.length ? 'pending' : undefined, cards, follow })
 }
 /** Replace a pending draft after the person edits it in its card. */

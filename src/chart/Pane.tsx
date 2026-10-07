@@ -5,6 +5,7 @@ import {
 } from 'lightweight-charts'
 import { bySym, history, optionHistory, atr, pivots, levels, TF_SEC, TF_LABEL, labelOf, parseKey, barStart, simNow, fmtIST, intraday, type Candle, type TF } from '../market'
 import { useStore, type OType, type Drawing } from '../store'
+import { useEntryGate, opensPosition, GateNote } from '../gate'
 import { AIMark, Badge, Button, IconButton, SegmentedControl, cn } from '../ds'
 import { PlusIcon, XIcon } from '../ds/lib/icons'
 import { inr, LabeledSwitch } from '../ui'
@@ -554,11 +555,12 @@ function DrawingToolbar({ sh, k, onDelete, onTrade, onAlert }: { sh: Drawing; k:
 /** Order ticket on the chart: entry, stop and target are lines you can drag; size comes from the rupees you are willing to risk. */
 function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Ticket; ltp: number; lot: number; onChange: (t: Ticket) => void; onClose: () => void }) {
   const st = useStore(); const [risk, setRisk] = useState(2000); const [product, setProduct] = useState<'MIS' | 'CNC'>('MIS'); const [trail, setTrail] = useState(false)
-  const opt = lot > 1
+  const opt = lot > 1; const gate = useEntryGate()
   const entry = t.market ? ltp : t.entry; const dir = t.side === 'BUY' ? 1 : -1
   const perUnit = Math.abs(entry - t.sl)
   const qty = Math.max(lot, Math.floor(risk / Math.max(perUnit, 0.05) / lot) * lot)
   const reward = Math.abs(t.tgt - entry) * qty; const rr = Math.abs(t.tgt - entry) / Math.max(perUnit, 0.05)
+  const held = gate && opensPosition(k, t.side, qty, opt ? 'NRML' : product)
   const valid = (t.sl - entry) * dir < 0 && (t.tgt - entry) * dir > 0
   const otype: OType = t.market ? 'MARKET' : (t.side === 'BUY') === (entry < ltp) ? 'LIMIT' : 'SL-M'
   const field = 'num h-8 w-24 rounded-full border border-line bg-surface px-3 text-right text-[12px] outline-none focus:border-fg-subtle'
@@ -591,7 +593,8 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
       <div className="mt-2"><LabeledSwitch label="Trail the stop as price moves" checked={trail} onChange={setTrail} /></div>
       {!valid && <p className="mt-2 text-[11px] text-down">The stop must be on the losing side and the target on the winning side of the entry.</p>}
       <div className="mt-3 flex items-center gap-2">
-        <Button size="sm" variant={t.side === 'BUY' ? 'primary' : 'danger'} disabled={!valid} onClick={place}>{t.side === 'BUY' ? 'Buy' : 'Sell'} {qty} · {otype === 'MARKET' ? 'market' : otype === 'LIMIT' ? 'limit' : 'stop entry'}</Button>
+        {held && gate && <GateNote g={gate} className="basis-full" />}
+        <Button size="sm" variant={t.side === 'BUY' ? 'primary' : 'danger'} disabled={!valid || !!held} onClick={place}>{t.side === 'BUY' ? 'Buy' : 'Sell'} {qty} · {otype === 'MARKET' ? 'market' : otype === 'LIMIT' ? 'limit' : 'stop entry'}</Button>
         <span className="text-[11px] text-fg-subtle">Drag the lines to adjust</span>
       </div>
     </div>
