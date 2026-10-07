@@ -13,8 +13,10 @@
 /* TradingView's green (#089981) and red (#F23645) replace Sandstone's status hues everywhere, text included, so
    candles, P&L, buy and sell read exactly as they do on TradingView. */
 :root, [data-theme="light"] {
-  --success: #089981; --success-fg: #089981; --success-soft: #e6f4f2;
-  --danger: #f23645;  --danger-fg: #f23645;  --danger-soft: #fdebec;
+  /* Fills, candles and dark mode keep TradingView's exact colours. Small text on light backgrounds uses the same
+     hues deepened to clear 4.5:1 on white, the soft tints and hovered rows (the exact ones measure 3.0 to 3.9). */
+  --success: #089981; --success-fg: #067764; --success-soft: #e6f4f2;
+  --danger: #f23645;  --danger-fg: #d10d1d;  --danger-soft: #fdebec;
 }
 .dark, [data-theme="dark"] {
   --success: #089981; --success-fg: #089981; --success-soft: #0c2a27;
