@@ -1,9 +1,9 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { bySym, labelOf, parseKey, keyOf, nextExpiries, INSTS, TF_LABEL, fmtIST, simNow, marketOpenNow, type TF } from '../market'
 import { LabeledSwitch } from '../ui'
 import { useStore, type ChartLayout, type ChartType } from '../store'
-import { useEntryGate, opensPosition, GateIcon } from '../gate'
+import { useEntryGate } from '../gate'
 import { Badge, Button, IconButton, KeyHint, Popover, cn } from '../ds'
 import { SearchIcon, XIcon } from '../ds/lib/icons'
 import Pane, { paneApi, type TicketReq } from './Pane'
@@ -62,12 +62,9 @@ export default function Workspace() {
   const active = Math.min(charts.active, layout.panes - 1)
   const pane = charts.panes[active]; const k = parseKey(pane.k); const inst = bySym(k.und)!
   const aiOn = !!aiLevels[pane.k]
-  const ltp = useStore((s) => s.ltp(pane.k))
   // Equities quote the best bid and offer from the order book; options keep a simple spread around the model price.
   const eq = inst.seg === 'EQ' && !k.strike
   const book = useDepth(eq ? k.und : 'NIFTY').d
-  const half = Math.max(0.05, +(ltp * 0.0002).toFixed(2))
-  const bid = eq ? book.bids[0].price : ltp - half, offer = eq ? book.asks[0].price : ltp + half
   const [depthOpen, setDepthOpen] = useState(false)
   useEffect(() => {
     if (!eq) return
@@ -151,19 +148,6 @@ export default function Workspace() {
               </div>}
             </Popover>
           </div>
-          {(inst.seg === 'EQ' || !!k.strike) && <div className="ml-1 flex items-center gap-1 max-md:hidden">
-            {/* While entries are paused the pair stays, greyed, with a lock saying why; a side that only closes what you hold stays live. */}
-            {gate && <span className="flex size-7 items-center justify-center text-fg-subtle @max-[500px]:hidden" title={`${gate.short}. ${gate.why} Exits still work.`} aria-label={gate.short}><GateIcon g={gate} /></span>}
-            {(['SELL', 'BUY'] as const).map((side, i) => { const buy = side === 'BUY'; const px = buy ? offer : bid
-              const ok = !gate || !opensPosition(pane.k, side, 1, 'MIS') || !opensPosition(pane.k, side, 1, 'CNC')
-              return <Fragment key={side}>
-                {i === 1 && <span className="num text-[10px] text-fg-subtle @max-[600px]:hidden" title="Spread">{(offer - bid).toFixed(2)}</span>}
-                <button onClick={() => ok && setReq({ side, n: Date.now() })} aria-disabled={!ok || undefined}
-                  title={ok ? (gate ? (useStore.getState().positions[pane.k]?.qty ? `Close your ${labelOf(pane.k)} position` : `Sell from your ${labelOf(pane.k)} holding`) : undefined) : `${gate!.short}. ${gate!.why} Exits still work.`}
-                  className={cn('flex h-8 flex-col items-center justify-center rounded-md px-3 leading-none @max-[500px]:px-2', ok ? (buy ? 'bg-success-soft text-success-fg' : 'bg-danger-soft text-danger-fg') : 'cursor-not-allowed bg-sunken text-fg-subtle')}
-                  aria-label={`${buy ? 'Buy' : 'Sell'} ${labelOf(pane.k)} at ${px.toFixed(2)}${ok ? '' : `: ${gate!.short}`}`}><span className="text-[10px]">{buy ? 'Buy' : 'Sell'}</span><span className="num text-[12px] font-bold">{px.toFixed(2)}</span></button>
-              </Fragment> })}
-          </div>}
           {eq && <Popover className="max-md:hidden" label={`${k.und} market depth`} align="end" open={depthOpen} onOpenChange={setDepthOpen} trigger={({ toggle, triggerProps }) => (
             <button type="button" onClick={toggle} {...triggerProps} title="Market depth (D)" className={cn('ml-1 inline-flex h-7 @max-[500px]:ml-0 @max-[500px]:px-1.5 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium transition-colors hover:bg-hover hover:text-fg', depthOpen ? 'bg-hover text-fg' : 'text-fg-muted')}>Depth</button>)}>
             {({ close }) => <div className="w-[340px] p-3">
@@ -209,7 +193,7 @@ export default function Workspace() {
 }
 
 function RailBtn({ label, pressed, children, ...rest }: { label: string; pressed?: boolean; children: ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" aria-label={label} title={label} aria-pressed={pressed} {...rest} className={cn('flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg', pressed && 'bg-hover text-fg')}>{children}</button>
+  return <button type="button" aria-label={label} title={label} aria-pressed={pressed} {...rest} className={cn('flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg', pressed && 'bg-info-soft text-info-fg hover:bg-info-soft hover:text-info-fg')}>{children}</button>
 }
 
 /** A tool group on the left rail: the button uses the group's last tool, the corner arrow opens the full list. */
@@ -221,9 +205,9 @@ function ToolGroup({ g, tool, setTool }: { g: (typeof GROUPS)[number]; tool: Too
   return (
     <div data-group={g.id} className="group relative">
       <button type="button" aria-label={`${shown.label}${shown.key ? ` (${shown.key})` : ''}`} title={`${shown.label}${shown.key ? ` (${shown.key})` : ''}`} aria-pressed={on}
-        onClick={() => setTool(on && g.id !== 'cursor' ? 'cross' : shown.v)} className={cn('flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg', on && 'bg-hover text-fg')}>{shown.icon({ width: 18, height: 18 })}</button>
+        onClick={() => setTool(on && g.id !== 'cursor' ? 'cross' : shown.v)} className={cn('flex size-8 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg', on && 'bg-info-soft text-info-fg hover:bg-info-soft hover:text-info-fg')}>{shown.icon({ width: 18, height: 18 })}</button>
       {g.tools.length > 1 && <button type="button" aria-label={`More ${g.label.toLowerCase()}`} aria-expanded={open} onClick={() => setOpen(!open)}
-        className="absolute -right-1 bottom-0 flex h-4 w-3 items-center justify-center text-fg-subtle opacity-0 group-hover:opacity-100 focus:opacity-100"><ChevronRight size={10} strokeWidth={2} aria-hidden /></button>}
+        className="absolute -right-1 bottom-0 flex h-4 w-3 items-center justify-center text-fg-subtle opacity-60 hover:opacity-100 group-hover:opacity-100 focus:opacity-100"><ChevronRight size={10} strokeWidth={2} aria-hidden /></button>}
       {open && <div role="menu" aria-label={g.label} className="absolute left-full top-0 z-40 ml-1 w-56 rounded-[10px] border border-line bg-raised p-1.5 shadow-lg animate-rise">
         <p className="px-2 py-1 text-[11px] font-medium text-fg-subtle">{g.label}</p>
         {g.tools.map((t) => <button key={t.v} role="menuitemradio" aria-checked={tool === t.v} onClick={() => { setTool(t.v); setOpen(false) }} className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-hover', tool === t.v && 'bg-sunken')}>

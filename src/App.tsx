@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
+import { BrandMark } from './brand'
 import { useStore, resetBook, type View } from './store'
 import { usePendingCount, useEntryGate, entryGate, opensPosition, GateNote, GateIcon } from './gate'
 import { INSTS, bySym, labelOf, parseKey } from './market'
@@ -275,7 +276,7 @@ export function TopBar({ left, extras }: { left?: ReactNode; extras?: ReactNode 
     <header className="relative z-40 col-span-full grid h-14 min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-line bg-surface px-3 [view-transition-name:topbar] sm:px-4">
       <div className="flex min-w-0 items-center gap-3">
         {/* The mark alone; the name stays for screen readers and the tooltip. */}
-        <span role="img" aria-label="Prompt Terminal" title="Prompt Terminal" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
+        <BrandMark size={28} className="shrink-0" />
         <SegmentedControl size="sm" label="Layout" className="max-md:hidden" value={chatFull ? 'chat' : 'terminal'} onChange={(v) => switchLayout(v === 'chat')} options={[{ value: 'chat', label: 'Agent' }, { value: 'terminal', label: 'Terminal' }]} />
       </div>
       <div className="flex min-w-0 items-center justify-center max-md:hidden">{left}</div>
@@ -583,7 +584,7 @@ function Ticket({ sym, side: s0, px: px0, close, place: at = 'absolute z-30 left
       <CostLine cost={cost} className="mt-3 border-t border-line pt-2.5" />
       {held && gate && <GateNote g={gate} className="mt-2" />}
       <div className="mt-2.5 flex gap-2">
-        <Button size="sm" className="max-md:h-11 max-md:flex-1 max-md:text-[14px]" variant={side === 'BUY' ? 'primary' : 'danger'} disabled={!!held || cost.short > 0 || outBand} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ?? undefined, tgt: tg ?? undefined, tag: exit ? undefined : tag })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
+        <Button size="sm" className="max-md:h-11 max-md:flex-1 max-md:text-[14px]" variant={side === 'BUY' ? 'success' : 'danger'} disabled={!!held || cost.short > 0 || outBand} onClick={() => { setToast(place(sym, side, qty, ot, ot === 'LIMIT' ? px : 0, prod, { trigger: ot === 'SL-M' ? px : undefined, sl: sl ?? undefined, tgt: tg ?? undefined, tag: exit ? undefined : tag })); close() }}>{side === 'BUY' ? 'Buy' : 'Sell'} {qty} {sym}</Button>
         <Button size="sm" variant="ghost" className="max-md:h-11" onClick={close}>Cancel</Button>
       </div>
     </div>

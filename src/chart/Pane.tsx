@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   createChart, createSeriesMarkers, createTextWatermark, CandlestickSeries, BarSeries, LineSeries, AreaSeries, BaselineSeries, HistogramSeries,
   type IChartApi, type ISeriesApi, type IPriceLine, type UTCTimestamp, type SeriesMarker, type Time, type ISeriesMarkersPluginApi, type SeriesType, type Logical,
 } from 'lightweight-charts'
 import { bySym, history, optionHistory, atr, pivots, levels, TF_SEC, TF_LABEL, labelOf, parseKey, barStart, simNow, fmtIST, intraday, type Candle, type TF } from '../market'
 import { useStore, type OType, type Drawing } from '../store'
-import { useEntryGate, opensPosition, GateNote } from '../gate'
+import { useEntryGate, opensPosition, GateNote, GateIcon } from '../gate'
+import { useDepth } from '../depth'
 import { Badge, Button, IconButton, SegmentedControl, cn } from '../ds'
 import { PlusIcon, XIcon } from '../ds/lib/icons'
 import { inr, LabeledSwitch } from '../ui'
@@ -46,6 +47,28 @@ export function patterns(c: Candle[]) {
     else if (b.high < a.high && b.low > a.low && range / (a.high - a.low || 1) < 0.5) out.push({ time: b.time, name: 'Inside bar', bull: b.close > b.open })
   }
   return out.slice(-6)
+}
+
+/** Sell and Buy at the live bid and offer, under the symbol line, as on TradingView. While entries are paused the pair stays, greyed, with a lock saying why; a side that only closes what you hold stays live. */
+function QuickTrade({ k, ltp, onTrade }: { k: string; ltp: number; onTrade: (side: 'BUY' | 'SELL') => void }) {
+  const p = parseKey(k); const eq = bySym(p.und)?.seg === 'EQ' && !p.strike; const gate = useEntryGate(); const book = useDepth(eq ? p.und : 'NIFTY').d
+  useStore((x) => x.positions[k]); useStore((x) => x.holdings)
+  const half = Math.max(0.05, +(ltp * 0.0002).toFixed(2)); const bid = eq ? book.bids[0].price : ltp - half, offer = eq ? book.asks[0].price : ltp + half
+  return (
+    <div className="pointer-events-auto flex items-center gap-1 pt-0.5">
+      {gate && <span className="flex size-6 items-center justify-center text-fg-subtle" title={`${gate.short}. ${gate.why} Exits still work.`} aria-label={gate.short}><GateIcon g={gate} size={13} /></span>}
+      {(['SELL', 'BUY'] as const).map((side, i) => { const buy = side === 'BUY'; const px = buy ? offer : bid
+        const ok = !gate || !opensPosition(k, side, 1, 'MIS') || !opensPosition(k, side, 1, 'CNC')
+        return <Fragment key={side}>
+          {i === 1 && <span className="num text-[10px] text-fg-subtle" title="Spread">{(offer - bid).toFixed(2)}</span>}
+          <button type="button" onClick={() => ok && onTrade(side)} aria-disabled={!ok || undefined}
+            title={ok ? (gate ? (useStore.getState().positions[k]?.qty ? `Close your ${labelOf(k)} position` : `Sell from your ${labelOf(k)} holding`) : undefined) : `${gate!.short}. ${gate!.why} Exits still work.`}
+            aria-label={`${buy ? 'Buy' : 'Sell'} ${labelOf(k)} at ${px.toFixed(2)}${ok ? '' : `: ${gate!.short}`}`}
+            className={cn('flex h-7 min-w-[72px] flex-col items-center justify-center rounded-md px-2.5 font-sans leading-none', ok ? (buy ? 'bg-success-soft text-success-fg hover:bg-success hover:text-white' : 'bg-danger-soft text-danger-fg hover:bg-danger hover:text-white') : 'cursor-not-allowed bg-sunken text-fg-subtle')}>
+            <span className="text-[9px]">{buy ? 'Buy' : 'Sell'}</span><span className="num text-[11px] font-bold">{px.toFixed(2)}</span></button>
+        </Fragment> })}
+    </div>
+  )
 }
 
 export default function Pane({ idx, k: key, tf, active, multi, className, tool, setTool, req, onSearch }: {
@@ -445,6 +468,7 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
               <span className={barChg >= 0 ? 'text-up' : 'text-down'}>{barChg >= 0 ? '+' : '−'}{Math.abs(barChg).toFixed(2)} ({barChg >= 0 ? '+' : '−'}{prevBar ? Math.abs(barChg / prevBar.close * 100).toFixed(2) : '0.00'}%)</span></span>}
             {barPattern && <span className="font-sans" style={{ color: 'var(--chart-5)' }}>· {barPattern.name}</span>}
           </div>
+          {tradable && (active || !multi) && <QuickTrade k={key} ltp={ltp} onTrade={(side) => openTicket(side)} />}
           {cfg.inds.filter((ins) => indDef(ins.type)?.overlay).map((ins) => <IndRow key={ins.id} ins={ins} values={[0, 1, 2].map((i) => legendFor(ins.id, i)).filter((x) => x !== undefined).map((v) => fmtV(v, !!indDef(ins.type)?.ownScale || ins.type === 'obv'))} editing={editInd === ins.id} setEditing={(v) => setEditInd(v ? ins.id : null)} />)}
           {toolHint && active && <Badge tone="info">{toolHint} · Esc to cancel</Badge>}
           {/* A switch that changes what you see should say so on the chart, with the way back one click away. */}
@@ -620,7 +644,7 @@ function ChartTicket({ k, t, ltp, lot, onChange, onClose }: { k: string; t: Tick
       <CostLine cost={cost} className="mt-3 border-t border-line pt-2.5" />
       {held && gate && <GateNote g={gate} className="mt-2" />}
       <div className="mt-2.5 flex items-center gap-2">
-        <Button size="sm" variant={t.side === 'BUY' ? 'primary' : 'danger'} disabled={!valid || !!held || cost.short > 0 || outBand} onClick={place}>{t.side === 'BUY' ? 'Buy' : 'Sell'} {qty} · {otype === 'MARKET' ? 'market' : otype === 'LIMIT' ? 'limit' : 'stop entry'}</Button>
+        <Button size="sm" variant={t.side === 'BUY' ? 'success' : 'danger'} disabled={!valid || !!held || cost.short > 0 || outBand} onClick={place}>{t.side === 'BUY' ? 'Buy' : 'Sell'} {qty} · {otype === 'MARKET' ? 'market' : otype === 'LIMIT' ? 'limit' : 'stop entry'}</Button>
         <span className="text-[11px] text-fg-subtle">Drag the lines to adjust</span>
       </div>
     </div>
