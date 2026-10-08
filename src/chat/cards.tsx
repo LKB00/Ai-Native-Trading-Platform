@@ -1132,7 +1132,7 @@ const Q = ({ n, q, children }: { n: number; q: string; children: ReactNode }) =>
  * Desk setup: four questions, then a summary of exactly what they change. Nothing is applied until "Set up my desk".
  * Shown on the first visit, and any time you ask to "set up my desk".
  */
-export function SetupCard({ first }: { first?: boolean }) {
+export function SetupCard({ first, onFinish }: { first?: boolean; onFinish?: () => void }) {
   // Running setup again starts from the current answers and limit, so it reads as "change", not "start over".
   const prev = useStore((st) => (st.profile && 'style' in st.profile ? st.profile : null)); const curLoss = useStore((st) => st.risk.maxLoss)
   const [style, setStyle] = useState<Style | null>(prev?.style ?? null); const [exp, setExp] = useState<Experience | null>(prev?.experience ?? null)
@@ -1144,8 +1144,8 @@ export function SetupCard({ first }: { first?: boolean }) {
   if (done) return <Shell title="Desk set up"><p className="text-[13px] text-fg-muted">Done. Your limits, rules and watchlist are in place; ask to “set up my desk” any time to change them.</p></Shell>
   return (
     <Shell pad={false} title={first ? 'Set up your desk' : 'Desk setup'} meta={<span>30 seconds</span>}
-      foot={<><Button size="sm" variant="primary" disabled={!plan} onClick={() => { applySetup(style!, exp!, themes, maxLoss); setDone(true) }}>Set up my desk</Button>
-        {first && <Button size="sm" variant="ghost" onClick={() => { skipSetup(); setDone(true) }}>Skip for now</Button>}
+      foot={<><Button size="sm" variant="primary" disabled={!plan} onClick={() => { applySetup(style!, exp!, themes, maxLoss); setDone(true); onFinish?.() }}>Set up my desk</Button>
+        {first && <Button size="sm" variant="ghost" onClick={() => { skipSetup(); setDone(true); onFinish?.() }}>Skip for now</Button>}
         <span className="ml-auto text-[11px] text-fg-subtle">You can change all of this later</span></>}>
       <div className="px-3.5 pb-3"><Read><b>Four quick questions, so I can set limits and rules that fit how you trade.</b> Paper money, simulated prices, nothing real at stake.</Read></div>
       <div className="divide-y divide-line border-t border-line">

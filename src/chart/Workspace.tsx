@@ -84,7 +84,7 @@ export default function Workspace() {
   const sep = <span aria-hidden className="mx-0.5 h-5 w-px bg-line" />
 
   return (
-    <div ref={root} className="flex h-full flex-col bg-surface">
+    <div ref={root} data-tour="chart" className="flex h-full flex-col bg-surface">
       {/* Top toolbar */}
       {/* One line at any width. As the chart narrows, the least-used controls fold into More, in this order:
             Indicators label, undo/redo, layout/settings/snapshot/full screen, spread, then alert and AI levels. */}

@@ -55,7 +55,7 @@ function QuickTrade({ k, ltp, onTrade }: { k: string; ltp: number; onTrade: (sid
   useStore((x) => x.positions[k]); useStore((x) => x.holdings)
   const half = Math.max(0.05, +(ltp * 0.0002).toFixed(2)); const bid = eq ? book.bids[0].price : ltp - half, offer = eq ? book.asks[0].price : ltp + half
   return (
-    <div className="pointer-events-auto flex items-center gap-1 pt-0.5">
+    <div data-tour="trade" className="pointer-events-auto flex w-fit items-center gap-1 pt-0.5">
       {gate && <span className="flex size-6 items-center justify-center text-fg-subtle" title={`${gate.short}. ${gate.why} Exits still work.`} aria-label={gate.short}><GateIcon g={gate} size={13} /></span>}
       {(['SELL', 'BUY'] as const).map((side, i) => { const buy = side === 'BUY'; const px = buy ? offer : bid
         const ok = !gate || !opensPosition(k, side, 1, 'MIS') || !opensPosition(k, side, 1, 'CNC')

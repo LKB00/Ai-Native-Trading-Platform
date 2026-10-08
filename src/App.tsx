@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { BrandMark } from './brand'
+import { Tour } from './welcome'
+import { useLearn } from './learn'
 import { useStore, resetBook, type View } from './store'
 import { usePendingCount, useEntryGate, entryGate, opensPosition, GateNote, GateIcon } from './gate'
 import { INSTS, bySym, labelOf, parseKey } from './market'
@@ -109,7 +111,7 @@ function Cockpit() {
       {(panels.copilot && (!narrow || mobile)) ? <ChatPanel overlay={false} resize={!mobile && <Splitter dir="x" sign={-1} value={panels.copilotW} min={340} max={640} label="Agent panel width" onSize={(copilotW) => useStore.getState().setPanels({ copilotW })} onToggle={() => useStore.getState().togglePanel('copilot')} className="-left-1" />} /> : null}
       {panels.copilot && narrow && !mobile && <ChatPanel overlay />}
       {(!panels.copilot || (narrow && !mobile)) && <CopilotRail />}
-      <Toast /><Palette /><ShortcutsSheet /><FnoDisclosure />
+      <Toast /><Palette /><ShortcutsSheet /><Tour /><FnoDisclosure />
     </div>
   )
 }
@@ -747,6 +749,8 @@ export function Palette() {
       { label: 'Exit all positions', hint: 'Command', run: () => ask('square off all') },
       { label: 'Kill switch', hint: 'Command', run: () => ask('kill switch') },
       { label: 'Toggle dark theme', hint: 'Command', run: () => st.toggleTheme() },
+      { label: 'Take the Terminal tour', hint: 'Help', run: () => { useLearn.getState().set({ tour: 'pending' }); switchLayout(false); setTimeout(() => useLearn.getState().set({ tour: 'running' }), 900) } },
+      { label: 'Getting started checklist', hint: 'Help', run: () => { const l = useLearn.getState(); if (l.started) l.set({ hidden: false, open: true }); else l.start(); switchLayout(true) } },
       { label: 'Keyboard shortcuts', hint: '?', run: () => useStore.setState({ shortcuts: true }) },
       { label: 'Reset paper account (cash, positions, orders)', hint: 'Account', run: () => { if (window.confirm('Reset the paper account? Positions, orders, alerts and trade history go back to the starting state. Chat and settings stay.')) resetBook() } },
       { label: 'New conversation (clear chat history)', hint: 'Chat', run: () => { if (window.confirm('Clear the conversation? Positions and orders are not affected.')) st.clearChat() } },

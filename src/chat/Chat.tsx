@@ -11,7 +11,8 @@ import { progress } from '../watch'
 import { useShallow } from 'zustand/react/shallow'
 import { ask } from '../ai'
 import { Chg, Money, pct } from '../ui'
-import { CardView, DraftCard, SetupCard, say } from './cards'
+import { CardView, DraftCard, say } from './cards'
+import { GettingStarted, Welcome } from '../welcome'
 import { DeskBar } from '../agent/Desk'
 
 /** Starting over drops drafts that are still waiting for approval, so say so first. */
@@ -69,6 +70,8 @@ function Thread({ full = false }: { full?: boolean }) {
   const mounted = useRef(false)
   useLayoutEffect(() => {
     const el = scroller.current; if (!el) return
+    // An empty thread is the welcome: it reads from the top, not from the bottom.
+    if (real.length === 0) { el.scrollTop = 0; return }
     el.scrollTop = saved.pinned || saved.top == null ? el.scrollHeight : saved.top
     // Cards with charts grow after the first frame; keep the bottom in view while they settle.
     if (saved.pinned) { const t = setTimeout(() => { el.scrollTop = el.scrollHeight }, 120); return () => clearTimeout(t) }
@@ -180,20 +183,20 @@ const STARTERS: { group: string; items: string[] }[] = [
 function Hero() {
   const h = +fmtIST(Date.now() / 1000, { hour: 'numeric', hour12: false })
   const fresh = useStore((s) => !s.profile)
+  if (fresh) return <Welcome />
   return (
     <div className="pt-4 @2xl:pt-[6vh]">
       <span className="inline-flex size-9 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={22} /></span>
       <h1 className="mt-3 text-[22px] font-semibold leading-tight tracking-[-0.02em] @2xl:mt-5 @2xl:text-[34px]">{h < 12 ? 'Good morning.' : h < 17 ? 'Good afternoon.' : 'Good evening.'} What are we trading?</h1>
       <p className="mt-2 max-w-xl text-[13px] leading-5 text-fg-muted @2xl:text-[15px] @2xl:leading-6">Say it in plain words. I pull up the data, draft the order with a stop, and nothing reaches the market until you approve it. I'll also tell you when a stop, target or alert is hit.</p>
-      {/* First visit: set up the desk before anything else; the starters come after, in the agent's reply. */}
-      {fresh ? <div className="mt-5 @2xl:mt-7"><SetupCard first /></div> : <>
+      <>
       <div className="mt-5 grid gap-4 @2xl:mt-7 @2xl:grid-cols-2 @2xl:gap-3">
         {STARTERS.map((g) => <div key={g.group} className="@2xl:rounded-[10px] @2xl:border @2xl:border-line @2xl:bg-surface @2xl:p-3">
           <p className="px-1 text-[11px] font-medium text-fg-subtle">{g.group}</p>
           <ul className="mt-1">{g.items.map((it) => <li key={it}><button type="button" onClick={() => say(it)} className="w-full rounded-lg px-2 py-1.5 text-left text-[13px] text-fg hover:bg-hover">{it}</button></li>)}</ul>
         </div>)}
       </div>
-      <p className="mt-5 text-[12px] text-fg-subtle">Type <KeyHint>@</KeyHint> for a symbol, <KeyHint>/</KeyHint> for commands. Paper trading on simulated prices. Not investment advice.</p></>}
+      <p className="mt-5 text-[12px] text-fg-subtle">Type <KeyHint>@</KeyHint> for a symbol, <KeyHint>/</KeyHint> for commands. Paper trading on simulated prices. Not investment advice.</p></>
     </div>
   )
 }
@@ -309,6 +312,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
         {/* Cards scroll away under a short fade instead of being cut off at a hard edge. */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-full h-6 bg-gradient-to-t from-bg to-transparent" />
         {/* The agent view's desk rail already shows positions and the lock, so these strips are for the docked panel only. */}
+        <GettingStarted compact={!full} />
         {!full && <PositionStrip />}
         {/* Locked mode: the state of the day sits where you're about to type, with the way forward next to it. */}
         {gate && !full && <div role="status" className="mb-2 flex min-h-10 items-center gap-2.5 rounded-[10px] border border-line bg-sunken py-[5px] pl-3 pr-1.5 text-[12px] leading-5 text-fg-muted">
