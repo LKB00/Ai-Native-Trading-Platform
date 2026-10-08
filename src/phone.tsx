@@ -64,12 +64,12 @@ export function StockScreen({ sym, onBack, onOrder, onDepth, onOptions, onFullCh
         {([['Open', q.open], ['Prev close', q.prev], ['Day high', q.high], ['Day low', q.low]] as const).map(([k, v]) => <div key={k}><p className="text-fg-subtle">{k}</p><p className="num mt-0.5 text-[14px] text-fg">{fmt(v)}</p></div>)}
       </section>
       <nav aria-label={`More for ${sym}`} className="mt-3 divide-y divide-[var(--border)] border-y border-line">
-        <Row icon={<MessageSquare size={18} strokeWidth={1.75} />} label={`Ask the agent about ${sym}`} sub="Trend, levels, volume and news in plain words" onClick={() => onAsk(`analyse ${lower}`)} />
+        <Row icon={<MessageSquare size={18} strokeWidth={1.75} />} label={`Ask the assistant about ${sym}`} sub="Trend, levels, volume and news in plain words" onClick={() => onAsk(`analyse ${lower}`)} />
         {!idx && <Row icon={<Rows3 size={18} strokeWidth={1.75} />} label="Market depth" sub="Best bids and offers, and who's heavier" onClick={onDepth} />}
         {inst.fno && <Row icon={<Layers size={18} strokeWidth={1.75} />} label="Option chain" sub="Strikes, open interest and Greeks" onClick={onOptions} />}
         <Row icon={<Bell size={18} strokeWidth={1.75} />} label="Set a price alert" sub={`Tell me when it crosses the day high (${fmt(q.high)})`} onClick={() => onAsk(`alert me if ${lower} crosses ${Math.ceil(q.high)}`)} />
       </nav>
-      <p className="px-4 py-4 text-[11px] text-fg-subtle">Simulated prices for paper trading. Not investment advice.</p>
+      <p className="px-4 py-4 text-[11px] text-fg-subtle">Simulated prices for practice trading. Not investment advice.</p>
     </Screen>
   )
 }

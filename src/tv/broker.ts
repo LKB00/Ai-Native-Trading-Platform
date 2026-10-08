@@ -118,7 +118,7 @@ function preview(o: PreOrder): OrderPreviewResult {
   if (margin > st.pnl().avail) errors.push(`Needs ${inr(margin - st.pnl().avail)} more than your free funds.`)
   if (k.strike && o.qty % inst.lot) errors.push(`Quantity must be a multiple of the lot size, ${inst.lot}.`)
   if (prod === 'MIS' && (secOfDay() >= SQUARE_OFF || st.misClosed === sessionDay())) errors.push('Intraday entries stop at 3:20 pm. Choose Delivery.')
-  if (st.risk.killed) errors.push(`Trading is locked: ${st.risk.reason ?? 'kill switch on'}. Exits still work.`)
+  if (st.risk.killed) errors.push(`Trading is locked: ${st.risk.reason ?? 'emergency stop on'}. Exits still work.`)
   if (o.stopLoss == null && !k.strike) warnings.push('No stop loss. Add one in the ticket to cap the loss.')
   if (k.strike && !long) warnings.push('Selling an option has unlimited risk. A hedged spread caps it.')
   if (k.strike && FREEZE[k.und] && o.qty > FREEZE[k.und]) warnings.push(`Above the ${FREEZE[k.und]} freeze quantity: it will be sliced into ${Math.ceil(o.qty / FREEZE[k.und])} orders.`)

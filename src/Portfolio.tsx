@@ -76,7 +76,7 @@ export default function Portfolio() {
   )
   return (
     <div>
-      <ViewHeader title="Portfolio" sub="Long-term holdings, SIPs and your trading account. Paper money, simulated prices.">
+      <ViewHeader title="Portfolio" sub="Long-term holdings, SIPs and your trading account. Practice money, simulated prices.">
         <Badge tone="neutral">{rows.length} holdings</Badge>
       </ViewHeader>
       <div className="@container space-y-4 p-4">
@@ -89,10 +89,10 @@ export default function Portfolio() {
           <StatTile label="Today on holdings" serif value={sign(t.day)} goodDirection="up"
             delta={{ text: `${Math.abs(t.prevValue ? (t.day / t.prevValue) * 100 : 0).toFixed(2)}%`, direction: dir(t.day), versus: 'since previous close' }} />
           <StatTile label="Available funds" serif value={inrShort(p.avail)} detail="For new trades" />
-          <StatTile label="Margin used" serif value={inrShort(p.used)} detail={`of ${inrShort(cash)} cash`} />
+          <StatTile label="Money in use" serif value={inrShort(p.used)} detail={`of ${inrShort(cash)} cash`} />
         </div>
 
-        <Section id="portfolio.holdings" title="Holdings" sub="Delivery (CNC). Held over 12 months counts as long-term." bodyClassName={rows.length ? '!px-0 !pb-0' : undefined}
+        <Section id="portfolio.holdings" title="Holdings" sub="Stocks you hold for the long run. Held over 12 months counts as long-term." bodyClassName={rows.length ? '!px-0 !pb-0' : undefined}
           summary={`${rows.length} holding${rows.length === 1 ? '' : 's'} · ${inrShort(t.value)}`}>
           {rows.length === 0 ? <EmptyState compact variant="cleared" title="No holdings" headingLevel={4}>Buy with the Delivery product to build long-term holdings.</EmptyState> : (
             <>
@@ -111,7 +111,7 @@ export default function Portfolio() {
             </li>)}</ul>
             <div className="scroll-thin overflow-x-auto rounded-b-[10px] max-md:hidden">
               <table className="tbl">
-                <thead><tr><th>Instrument</th><th>Qty</th><th>Avg</th><th>LTP</th><th>Value</th><th>P&amp;L</th><th>Day</th><th>Held</th><th><span className="sr-only">Actions</span></th></tr></thead>
+                <thead><tr><th>Name</th><th>Qty</th><th>Avg price</th><th>Price</th><th>Value</th><th>Profit / loss</th><th>Today</th><th>Held</th><th><span className="sr-only">Actions</span></th></tr></thead>
                 <tbody>{rows.map((r) => (<Fragment key={r.sym}>
                   <tr>
                     <td className="!font-sans"><button onClick={() => go(r.sym)} className="text-left hover:underline"><b>{r.sym}</b><div className="max-w-44 truncate text-[11px] text-fg-subtle">{r.name}</div></button></td>
@@ -149,7 +149,7 @@ export default function Portfolio() {
             summary={<>Unrealised LTCG <Money v={t.ltcg} /> · STCG <Money v={t.stcg} /></>}>
             <div className="scroll-thin overflow-x-auto">
               <table className="tbl">
-                <thead><tr><th>Unrealised</th><th>Gain / loss</th><th>Rate</th><th>Tax if sold today</th></tr></thead>
+                <thead><tr><th>Not sold yet</th><th>Gain / loss</th><th>Rate</th><th>Tax if sold today</th></tr></thead>
                 <tbody>
                   <tr><td className="!font-sans">Short-term (STCG)</td><td><Money v={t.stcg} /></td><td>20%</td><td>{inr(taxStcg)}</td></tr>
                   <tr><td className="!font-sans">Long-term (LTCG)</td><td><Money v={t.ltcg} /></td><td>12.5%</td><td>{inr(taxLtcg)}</td></tr>

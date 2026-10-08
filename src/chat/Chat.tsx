@@ -1,4 +1,4 @@
-// The AI agent, docked in the cockpit. You say what you want; it answers with live cards (quotes, charts,
+// The Assistant, docked in the cockpit. You say what you want; it answers with live cards (quotes, charts,
 // chains, scans, positions) and drafts every trade as an editable ticket you approve in place. It also speaks
 // first when something happens to your money. The chart, watchlist and positions stay in view around it.
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -38,18 +38,18 @@ export function ChatPanel({ overlay, resize, full = false }: { overlay: boolean;
   return (
     // Docked it's a grid column (relative, for its resize handle); as a drawer it's fixed over the page. Never both:
     // with both classes 'relative' wins, and the drawer would take a grid slot and push the folded rail onto a new row.
-    <aside id="copilot" aria-label="AI agent" className={cn('flex min-h-0 min-w-0 flex-col bg-bg', !full && 'border-l border-line', overlay ? 'fixed bottom-0 right-0 top-[86px] z-40 w-[min(440px,100vw)] shadow-lg animate-sheet' : 'relative max-md:border-l-0')}>
+    <aside id="copilot" aria-label="Assistant" className={cn('flex min-h-0 min-w-0 flex-col bg-bg', !full && 'border-l border-line', overlay ? 'fixed bottom-0 right-0 top-[86px] z-40 w-[min(440px,100vw)] shadow-lg animate-sheet' : 'relative max-md:border-l-0')}>
       {resize}
       {/* In the Chat layout the top bar already says where you are, so the panel drops its header; New chat and the
           drafts badge move up there (ChatTopActions). The docked panel keeps it, to name the column. */}
       {!full && <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line bg-surface pl-4 pr-2 max-md:hidden">
         <span className="inline-flex size-7 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span>
-        <h2 className="font-sans text-[13px] font-semibold text-fg">AI agent</h2>
+        <h2 className="font-sans text-[13px] font-semibold text-fg">Assistant</h2>
         {pending > 0 && <button type="button" onClick={() => document.querySelector('[data-pending]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}><Badge tone="warning">{pending} waiting for you</Badge></button>}
         <span className="ml-auto flex items-center gap-0.5">
           <KeyHint className="mr-1 max-lg:hidden">/</KeyHint>
           <IconButton size="sm" label="New conversation" disabled={!hasChat} onClick={() => { if (confirmClear()) useStore.getState().clearChat() }}><SquarePen size={15} strokeWidth={1.5} /></IconButton>
-          <IconButton size="sm" className="max-md:hidden" label="Hide the agent ( ] )" onClick={() => useStore.getState().togglePanel('copilot')}><PanelRightClose size={15} strokeWidth={1.5} /></IconButton>
+          <IconButton size="sm" className="max-md:hidden" label="Hide the assistant ( ] )" onClick={() => useStore.getState().togglePanel('copilot')}><PanelRightClose size={15} strokeWidth={1.5} /></IconButton>
         </span>
       </header>}
       {full && <div className="min-[960px]:hidden"><DeskBar /></div>}
@@ -196,7 +196,7 @@ function Hero() {
           <ul className="mt-1">{g.items.map((it) => <li key={it}><button type="button" onClick={() => say(it)} className="w-full rounded-lg px-2 py-1.5 text-left text-[13px] text-fg hover:bg-hover">{it}</button></li>)}</ul>
         </div>)}
       </div>
-      <p className="mt-5 text-[12px] text-fg-subtle">Type <KeyHint>@</KeyHint> for a symbol, <KeyHint>/</KeyHint> for commands. Paper trading on simulated prices. Not investment advice.</p></>
+      <p className="mt-5 text-[12px] text-fg-subtle">Type <KeyHint>@</KeyHint> for a symbol, <KeyHint>/</KeyHint> for commands. Practice trading with simulated prices. Not investment advice.</p></>
     </div>
   )
 }
@@ -254,12 +254,12 @@ const COMMANDS: { cmd: string; text: string; desc: string }[] = [
   { cmd: 'options', text: 'nifty option chain', desc: 'Option chain; tap a price to trade' },
   { cmd: 'strategy', text: 'mildly bullish on nifty, max loss 5000', desc: 'Strategies that fit a view and a max loss' },
   { cmd: 'scan', text: 'stocks ', desc: 'Screen in words: “above 200 ema with rsi over 60 in pharma”' },
-  { cmd: 'alert', text: 'alert me if ', desc: 'Price alert or GTT: “buy 10 tcs if it crosses 4200”' },
+  { cmd: 'alert', text: 'alert me if ', desc: 'Price alert, or an order that fires at a price: “buy 10 tcs if it crosses 4200”' },
   { cmd: 'positions', text: 'show my positions', desc: 'Live positions with exit controls' },
   { cmd: 'brief', text: 'brief me', desc: 'Market and your book in one look' },
   { cmd: 'review', text: 'review my trades', desc: 'What your last 30 days say' },
   { cmd: 'limits', text: 'set max loss 5000', desc: 'Daily loss limit, trades per day' },
-  { cmd: 'exit', text: 'square off all', desc: 'Close everything (asks first)' },
+  { cmd: 'exit', text: 'close all positions', desc: 'Close everything (asks first)' },
 ]
 
 /** focus: the @ list opened from the Focus chip, where picking switches the focus symbol instead of typing it. */
@@ -335,7 +335,7 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
           {/* One unit, the way AI composers work: what you type on top, and everything that acts on it in the box's
               own bottom row. Context on the left (the focus symbol, commands), input and send on the right. */}
           <div className="rounded-lg border border-line bg-surface p-1.5 transition-colors focus-within:border-line-strong">
-            <textarea id="chat-input" ref={ta} rows={1} value={text} aria-label="Message the trading agent" placeholder={gate ? (matchMedia('(max-width: 640px)').matches ? 'Ask, review or exit' : 'Ask, review the day, or close a position') : matchMedia('(max-width: 640px)').matches ? 'Trade, scan or ask' : 'Trade, scan or ask. @ for a symbol, / for commands'}
+            <textarea id="chat-input" ref={ta} rows={1} value={text} aria-label="Message the assistant" placeholder={gate ? (matchMedia('(max-width: 640px)').matches ? 'Ask, review or exit' : 'Ask, review the day, or close a position') : matchMedia('(max-width: 640px)').matches ? 'Trade, scan or ask' : 'Trade, scan or ask. @ for a symbol, / for commands'}
                 onChange={(e) => { setText(e.target.value); if (!menu?.focus) detect(e.target.value, e.target.selectionStart) }}
                 onKeyDown={(e) => {
                   if (menu && items.length) {
@@ -365,10 +365,10 @@ function ChatComposer({ chips, full = false }: { chips?: ReactNode; full?: boole
             </div>
           </div>
         </div>
-        {full && <p className="mt-2 text-center text-[11px] text-fg-subtle">Paper trading on simulated prices · not investment advice</p>}
+        {full && <p className="mt-2 text-center text-[11px] text-fg-subtle">Practice trading with simulated prices · not investment advice</p>}
       </div>
       {/* In Terminal the panel ends in a 49px bar with its top rule, level with the folded positions bar beside it. */}
-      {!full && <div className="flex h-[49px] shrink-0 items-center justify-center border-t border-line bg-surface px-4 text-[11px] text-fg-subtle">Paper trading on simulated prices · not investment advice</div>}
+      {!full && <div className="flex h-[49px] shrink-0 items-center justify-center border-t border-line bg-surface px-4 text-[11px] text-fg-subtle">Practice trading with simulated prices · not investment advice</div>}
     </>
   )
 }

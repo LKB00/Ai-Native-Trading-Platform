@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom'
 import { ArrowRight, Check, ChevronDown, ChevronUp, LayoutDashboard, MessagesSquare, ShieldCheck, X } from 'lucide-react'
 import { useStore } from './store'
 import { Badge, Button, cn } from './ds'
-import { BrandMark } from './brand'
+import { BrandMark, BRAND } from './brand'
 import { SetupCard, say } from './chat/cards'
 import { skipSetup } from './setup'
 import { STEPS, progress, useLearn, type StepId } from './learn'
@@ -57,8 +57,8 @@ function TwoWays() {
   )
   return (
     <div className="grid gap-3 @2xl:grid-cols-2">
-      {row(MessagesSquare, 'Agent: talk to it', 'This screen. Anything the Terminal can do, you can ask for here, and it keeps your money, positions and alerts in view.')}
-      {row(LayoutDashboard, 'Terminal: see and click', 'Charts, the watchlist, the order ticket, the option chain and your positions, with the agent beside them. Switch any time from the top-left.')}
+      {row(MessagesSquare, 'Chat: just ask', 'This screen. Anything you can do on the charts screen, you can ask for here, and it keeps your money, positions and alerts in view.')}
+      {row(LayoutDashboard, 'Charts: see and click', 'Charts, your watchlist, the order ticket, options and your positions, with the assistant beside them. Switch any time from the top-left.')}
     </div>
   )
 }
@@ -72,11 +72,11 @@ export function Welcome() {
   return (
     <div ref={top} className="pt-4 @2xl:pt-[5vh]">
       <BrandMark size={44} />
-      <h1 className="mt-4 text-[22px] font-semibold leading-tight tracking-[-0.02em] @2xl:text-[34px]">Welcome to Prompt Terminal.</h1>
-      <p className="mt-2 max-w-xl text-[13px] leading-5 text-fg-muted @2xl:text-[15px] @2xl:leading-6">A trading desk for Indian markets where you talk to an agent instead of filling in forms. You start with <b className="font-medium text-fg">₹10,00,000 of practice money</b> and simulated NSE prices, so nothing here is real.</p>
+      <h1 className="mt-4 text-[22px] font-semibold leading-tight tracking-[-0.02em] @2xl:text-[34px]">Welcome to {BRAND}.</h1>
+      <p className="mt-2 max-w-xl text-[13px] leading-5 text-fg-muted @2xl:text-[15px] @2xl:leading-6">Practice trading for the Indian markets, where you chat with an assistant instead of filling in forms. You start with <b className="font-medium text-fg">₹10,00,000 of practice money</b> and simulated NSE prices, so nothing here is real.</p>
 
       <ol aria-label="Steps" className="mt-6 flex items-center gap-2 text-[12px]">
-        {['How it works', 'Your desk'].map((t, i) => <li key={t} className="flex items-center gap-2" aria-current={step === i ? 'step' : undefined}>
+        {['How it works', 'Your limits'].map((t, i) => <li key={t} className="flex items-center gap-2" aria-current={step === i ? 'step' : undefined}>
           {i > 0 && <span aria-hidden className="h-px w-6 bg-[var(--border-strong)]" />}
           <span className={cn('flex size-5 items-center justify-center rounded-full text-[11px] font-semibold', step === i ? 'bg-fg text-[var(--bg)]' : i < step ? 'bg-success text-white' : 'border border-line text-fg-subtle')}>{i < step ? <Check size={11} strokeWidth={3} /> : i + 1}</span>
           <span className={step === i ? 'font-medium text-fg' : 'text-fg-subtle'}>{t}</span>
@@ -88,7 +88,7 @@ export function Welcome() {
         <TwoWays />
         <p className="flex items-start gap-2 text-[12px] leading-5 text-fg-muted"><ShieldCheck size={14} strokeWidth={1.75} className="mt-[3px] shrink-0 text-fg-subtle" aria-hidden />You are always protected: you set a daily loss limit next, every entry can require a stop, and I close everything at your limit. Exits always work.</p>
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button size="md" variant="primary" trailing={<ArrowRight size={14} strokeWidth={2} />} onClick={() => setStep(1)}>Set up my desk</Button>
+          <Button size="md" variant="primary" trailing={<ArrowRight size={14} strokeWidth={2} />} onClick={() => setStep(1)}>Set my limits</Button>
           <Button size="md" variant="ghost" onClick={() => { skipSetup(); finish() }}>Skip intro</Button>
           <span className="ml-auto text-[11px] text-fg-subtle">About a minute</span>
         </div>
@@ -108,11 +108,11 @@ function sample() {
   return { stop: Math.floor(sbin * 0.98), level: Math.ceil((nifty + 100) / 50) * 50 }
 }
 const STEP_INFO: Record<StepId, { title: string; hint: string; go: string; run: () => void }> = {
-  ask: { title: 'Ask the agent something', hint: 'Start with a morning brief of your account and the market.', go: 'Brief me', run: () => say('brief me') },
+  ask: { title: 'Ask the assistant something', hint: 'Start with a morning brief of your account and the market.', go: 'Brief me', run: () => say('brief me') },
   draft: { title: 'Have it draft a trade', hint: 'It sizes the order and adds a stop. Nothing is sent yet.', go: 'Draft one', run: () => say(`buy 10 sbin with sl ${sample().stop}`) },
-  approve: { title: 'Approve a draft', hint: 'Paper money, so it is safe. Orders still go through your limits.', go: 'Find my draft', run: () => {
+  approve: { title: 'Approve a draft', hint: 'Practice money, so it is safe. Orders still go through your limits.', go: 'Find my draft', run: () => {
     const el = document.querySelector('[data-pending]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); else say(`buy 10 sbin with sl ${sample().stop}`) } },
-  terminal: { title: 'Open the Terminal', hint: 'Chart, watchlist and order ticket, with the agent beside them.', go: 'Open it', run: () => useStore.getState().setPanels({ chatFull: false, copilot: true }) },
+  terminal: { title: 'Open the charts', hint: 'Chart, watchlist and order ticket, with the assistant beside them.', go: 'Open it', run: () => useStore.getState().setPanels({ chatFull: false, copilot: true }) },
   alert: { title: 'Set a price alert', hint: 'I will message you the moment it crosses, even while you are elsewhere.', go: 'Set one', run: () => say(`alert me if nifty crosses ${sample().level}`) },
 }
 
@@ -156,8 +156,8 @@ const TOUR: TourStep[] = [
   { find: '[data-tour="chart"]', title: 'The chart', text: 'Draw with the tools on the left, change the interval from the top, and press B or S to open an order ticket right on the chart.' },
   { find: '[data-tour="trade"]', title: 'Sell and Buy at the live price', text: 'These open the ticket with a stop and a target already drawn on the chart. Drag the lines to adjust, then confirm. If a limit pauses new entries, they stay here, greyed, with the reason.', pad: 4 },
   { find: 'section[aria-label="Positions and orders"]', title: 'Positions, orders and alerts', text: 'Everything you hold or have waiting. Hover a row to add, set a stop or target, convert, or exit. Click it for the full timeline.' },
-  { find: '#copilot', title: 'The agent is still here', text: 'Same agent as the Agent view. Press / to type to it, or ask in plain words: “reliance chart”, “buy 1 lot nifty atm ce”, “how did I do this week”.' },
-  { find: 'header', title: 'Everything else', text: 'Options, Scanner, Markets, Portfolio and Journal are up here. Press ⌘K to search or run anything, and ? to see every shortcut.', pad: 0 },
+  { find: '#copilot', title: 'The assistant is still here', text: 'Same assistant as in Chat. Press / to type to it, or ask in plain words: “reliance chart”, “buy 1 lot nifty atm ce”, “how did I do this week”.' },
+  { find: 'header', title: 'Everything else', text: 'Options, Find stocks, Markets, Portfolio and Journal are up here. Press ⌘K to search or run anything, and ? to see every shortcut.', pad: 0 },
 ]
 
 export function Tour() {
@@ -193,11 +193,11 @@ export function Tour() {
   if (top + 190 > vh) top = Math.max(12, hole.top + hole.height - 190 > 12 && hole.height > 190 ? hole.top : vh - 202)
   left = Math.min(Math.max(12, left), vw - W - 12); top = Math.min(Math.max(12, top), vh - 202)
   return createPortal(
-    <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={`Terminal tour, step ${i + 1} of ${steps.length}: ${cur.title}`}>
+    <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={`Tour, step ${i + 1} of ${steps.length}: ${cur.title}`}>
       <div className="absolute inset-0" />
       <div aria-hidden className="pointer-events-none absolute rounded-[10px] ring-2 ring-white/80 transition-all duration-200" style={{ ...hole, boxShadow: '0 0 0 9999px rgba(8,8,12,.55)' }} />
       <div className="absolute rounded-[12px] border border-line bg-raised p-4 shadow-lg animate-rise" style={{ left, top, width: W }}>
-        <p className="text-[11px] font-medium text-fg-subtle">Terminal tour · {i + 1} of {steps.length}</p>
+        <p className="text-[11px] font-medium text-fg-subtle">Tour · {i + 1} of {steps.length}</p>
         <h2 className="mt-1 text-[15px] font-semibold text-fg">{cur.title}</h2>
         <p className="mt-1.5 text-[13px] leading-5 text-fg-muted">{cur.text}</p>
         <div className="mt-4 flex items-center gap-2">

@@ -15,13 +15,13 @@ type Item = { keys: string[][]; what: string; note?: string }
 const GROUPS: { title: string; where: string; items: Item[] }[] = [
   { title: 'General', where: 'Anywhere', items: [
     { keys: [[MOD, 'K']], what: 'Search, commands and questions' },
-    { keys: [['/']], what: 'Ask the agent', note: 'Focuses the composer' },
+    { keys: [['/']], what: 'Ask the assistant', note: 'Focuses the composer' },
     { keys: [['?']], what: 'Show these shortcuts' },
     { keys: [['Esc']], what: 'Close what is open' },
   ] },
-  { title: 'Layout', where: 'Terminal view', items: [
+  { title: 'Layout', where: 'Charts screen', items: [
     { keys: [['[']], what: 'Show or hide the watchlist' },
-    { keys: [[']']], what: 'Show or hide the agent' },
+    { keys: [[']']], what: 'Show or hide the assistant' },
     { keys: [['\\']], what: 'Show or hide positions and orders' },
     { keys: [['Shift', 'F']], what: 'Focus mode: hide every panel' },
   ] },
@@ -57,7 +57,7 @@ const GROUPS: { title: string; where: string; items: Item[] }[] = [
     { keys: [['C']], what: 'Its option chain', note: 'F&O stocks' },
     { keys: [['Delete']], what: 'Remove it from the list' },
   ] },
-  { title: 'Agent', where: 'In the composer', items: [
+  { title: 'Assistant', where: 'In the message box', items: [
     { keys: [['Enter']], what: 'Send' },
     { keys: [['Shift', 'Enter']], what: 'New line' },
     { keys: [['@']], what: 'Pick a symbol' },

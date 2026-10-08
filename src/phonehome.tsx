@@ -32,7 +32,7 @@ export function PhoneTop({ title, onSearch, onBell, unread }: { title: ReactNode
 export function AskButton({ onClick }: { onClick: () => void }) {
   const pending = usePendingCount()
   return (
-    <button type="button" onClick={onClick} aria-label={pending ? `Ask the agent, ${pending} waiting for you` : 'Ask the agent'}
+    <button type="button" onClick={onClick} aria-label={pending ? `Ask the assistant, ${pending} waiting for you` : 'Ask the assistant'}
       className="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 items-center gap-2 rounded-full bg-fg pl-4 pr-5 text-[15px] font-semibold text-[var(--bg)] shadow-lg active:scale-95">
       <Sparkles size={20} strokeWidth={1.75} />Ask
       {pending > 0 && <span className="num absolute -right-1 -top-1 min-w-5 rounded-full bg-attention px-1.5 text-center text-[11px] font-bold leading-5 text-[var(--ref-charcoal)]">{pending}</span>}
@@ -51,11 +51,11 @@ export type Tool = { id: string; label: string; sub: string; icon: ReactNode; ru
 export const TOOLS: Tool[] = [
   { id: 'chain', label: 'Option chain', sub: 'Strikes, OI and Greeks', icon: <Layers size={20} strokeWidth={1.75} />, run: 'page', view: 'chain' },
   { id: 'strategy', label: 'Strategy builder', sub: 'Multi-leg payoffs', icon: <Workflow size={20} strokeWidth={1.75} />, run: 'page', view: 'strategy' },
-  { id: 'scanner', label: 'Scanner', sub: 'Find stocks by conditions', icon: <ScanSearch size={20} strokeWidth={1.75} />, run: 'page', view: 'scanner' },
+  { id: 'scanner', label: 'Find stocks', sub: 'Filter by price, trend and volume', icon: <ScanSearch size={20} strokeWidth={1.75} />, run: 'page', view: 'scanner' },
   { id: 'markets', label: 'Markets', sub: 'Breadth, sectors, events', icon: <TrendingUp size={20} strokeWidth={1.75} />, run: 'page', view: 'markets' },
   { id: 'setups', label: "Today's setups", sub: 'Entries with stop and target', icon: <Zap size={20} strokeWidth={1.75} />, run: 'ask', q: "today's setups" },
   { id: 'journal', label: 'Journal', sub: 'What your trades say', icon: <BookOpen size={20} strokeWidth={1.75} />, run: 'page', view: 'journal' },
-  { id: 'alerts', label: 'Alerts and GTT', sub: 'Price alerts and triggers', icon: <Bell size={20} strokeWidth={1.75} />, run: 'ask', q: 'show my alerts' },
+  { id: 'alerts', label: 'Alerts and triggers', sub: 'Price alerts and triggers', icon: <Bell size={20} strokeWidth={1.75} />, run: 'ask', q: 'show my alerts' },
   { id: 'rules', label: 'Rules and limits', sub: 'Daily loss, trades, standing rules', icon: <Shield size={20} strokeWidth={1.75} />, run: 'tab', tab: 'profile' },
 ]
 
@@ -95,20 +95,20 @@ export function PhoneHome({ onStock, onTool, onAsk, onTab }: { onStock: (sym: st
           <div><p className="text-fg-subtle">Holdings</p><p className="num mt-0.5 text-[14px] text-fg">{inrShort(holdValue)}</p></div>
           <div><p className="text-fg-subtle">Open</p><p className="num mt-0.5 text-[14px] text-fg">{open} position{open === 1 ? '' : 's'}</p></div>
         </div>
-        {s.risk.killed && <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-sunken px-3 py-2 text-[12px] text-fg-muted"><Lock size={13} strokeWidth={2} />Locked for today: {s.risk.reason?.toLowerCase() ?? 'kill switch'}. Exits still work.</p>}
+        {s.risk.killed && <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-sunken px-3 py-2 text-[12px] text-fg-muted"><Lock size={13} strokeWidth={2} />Locked for today: {s.risk.reason?.toLowerCase() ?? 'emergency stop'}. Exits still work.</p>}
       </button>
 
       {/* 2 · The agent: the fastest way to do anything here. */}
       <div className="mx-4 mt-3">
         <button type="button" onClick={() => onAsk()} className="flex h-12 w-full items-center gap-2.5 rounded-full border border-line bg-sunken px-4 text-left text-[15px] text-fg-subtle active:bg-hover">
-          <Sparkles size={18} strokeWidth={1.75} className="text-fg-muted" /><span className="truncate">Ask the agent anything</span>
+          <Sparkles size={18} strokeWidth={1.75} className="text-fg-muted" /><span className="truncate">Ask the assistant anything</span>
         </button>
         <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
           {(s.risk.killed ? ['Review today', 'My rules', 'Review my trades'] : ['Brief me', "Today's setups", 'Show my positions']).map((q) =>
             <button key={q} type="button" onClick={() => onAsk(q.toLowerCase())} className="h-10 shrink-0 rounded-full border border-line px-4 text-[14px] text-fg active:bg-hover">{q}</button>)}
         </div>
         {pending > 0 && <button type="button" onClick={() => onAsk()} className="mt-3 flex w-full items-center gap-3 rounded-[12px] bg-attention-soft px-4 py-3 text-left text-[14px] text-attention-fg">
-          <span className="flex-1"><b>{pending} draft{pending > 1 ? 's' : ''} waiting for you.</b> Review and approve in the agent.</span><ChevronRight size={18} /></button>}
+          <span className="flex-1"><b>{pending} draft{pending > 1 ? 's' : ''} waiting for you.</b> Review and approve in the assistant.</span><ChevronRight size={18} /></button>}
       </div>
 
       {/* 3 · The market, at a glance. */}
@@ -131,7 +131,7 @@ export function PhoneHome({ onStock, onTool, onAsk, onTab }: { onStock: (sym: st
       </Section>
 
       {/* 5 · Setups from your own watchlist, when there are any. */}
-      {setups.length > 0 && <Section title="Setups on your watchlist" action={<button type="button" onClick={() => onAsk("today's setups")} className="text-[13px] font-medium text-fg-muted">See all</button>}>
+      {setups.length > 0 && <Section title="Trade ideas on your watchlist" action={<button type="button" onClick={() => onAsk("trade ideas for today")} className="text-[13px] font-medium text-fg-muted">See all</button>}>
         <div className="divide-y divide-[var(--border)] border-y border-line">{setups.map((x) => { const q = s.prices[x.sym]
           return row({ sym: x.sym, name: bySym(x.sym)?.name ?? '', ltp: q.ltp, chg: (q.ltp / q.prev - 1) * 100 }, `${x.kind}: entry ${fmt(x.entry)}, stop ${fmt(x.stop)}`) })}</div>
       </Section>}
@@ -144,7 +144,7 @@ export function PhoneHome({ onStock, onTool, onAsk, onTab }: { onStock: (sym: st
         </div>
         <div className="divide-y divide-[var(--border)]">{movers[mv].map((r) => row(r, mv === 'active' ? `Volume ${r.volx.toFixed(1)}× usual` : undefined))}</div>
       </Section>
-      <p className="px-4 pt-6 text-center text-[11px] text-fg-subtle">Paper trading on simulated prices. Not investment advice.</p>
+      <p className="px-4 pt-6 text-center text-[11px] text-fg-subtle">Practice trading with simulated prices. Not investment advice.</p>
     </div>
   )
 }
@@ -182,7 +182,7 @@ export function PhoneProfile({ onHoldings, onAsk }: { onHoldings: () => void; on
     <div className="pb-28">
       <div className="flex items-center gap-3.5 px-4 pt-5">
         <span className="flex size-14 items-center justify-center rounded-full bg-lime text-[20px] font-semibold text-on-lime">P</span>
-        <div><p className="text-[18px] font-semibold text-fg">Paper account</p><p className="text-[13px] text-fg-subtle">₹10,00,000 to practise with · simulated NSE</p></div>
+        <div><p className="text-[18px] font-semibold text-fg">Practice account</p><p className="text-[13px] text-fg-subtle">₹10,00,000 to practise with · simulated NSE</p></div>
       </div>
       {group('Funds', <>
         {row(<Wallet size={18} />, 'Available to trade', inr(p.avail))}
@@ -198,13 +198,13 @@ export function PhoneProfile({ onHoldings, onAsk }: { onHoldings: () => void; on
         </div>}
       </>)}
       {group('Your rules', rules.length ? rules.map((id) => <div key={id} className="flex min-h-12 items-center gap-3 px-4 py-2.5 text-[14px] text-fg"><Shield size={16} className="shrink-0 text-up" />{ruleText(id, s.rules)}</div>)
-        : <button type="button" onClick={() => onAsk('my rules')} className="flex min-h-12 w-full items-center px-4 text-left text-[14px] text-fg-muted">No rules yet. Ask the agent to suggest some from your trades.</button>)}
+        : <button type="button" onClick={() => onAsk('my rules')} className="flex min-h-12 w-full items-center px-4 text-left text-[14px] text-fg-muted">No rules yet. Ask the assistant to suggest some from your trades.</button>)}
       {group('Settings', <>
         {row(s.theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />, 'Appearance', s.theme === 'dark' ? 'Dark' : 'Light', () => s.toggleTheme())}
         {row(<KeyRound size={18} />, 'AI engine', s.apiKey ? 'Claude' : 'Built-in', () => setKey(true))}
-        {row(<RotateCcw size={18} />, 'Reset paper account', '', () => { if (window.confirm('Reset the paper account? Positions, orders, alerts and trade history go back to the starting state.')) resetBook() })}
+        {row(<RotateCcw size={18} />, 'Reset practice account', '', () => { if (window.confirm('Reset the practice account? Positions, orders, alerts and trade history go back to the starting state.')) resetBook() })}
       </>)}
-      <p className="px-4 pt-6 text-center text-[11px] text-fg-subtle">Paper trading on simulated prices. Not investment advice.</p>
+      <p className="px-4 pt-6 text-center text-[11px] text-fg-subtle">Practice trading with simulated prices. Not investment advice.</p>
 
       <Sheet open={edit} onClose={() => setEdit(false)} label="Risk limits">
         <form className="space-y-4 px-4" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); s.setRisk({ maxLoss: Math.max(500, +(f.get('loss') ?? 0)), maxTrades: Math.max(1, +(f.get('trades') ?? 0)) }); s.setToast('Limits saved'); setEdit(false) }}>

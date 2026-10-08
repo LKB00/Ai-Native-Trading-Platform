@@ -39,7 +39,7 @@ export default function Chain() {
         <thead>
           <tr className="max-md:hidden"><th colSpan={5} className="!text-center">Calls</th><th /><th colSpan={5} className="!text-center">Puts</th></tr>
           <tr className="md:hidden"><th colSpan={2} className="!text-center">Calls</th><th /><th colSpan={2} className="!text-center">Puts</th></tr>
-          <tr><th className="max-md:hidden">OI change</th><th>OI</th><th className="max-md:hidden">IV</th><th className="max-md:hidden">Delta</th><th>LTP</th><th className="!text-center">Strike</th><th>LTP</th><th className="max-md:hidden">Delta</th><th className="max-md:hidden">IV</th><th>OI</th><th className="max-md:hidden">OI change</th></tr>
+          <tr><th className="max-md:hidden">OI change</th><th>OI</th><th className="max-md:hidden">IV</th><th className="max-md:hidden">Delta</th><th>Price</th><th className="!text-center">Strike</th><th>Price</th><th className="max-md:hidden">Delta</th><th className="max-md:hidden">IV</th><th>OI</th><th className="max-md:hidden">OI change</th></tr>
         </thead>
         <tbody>
           {rows.map((r) => { const ci = r.strike < spot ? ' itm' : '', pi = r.strike > spot ? ' itm' : ''; return (

@@ -80,7 +80,7 @@ export default function Scanner() {
 
   return (
     <div className="@container">
-      <ViewHeader title="Scanner" sub={`${scan.name || 'All stocks'} · simulated data`}>
+      <ViewHeader title="Find stocks" sub={`${scan.name || 'All stocks'} · simulated data`}>
         {scan.filters.length > 0 && <Button size="sm" variant="ghost" onClick={() => setScan({ filters: [], name: '', sort: 'chg' })}>Clear scan</Button>}
       </ViewHeader>
       <div className={cn('grid gap-4 p-4', presetsOpen && '@4xl:grid-cols-[260px_minmax(0,1fr)]')}>
@@ -96,7 +96,7 @@ export default function Scanner() {
                 </button>
               </li>) })}
           </ul>
-          <p className="text-[12px] text-fg-subtle">Tip: ask the agent <i>“stocks near 52-week high with volume 2x in IT”</i> and the scan appears here.</p>
+          <p className="text-[12px] text-fg-subtle">Tip: ask the assistant <i>“stocks near 52-week high with volume 2x in IT”</i> and the scan appears here.</p>
         </Section>
 
         <div className="min-w-0 space-y-3">
@@ -134,7 +134,7 @@ export default function Scanner() {
             : <div className="scroll-thin overflow-x-auto rounded-b-[10px]">
                 <table className="tbl">
                   <thead><tr>
-                    {th('sym', 'Symbol', true)}{th('ltp', 'LTP')}{th('chg', 'Change')}
+                    {th('sym', 'Symbol', true)}{th('ltp', 'Price')}{th('chg', 'Change')}
                     {cols.map((c) => th(c, shortLabel[c] ?? FIELDS[c].label))}
                     <th><span className="sr-only">Actions</span></th>
                   </tr></thead>

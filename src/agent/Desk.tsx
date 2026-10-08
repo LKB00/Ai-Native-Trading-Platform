@@ -30,11 +30,11 @@ const row = 'group flex h-8 w-full items-center gap-2 rounded-md px-1 text-left 
 /**
  * How far the agent may go on its own for each thing it watches, said plainly. Notify: it tells you. Auto: it places
  * the order itself when the condition is met (still inside your limits and rules). Placed: an order already resting
- * at the exchange. Guard: a rule checked on every entry. Paused: kept, but not watched.
+ * at the exchange. Rule: a rule checked on every entry. Paused: kept, but not watched.
  */
-type L = 'Notify' | 'Auto' | 'Placed' | 'Guard' | 'Paused'
+type L = 'Notify' | 'Auto' | 'Placed' | 'Rule' | 'Paused'
 const Level = ({ l }: { l: L }) => (
-  <span className={cn('shrink-0 rounded px-1.5 py-px text-[10px] font-medium', l === 'Auto' ? 'bg-attention-soft text-[var(--attention-fg)]' : l === 'Guard' || l === 'Placed' ? 'bg-sunken text-fg-muted' : 'bg-sunken text-fg-subtle')}>{l}</span>
+  <span className={cn('shrink-0 rounded px-1.5 py-px text-[10px] font-medium', l === 'Auto' ? 'bg-attention-soft text-[var(--attention-fg)]' : l === 'Rule' || l === 'Placed' ? 'bg-sunken text-fg-muted' : 'bg-sunken text-fg-subtle')}>{l}</span>
 )
 const hoverBtn = 'hidden size-6 shrink-0 items-center justify-center rounded text-fg-subtle hover:bg-surface hover:text-fg group-hover:inline-flex'
 
@@ -65,7 +65,7 @@ export function DeskRail() {
   const ruleIds = Object.keys(rules) as RuleId[]
   const watching = triggers.length + working.length + ruleIds.length
   return (
-    <aside aria-label="Your desk" className="scroll-thin flex min-h-0 flex-col overflow-y-auto border-r border-line bg-surface">
+    <aside aria-label="Your account" className="scroll-thin flex min-h-0 flex-col overflow-y-auto border-r border-line bg-surface">
       {/* Today: the one number that matters most, then what's free, then whether you can trade. */}
       <section className="border-b border-line px-4 py-4">
         <p className="text-[11px] font-medium text-fg-subtle">Today, after charges</p>
@@ -107,10 +107,10 @@ export function DeskRail() {
           <WatchRow key={`o${o.id}`} icon={<Clock size={13} strokeWidth={1.75} />} title={<span className="num">{o.side === 'BUY' ? 'Buy' : 'Sell'} {o.qty} {labelOf(o.key)}</span>}
             sub={<span className="num">{o.otype === 'LIMIT' ? 'limit' : 'stop'} {px(o.otype === 'LIMIT' ? o.price : o.trigger ?? o.price)}</span>} level="Placed" onStop={() => useStore.getState().cancel(o.id)} />))}
         {ruleIds.map((id) => (
-          <WatchRow key={id} icon={<Shield size={13} strokeWidth={1.75} />} title={ruleText(id, rules)} sub="checked on every entry" level="Guard" onStop={() => useStore.getState().setRules({ [id]: undefined })} />))}
+          <WatchRow key={id} icon={<Shield size={13} strokeWidth={1.75} />} title={ruleText(id, rules)} sub="checked on every entry" level="Rule" onStop={() => useStore.getState().setRules({ [id]: undefined })} />))}
       </Section>
 
-      <Section label="Watchlist" count={watch.length} action={<button type="button" onClick={() => say('today\'s setups')} className="ml-auto rounded px-1.5 py-0.5 text-[11px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg">Setups →</button>}>
+      <Section label="Watchlist" count={watch.length} action={<button type="button" onClick={() => say('trade ideas for today')} className="ml-auto rounded px-1.5 py-0.5 text-[11px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg">Trade ideas →</button>}>
         {watch.map((w) => { const q = prices[w]; if (!q) return null; const c = (q.ltp / q.prev - 1) * 100; return (
           <button key={w} type="button" onClick={() => say(w.toLowerCase())} className={row}>
             <span className="min-w-0 flex-1 truncate font-medium text-fg">{w}</span>

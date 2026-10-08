@@ -5,7 +5,7 @@ import { ArrowLeftRight, LineChart, LogOut, PanelRight, Plus, Target, X } from '
 import { useStore, type Order } from './store'
 import { labelOf, parseKey } from './market'
 import { Badge, Button, cn } from './ds'
-import { Money, inr } from './ui'
+import { Money, inr, prodLabel } from './ui'
 import { TagPicker } from './ticket'
 import { isSetupTag, tagLabel } from './rules'
 import { ask } from './ai'
@@ -15,7 +15,7 @@ export type DrawerTarget = { kind: 'order'; id: number } | { kind: 'pos'; key: s
 
 const fmt = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const time = (ms?: number) => (ms ? new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '')
-const VIA: Record<string, string> = { manual: 'You, from the ticket', ai: 'The agent, approved by you', chart: 'You, from the chart', gtt: 'A GTT you set', bracket: 'Your exit plan (stop or target)', risk: 'Risk limits', sip: 'Your SIP' }
+const VIA: Record<string, string> = { manual: 'You, from the ticket', ai: 'The assistant, approved by you', chart: 'You, from the chart', gtt: 'A price trigger you set', bracket: 'Your exit plan (stop or target)', risk: 'Risk limits', sip: 'Your SIP' }
 export const statusOf = (o: Order) => o.status === 'COMPLETE' ? 'Filled' : o.status === 'REJECTED' ? 'Rejected' : o.status === 'OPEN' ? 'Working' : o.status === 'TRIGGER_PENDING' ? 'Waiting for trigger' : 'Cancelled'
 const toneOf = (o: Order) => o.status === 'COMPLETE' ? 'success' : o.status === 'REJECTED' ? 'danger' : o.status === 'CANCELLED' ? 'neutral' : 'info'
 const goChart = (key: string) => { const s = useStore.getState(); s.setSym(parseKey(key).und); s.setView(parseKey(key).strike ? 'chain' : 'chart') }
@@ -136,11 +136,11 @@ function OrderDetail({ id, onClose, onOpen }: { id: number; onClose: () => void;
           <Label>Details</Label>
           <dl className="divide-y divide-[var(--border)]">
             <Row k="Order ID">#{o.id}</Row>
-            <Row k="Type">{o.otype === 'SL-M' ? 'Stop entry (SL-M)' : o.otype === 'LIMIT' ? 'Limit' : 'Market'}</Row>
-            <Row k="Product">{o.product === 'CNC' ? 'Delivery (CNC)' : o.product === 'MIS' ? 'Intraday (MIS)' : 'F&O carry (NRML)'}</Row>
+            <Row k="Type">{o.otype === 'SL-M' ? 'At trigger price' : o.otype === 'LIMIT' ? 'Limit' : 'Market'}</Row>
+            <Row k="Type">{o.product === 'CNC' ? 'Delivery' : o.product === 'MIS' ? 'Intraday' : 'Carry forward (options)'}</Row>
             {o.otype !== 'MARKET' && <Row k={o.otype === 'LIMIT' ? 'Limit price' : 'Trigger'}>₹{fmt(o.otype === 'LIMIT' ? o.price : o.trigger ?? o.price)}</Row>}
-            {(o.sl || o.tgt || o.trail) ? <Row k="Exit plan"><span className="text-down">{o.sl ? `Stop ₹${fmt(o.sl)}` : ''}</span>{o.sl && o.tgt ? ' · ' : ''}<span className="text-up">{o.tgt ? `Target ₹${fmt(o.tgt)}` : ''}</span>{o.trail ? ` · trail ${o.trail}` : ''}</Row> : null}
-            {o.tag && <Row k={o.via === 'bracket' || o.via === 'risk' ? 'Reason' : 'Setup'}><span className="font-sans">{tagLabel(o.tag)}</span></Row>}
+            {(o.sl || o.tgt || o.trail) ? <Row k="Stop & target"><span className="text-down">{o.sl ? `Stop ₹${fmt(o.sl)}` : ''}</span>{o.sl && o.tgt ? ' · ' : ''}<span className="text-up">{o.tgt ? `Target ₹${fmt(o.tgt)}` : ''}</span>{o.trail ? ` · trail ${o.trail}` : ''}</Row> : null}
+            {o.tag && <Row k={o.via === 'bracket' || o.via === 'risk' ? 'Reason' : 'Reason'}><span className="font-sans">{tagLabel(o.tag)}</span></Row>}
             <Row k="Placed by"><span className="font-sans">{VIA[o.via] ?? o.via}</span></Row>
           </dl>
         </section>
@@ -148,7 +148,7 @@ function OrderDetail({ id, onClose, onOpen }: { id: number; onClose: () => void;
       </div>
       <footer className="flex shrink-0 items-center gap-2 border-t border-line px-4 py-3">
         <Button size="sm" variant="secondary" onClick={() => goChart(o.key)}>Chart</Button>
-        <Button size="sm" variant="ghost" onClick={() => ask(o.status === 'REJECTED' ? `why was my ${label.toLowerCase()} order rejected: ${o.note ?? ''}` : `review my ${parseKey(o.key).und.toLowerCase()} trade`)}>{o.status === 'REJECTED' ? 'Ask the agent why' : 'Ask the agent'}</Button>
+        <Button size="sm" variant="ghost" onClick={() => ask(o.status === 'REJECTED' ? `why was my ${label.toLowerCase()} order rejected: ${o.note ?? ''}` : `review my ${parseKey(o.key).und.toLowerCase()} trade`)}>{o.status === 'REJECTED' ? 'Ask the assistant why' : 'Ask the assistant'}</Button>
       </footer>
     </>
   )
@@ -177,13 +177,13 @@ function PositionDetail({ k, focus, onClose, onOpen, onAdd }: { k: string; focus
           {open && <p className="num mt-1.5 text-[12px] text-fg-muted">{long ? 'Long' : 'Short'} {Math.abs(pos.qty)} at ₹{fmt(pos.avg)} · now ₹{fmt(ltp)}</p>}
         </section>
         {open && <section className="border-t border-line px-4 py-3">
-          <Label>Exit plan</Label>
-          <form className="grid grid-cols-3 gap-2" onSubmit={(e) => { e.preventDefault(); const st = useStore.getState(); st.setBracket(k, { sl: sl ? +sl : undefined, tgt: tg ? +tg : undefined, trail: tr ? +tr : undefined, peak: undefined }); st.setToast(`Exit plan saved for ${labelOf(k)}`) }}>
+          <Label>Stop &amp; target</Label>
+          <form className="grid grid-cols-3 gap-2" onSubmit={(e) => { e.preventDefault(); const st = useStore.getState(); st.setBracket(k, { sl: sl ? +sl : undefined, tgt: tg ? +tg : undefined, trail: tr ? +tr : undefined, peak: undefined }); st.setToast(`Stop and target saved for ${labelOf(k)}`) }}>
             <label className="text-[11px] text-down">Stop<input id="plan-sl" type="number" step={0.05} placeholder="none" value={sl} onChange={(e) => setSl(e.target.value)} className={cn(field, 'mt-1')} /></label>
             <label className="text-[11px] text-up">Target<input type="number" step={0.05} placeholder="none" value={tg} onChange={(e) => setTg(e.target.value)} className={cn(field, 'mt-1')} /></label>
             <label className="text-[11px] text-fg-subtle">Trail (pts)<input type="number" step={0.05} placeholder="off" value={tr} onChange={(e) => setTr(e.target.value)} className={cn(field, 'mt-1')} /></label>
             <p className="col-span-3 text-[11px] text-fg-subtle">{b?.sl ? <>If the stop is hit you lose about <span className="num text-down">{inr(risk)}</span> from here.</> : 'No stop yet: nothing limits the loss if it turns.'}</p>
-            <div className="col-span-3"><Button size="sm" variant="secondary" type="submit">Save exit plan</Button></div>
+            <div className="col-span-3"><Button size="sm" variant="secondary" type="submit">Save stop & target</Button></div>
           </form>
         </section>}
         <section className="border-t border-line px-4 py-3">
@@ -196,7 +196,7 @@ function PositionDetail({ k, focus, onClose, onOpen, onAdd }: { k: string; focus
           </dl>
         </section>
         <section className="border-t border-line px-4 py-3">
-          <Label>Setup</Label>
+          <Label>Reason</Label>
           {open ? <TagPicker value={isSetupTag(pos.tag) ? pos.tag : undefined} onChange={(t) => useStore.getState().tagPosition(k, t)} /> : <p className="text-[12px] text-fg">{isSetupTag(pos.tag) ? tagLabel(pos.tag!) : 'Untagged'}</p>}
         </section>
         <Related k={k} onOpen={onOpen} />
@@ -246,7 +246,7 @@ export function PhonePositions({ onOpen, onStock, onOrder, holdings }: { onOpen:
             <button type="button" className={card} aria-expanded={expanded} onClick={() => { setOpenKey(expanded ? null : x.key); setConfirm(null) }}>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] font-semibold text-fg">{labelOf(x.key)}</span>
-                <span className="num block text-[12px] text-fg-subtle">{x.product} · {x.qty ? `${x.qty > 0 ? '+' : ''}${x.qty} at ${fmt(x.avg)}` : 'closed'}{isSetupTag(x.tag) ? ` · ${tagLabel(x.tag!)}` : ''}</span>
+                <span className="num block text-[12px] text-fg-subtle">{prodLabel(x.product)} · {x.qty ? `${x.qty > 0 ? '+' : ''}${x.qty} at ${fmt(x.avg)}` : 'closed'}{isSetupTag(x.tag) ? ` · ${tagLabel(x.tag!)}` : ''}</span>
                 {x.qty ? <span className="num block text-[12px]">{b?.sl || b?.tgt ? <><span className="text-down">{b.sl ? `SL ${fmt(b.sl)}` : ''}</span>{b.sl && b.tgt ? ' · ' : ''}<span className="text-up">{b.tgt ? `T ${fmt(b.tgt)}` : ''}</span></> : <span className="font-sans text-[var(--attention-fg)]">No stop</span>}</span> : null}
               </span>
               <span className="shrink-0 text-right"><Money v={pl} className="block text-[16px] font-semibold" /><span className="num block text-[12px] text-fg-subtle">LTP {fmt(l)}</span></span>
@@ -272,7 +272,7 @@ export function PhonePositions({ onOpen, onStock, onOrder, holdings }: { onOpen:
               </div>}
             </div>}
           </li> })}</ul>
-          : <p className="px-4 py-10 text-center text-[14px] text-fg-subtle">No positions today. Tap a stock in your watchlist, or ask the agent.</p>)}
+          : <p className="px-4 py-10 text-center text-[14px] text-fg-subtle">No positions today. Tap a stock in your watchlist, or ask the assistant.</p>)}
         {tab === 'hold' && holdings}
         {tab === 'ord' && (s.orders.length ? <ul className="divide-y divide-[var(--border)]">{s.orders.map((o) => <li key={o.id}><button type="button" className={card} onClick={() => onOpen({ kind: 'order', id: o.id })}>
             <span className="min-w-0 flex-1">

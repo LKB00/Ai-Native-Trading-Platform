@@ -86,3 +86,6 @@ export function AgentNote({ label, children, className }: { label?: string; chil
     </div>
   )
 }
+
+/** Product codes as people say them. */
+export const prodLabel = (p?: string) => (p === 'MIS' ? 'Intraday' : p === 'CNC' ? 'Delivery' : p === 'NRML' ? 'Carry forward' : p ?? '')

@@ -45,18 +45,18 @@ export function applySetup(style: Style, exp: Experience, themes: string[], maxL
   s.setRules({ stopRequired: p.rules.stopRequired, maxRiskPct: p.rules.maxRiskPct })
   if (p.watch.length > 2) s.setWatch(p.watch)
   s.setProfile({ style, experience: exp, themes, at: Date.now() })
-  s.log('user', `Desk set up: ${style}, ${exp}, ${themes.join('/')}, max loss ${maxLoss}`)
+  s.log('user', `Setup saved: ${style}, ${exp}, ${themes.join('/')}, max loss ${maxLoss}`)
   const lines = [
     `- **Daily loss limit ₹${p.maxLoss.toLocaleString('en-IN')}** and **${p.maxTrades} trades a day**. At the limit I close everything and pause new entries until the next session.`,
     p.rules.stopRequired ? `- **Every entry gets a stop**, and no trade risks more than **${p.rules.maxRiskPct}% of capital**. Drafts arrive sized and protected; you can switch either rule off in "my rules".` : '- **No standing rules yet.** Your journal will suggest some once it sees how you trade.',
     p.watch.length > 2 ? `- **Watchlist:** ${p.watch.join(', ')}.` : '',
     `- ${style === 'swing' || style === 'investing' ? 'Orders default to **Delivery**' : style === 'options' ? 'Options carry overnight as **NRML**' : 'Orders default to **Intraday**, squared off at 3:20 pm'}.`,
   ].filter(Boolean)
-  s.addMsg({ role: 'ai', text: `**Your desk is ready.**\n\n${lines.join('\n')}\n\nYou trade ₹10,00,000 of paper money on simulated NSE prices. When the market is closed I replay the last session, so you can practise any time. Where would you like to start?`, follow: p.follow })
+  s.addMsg({ role: 'ai', text: `**You are all set.**\n\n${lines.join('\n')}\n\nYou trade ₹10,00,000 of practice money on simulated NSE prices. When the market is closed I replay the last session, so you can practise any time. Where would you like to start?`, follow: p.follow })
 }
 
 export function skipSetup() {
-  const s = useStore.getState(); s.setProfile({ skipped: true, at: Date.now() }); s.log('user', 'Skipped desk setup')
+  const s = useStore.getState(); s.setProfile({ skipped: true, at: Date.now() }); s.log('user', 'Skipped setup')
 }
 
 /** The style the desk was set up for, if any: drafts use it to pick Delivery or Intraday. */

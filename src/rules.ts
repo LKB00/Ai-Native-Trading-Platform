@@ -16,7 +16,8 @@ export type Rules = {
 
 /** The setups offered when tagging a trade, before your own tags. Tags are stored lower-case. */
 export const SETUP_TAGS = ['breakout', 'pullback', 'bounce', 'momentum', 'reversal', 'scalp', 'gap', 'news']
-export const tagLabel = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+const PLAIN: Record<string, string> = { 'auto square-off 3:20 pm': 'Closed automatically at 3:20 pm', 'kill switch': 'Emergency stop', 'max loss': 'Daily loss limit', 'max profit': 'Profit target' }
+export const tagLabel = (t: string) => PLAIN[t.toLowerCase()] ?? t.charAt(0).toUpperCase() + t.slice(1)
 /** Tags that describe how a trade ended or was managed, not why it was taken. Never offered as setups. */
 const NOT_SETUPS = /^(stop|target|trailing stop|investment|auto square-off|risk|slice|daily loss|kill|max loss|max profit|loss limit|profit|cool-?off)/i
 export const isSetupTag = (t?: string) => !!t && !NOT_SETUPS.test(t)
@@ -89,7 +90,7 @@ export function insights(trades: Trade[], rules: Rules, capital: number): Insigh
       if (late.length >= 3 && ln < 0 && avg(late.map(net)) < avg(early.map(net)) - avgLoss * 0.25) {
         out.push({ id: 'noEntryAfter', weight: -ln,
           lead: `Trades you opened after ${hhmm(h * 3600)} lost ${inr(ln)} across ${late.length} trades`,
-          detail: `Earlier ones ${en >= 0 ? `made ${inr(en)}` : `lost ${inr(en)}`}. Late entries have less time to work before the 3:20 pm square-off.`,
+          detail: `Earlier ones ${en >= 0 ? `made ${inr(en)}` : `lost ${inr(en)}`}. Late entries have less time to work before intraday positions close at 3:20 pm.`,
           rule: { noEntryAfter: h * 3600 } })
         break
       }

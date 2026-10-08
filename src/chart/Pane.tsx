@@ -249,7 +249,7 @@ export default function Pane({ idx, k: key, tf, active, multi, className, tool, 
     if (b?.tgt != null) specs.push({ id: 'tgt', price: b.tgt, kind: 'tgt', label: `Target · +${inr(Math.abs((b.tgt - pos.avg) * pos.qty))}`, color: col.up, style: 2, drag: true })
   }
   for (const o of s.orders) if (o.key === key && (o.status === 'OPEN' || o.status === 'TRIGGER_PENDING')) specs.push({ id: 'o' + o.id, price: o.status === 'TRIGGER_PENDING' ? o.trigger! : o.price, kind: 'order', label: `${o.side === 'BUY' ? 'Buy' : 'Sell'} ${o.qty} ${o.otype === 'LIMIT' ? 'limit' : 'stop'}`, color: col.info, style: 0, drag: true, ref: o.id })
-  if (!opt) for (const t of s.triggers) if (t.sym === key && !t.done) specs.push({ id: 't' + t.id, price: t.price, kind: 'alert', label: t.then ? `GTT ${t.then.side.toLowerCase()} ${t.then.qty}` : 'Alert', color: col.info, style: 1, drag: true, ref: t.id })
+  if (!opt) for (const t of s.triggers) if (t.sym === key && !t.done) specs.push({ id: 't' + t.id, price: t.price, kind: 'alert', label: t.then ? `Trigger: ${t.then.side.toLowerCase()} ${t.then.qty}` : 'Alert', color: col.info, style: 1, drag: true, ref: t.id })
   if (!cfg.hideAll) for (const p of s.drawings[key] ?? []) specs.push({ id: 'd' + p, price: p, kind: 'draw', label: 'Line', color: col.draw, style: 0, drag: !cfg.lockAll, ref: p })
   for (const l of lvl) specs.push({ id: 'ai' + l.price.toFixed(1), price: l.price, kind: 'ai', label: `${l.kind === 'resistance' ? 'R' : 'S'} ${l.touches}×`, color: col.ai, style: 2, drag: false })
   if (cfg.pivots && !opt) for (const [k2, v] of Object.entries(piv)) specs.push({ id: 'pv' + k2, price: v, kind: 'pivot', label: k2 === 'P' ? 'Pivot' : k2, color: col.sub, style: 3, drag: false })

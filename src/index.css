@@ -109,3 +109,7 @@ html.switching *, html.switching *::before, html.switching *::after { animation:
   .tbl th:last-child, .tbl td:last-child { padding-right: 12px; }
   button, a { -webkit-tap-highlight-color: transparent; }
 }
+
+/* Brand mark: a dark tile on light screens, a light tile on dark ones. The green deepens on the light tile to keep 3:1. */
+:root { --brand-tile: #111116; --brand-ink: #ffffff; --brand-mark: #2ee6b0; }
+:root.dark, :root[data-theme="dark"] { --brand-tile: #f6f6f8; --brand-ink: #111116; --brand-mark: #0a9a74; }

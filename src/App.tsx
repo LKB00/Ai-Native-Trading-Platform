@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
-import { BrandMark } from './brand'
+import { BrandMark, BRAND } from './brand'
 import { Tour } from './welcome'
 import { useLearn } from './learn'
 import { useStore, resetBook, type View } from './store'
@@ -10,7 +10,7 @@ import { ask } from './ai'
 import type { Action } from './actions'
 import { AIMark, Badge, Button, IconButton, MeterBar, Popover, SegmentedControl, KeyHint, cn } from './ds'
 import { ChevronIcon, MoonIcon, SunIcon, SettingsIcon, SearchIcon, XIcon, PlusIcon, CheckIcon, ShieldIcon, ArrowRightIcon } from './ds/lib/icons'
-import { inr, pct, Chg, Money, LabeledSwitch } from './ui'
+import { inr, pct, Chg, Money, LabeledSwitch, prodLabel } from './ui'
 import { FlashPrice, TickerTape } from './cockpit/live'
 import Chart from './Chart'
 import Chain from './Chain'
@@ -38,7 +38,7 @@ export { inr, Chg, Money }
 const NAV: { value: string; label: string; views: View[] }[] = [
   { value: 'chart', label: 'Trade', views: ['chart'] },
   { value: 'chain', label: 'Options', views: ['chain', 'strategy'] },
-  { value: 'scanner', label: 'Scanner', views: ['scanner'] },
+  { value: 'scanner', label: 'Find stocks', views: ['scanner'] },
   { value: 'markets', label: 'Markets', views: ['markets'] },
   { value: 'portfolio', label: 'Portfolio', views: ['portfolio'] },
   { value: 'journal', label: 'Journal', views: ['journal'] },
@@ -60,7 +60,7 @@ export default function App() {
 
 /**
  * The cockpit: one trading screen. Live watchlist on the left, the chart (or chain, scanner, portfolio…) in the
- * middle with positions and orders below it, and the AI agent docked on the right, where every trade is drafted
+ * middle with positions and orders below it, and the assistant docked on the right, where every trade is drafted
  * and approved. A ticker tape and the market clock run under the top bar.
  */
 function Cockpit() {
@@ -108,7 +108,7 @@ function Cockpit() {
         style={{ '--bh': `${bh}px` } as React.CSSProperties}>
         <SubBar /><Main /><Bottom />
       </main>
-      {(panels.copilot && (!narrow || mobile)) ? <ChatPanel overlay={false} resize={!mobile && <Splitter dir="x" sign={-1} value={panels.copilotW} min={340} max={640} label="Agent panel width" onSize={(copilotW) => useStore.getState().setPanels({ copilotW })} onToggle={() => useStore.getState().togglePanel('copilot')} className="-left-1" />} /> : null}
+      {(panels.copilot && (!narrow || mobile)) ? <ChatPanel overlay={false} resize={!mobile && <Splitter dir="x" sign={-1} value={panels.copilotW} min={340} max={640} label="Assistant panel width" onSize={(copilotW) => useStore.getState().setPanels({ copilotW })} onToggle={() => useStore.getState().togglePanel('copilot')} className="-left-1" />} /> : null}
       {panels.copilot && narrow && !mobile && <ChatPanel overlay />}
       {(!panels.copilot || (narrow && !mobile)) && <CopilotRail />}
       <Toast /><Palette /><ShortcutsSheet /><Tour /><FnoDisclosure />
@@ -119,7 +119,7 @@ function Cockpit() {
 type Layer = { t: 'stock'; sym: string } | { t: 'order'; sym: string; side: 'BUY' | 'SELL'; px?: number } | { t: 'chart' } | { t: 'page'; view: View }
   | { t: 'pos'; target: DrawerTarget } | { t: 'depth'; sym: string } | { t: 'agent' } | { t: 'search' } | { t: 'bell' }
 const PAGE: Partial<Record<View, { label: string; el: () => ReactNode }>> = {
-  markets: { label: 'Markets', el: () => <Markets /> }, scanner: { label: 'Scanner', el: () => <Scanner /> }, chain: { label: 'Option chain', el: () => <Chain /> },
+  markets: { label: 'Markets', el: () => <Markets /> }, scanner: { label: 'Find stocks', el: () => <Scanner /> }, chain: { label: 'Option chain', el: () => <Chain /> },
   strategy: { label: 'Strategy builder', el: () => <Strategy /> }, journal: { label: 'Journal', el: () => <Journal /> }, portfolio: { label: 'Holdings', el: () => <Portfolio /> },
 }
 type PhoneTab = 'home' | 'watch' | 'positions' | 'tools' | 'profile'
@@ -170,7 +170,7 @@ function PhoneCockpit() {
   const title = TABS.find((t) => t.id === tab)!.label
   return (
     <div className="grid h-[100dvh] grid-cols-1 grid-rows-[auto_minmax(0,1fr)_auto]">
-      <PhoneTop title={tab === 'home' ? 'Prompt Terminal' : title} onSearch={() => push({ t: 'search' })} onBell={openBell} unread={unread} />
+      <PhoneTop title={tab === 'home' ? BRAND : title} onSearch={() => push({ t: 'search' })} onBell={openBell} unread={unread} />
       <div className="min-h-0 overflow-hidden">
         {tab === 'home' && <div className="scroll-thin h-full overflow-y-auto overscroll-contain bg-surface"><PhoneHome onStock={openStock} onTool={openTool} onAsk={openAgent} onTab={(t) => setTab(t)} /></div>}
         {tab === 'watch' && <div className="flex h-full flex-col overflow-hidden bg-surface"><TickerTape /><WatchBody header={null} onOpen={openStock} /></div>}
@@ -194,7 +194,7 @@ function PhoneCockpit() {
         {l.t === 'chart' && <Screen title={sym} sub="Full chart" onBack={pop}><div className="grid h-full min-h-[70dvh] grid-rows-[minmax(0,1fr)]"><Chart /></div></Screen>}
         {l.t === 'page' && <Screen title={PAGE[l.view]?.label ?? ''} onBack={pop}>{PAGE[l.view]?.el()}</Screen>}
         {l.t === 'order' && <OrderPad key={l.sym + l.side + (l.px ?? '')} sym={l.sym} side={l.side} px={l.px} onBack={pop} onPlaced={pop} />}
-        {l.t === 'agent' && <Screen title="Agent" sub={pending ? `${pending} waiting for you` : 'Trade, analyse or ask anything'} onBack={pop} right={<div className="flex items-center pr-1"><ChatTopActions /></div>}>
+        {l.t === 'agent' && <Screen title="Assistant" sub={pending ? `${pending} waiting for you` : 'Trade, analyse or ask anything'} onBack={pop} right={<div className="flex items-center pr-1"><ChatTopActions /></div>}>
           <div className="flex h-full flex-col [&>aside]:h-full [&>aside]:border-0"><ChatPanel overlay={false} /></div></Screen>}
         {l.t === 'search' && <SearchScreen onBack={pop} onStock={openStock} onAsk={openAgent} />}
         {l.t === 'pos' && i === nav.stack.length - 1 && <Drawer target={l.target} onClose={pop} onOpen={(t) => replace({ t: 'pos', target: t })} onAdd={(k) => { const p = useStore.getState().positions[k]; if (p?.qty) order(k, p.qty > 0 ? 'BUY' : 'SELL') }} />}
@@ -234,12 +234,12 @@ function CopilotRail() {
   const pending = usePendingCount(); const busy = useStore((s) => s.busy)
   const openIt = () => { useStore.getState().setPanels({ copilot: true, focus: false }); setTimeout(() => document.querySelector<HTMLTextAreaElement>('#chat-input')?.focus(), 50) }
   return (
-    <aside aria-label="AI agent (folded)" className="flex min-h-0 flex-col items-center gap-3 border-l border-line bg-surface py-3 max-md:flex-row max-md:border-l-0 max-md:border-t max-md:px-3 max-md:py-2">
-      <IconButton size="sm" label="Show the AI agent ( ] )" onClick={openIt}><ChevronIcon width={14} height={14} className="rotate-180" /></IconButton>
-      <button onClick={openIt} aria-label={pending ? `Open the AI agent, ${pending} waiting for your approval` : busy ? 'Open the AI agent, thinking' : 'Open the AI agent'}
+    <aside aria-label="Assistant (folded)" className="flex min-h-0 flex-col items-center gap-3 border-l border-line bg-surface py-3 max-md:flex-row max-md:border-l-0 max-md:border-t max-md:px-3 max-md:py-2">
+      <IconButton size="sm" label="Show the assistant ( ] )" onClick={openIt}><ChevronIcon width={14} height={14} className="rotate-180" /></IconButton>
+      <button onClick={openIt} aria-label={pending ? `Open the assistant, ${pending} waiting for your approval` : busy ? 'Open the assistant, thinking' : 'Open the assistant'}
         className="flex items-center gap-2 rounded-full px-1.5 py-3 text-[11px] uppercase tracking-[0.12em] text-fg-subtle hover:bg-hover hover:text-fg md:[writing-mode:vertical-rl] max-md:px-3 max-md:py-1">
         <span className="inline-flex size-6 items-center justify-center rounded-full bg-lime text-on-lime [writing-mode:horizontal-tb]"><AIMark size={16} /></span>
-        AI agent
+        Assistant
         {busy && <span aria-hidden className="size-1.5 rounded-full bg-fg animate-pulse-dot" />}
       </button>
       {pending > 0 && <button onClick={openIt} aria-label={`${pending} waiting for your approval`} title={`${pending} waiting for your approval`}
@@ -279,7 +279,7 @@ export function TopBar({ left, extras }: { left?: ReactNode; extras?: ReactNode 
       <div className="flex min-w-0 items-center gap-3">
         {/* The mark alone; the name stays for screen readers and the tooltip. */}
         <BrandMark size={28} className="shrink-0" />
-        <SegmentedControl size="sm" label="Layout" className="max-md:hidden" value={chatFull ? 'chat' : 'terminal'} onChange={(v) => switchLayout(v === 'chat')} options={[{ value: 'chat', label: 'Agent' }, { value: 'terminal', label: 'Terminal' }]} />
+        <SegmentedControl size="sm" label="Layout" className="max-md:hidden" value={chatFull ? 'chat' : 'terminal'} onChange={(v) => switchLayout(v === 'chat')} options={[{ value: 'chat', label: 'Chat' }, { value: 'terminal', label: 'Charts' }]} />
       </div>
       <div className="flex min-w-0 items-center justify-center max-md:hidden">{left}</div>
       <div className="col-start-3 flex min-w-0 items-center justify-end gap-2">
@@ -287,12 +287,12 @@ export function TopBar({ left, extras }: { left?: ReactNode; extras?: ReactNode 
         {extras}
         <RiskCenter net={net} />
         <Popover label="AI engine" align="end" trigger={({ toggle, triggerProps }) => (
-          <IconButton label={apiKey ? 'AI engine: Claude' : 'AI engine: built-in'} onClick={toggle} {...triggerProps}><SettingsIcon /></IconButton>)}>
+          <IconButton label={apiKey ? 'Assistant: Claude' : 'Assistant: built-in'} onClick={toggle} {...triggerProps}><SettingsIcon /></IconButton>)}>
           {({ close }) => (
             <div className="w-80 space-y-3 p-3">
-              <p className="text-[13px] font-semibold text-fg">AI engine</p>
-              <p className="text-[13px] text-fg-muted">The built-in engine understands trading commands offline. Add an Anthropic API key and Claude reads free-form requests. Every number still comes from the terminal's own data, and every trade still needs your approval. The key stays in this browser.</p>
-              <input type="password" aria-label="Anthropic API key" placeholder="sk-ant-…" defaultValue={apiKey} onBlur={(e) => setApiKey(e.target.value.trim())}
+              <p className="text-[13px] font-semibold text-fg">Assistant</p>
+              <p className="text-[13px] text-fg-muted">The built-in assistant works offline and understands trading requests. To let it understand any wording, add an Anthropic key. Every number still comes from this app's own data, and every trade still needs your approval. The key stays in this browser.</p>
+              <input type="password" aria-label="Anthropic key" placeholder="sk-ant-…" defaultValue={apiKey} onBlur={(e) => setApiKey(e.target.value.trim())}
                 className="h-8 w-full rounded-md border border-line bg-surface px-3 text-[13px] outline-none focus:border-fg-subtle" />
               <div className="flex gap-2"><Button size="sm" onClick={close}>Done</Button>{apiKey && <Button size="sm" variant="ghost" onClick={() => setApiKey('')}>Remove key</Button>}</div>
             </div>)}
@@ -328,13 +328,13 @@ function RiskCenter({ net }: { net: number }) {
       <button onClick={toggle} {...triggerProps} className="flex h-8 items-center gap-2 whitespace-nowrap rounded-md border border-line bg-surface px-3 text-[12px] hover:border-line-strong max-md:px-2">
         {/* State shows as the icon's colour only, so a lock reads at a glance without the pill shouting over the bar. */}
         <ShieldIcon width={14} height={14} className={risk.killed ? 'text-danger-fg' : cooling ? 'text-attention-fg' : 'text-fg-subtle'} />
-        <span className="text-fg-muted max-sm:hidden">{risk.killed ? 'Locked' : cooling ? 'Cool-off' : 'Day'}</span>
+        <span className="text-fg-muted max-sm:hidden">{risk.killed ? 'Locked' : cooling ? 'On a break' : 'Today'}</span>
         <Money v={net} className="font-medium" />
       </button>)}>
       <div className="w-[320px] space-y-4 p-3">
         <div><p className="text-[13px] font-semibold text-fg">Risk limits for today</p><p className="text-[12px] text-fg-subtle">Checked every second. When a limit is hit, positions close and new entries lock until tomorrow. Exits always work.</p></div>
-        {risk.killed && <div className="rounded-lg bg-danger-soft p-3 text-[12px] text-danger-fg"><b>Trading locked.</b> {risk.reason}. <button className="underline" onClick={() => setRisk({ killed: false, reason: undefined })}>Unlock (paper mode)</button></div>}
-        {cooling && <div className="rounded-lg bg-attention-soft p-3 text-[12px] text-attention-fg"><b>Cool-off.</b> {risk.cooloffAfter} losses in a row. New entries resume in {Math.ceil((risk.cooloffUntil! - Date.now()) / 60000)} min. <button className="underline" onClick={() => setRisk({ cooloffUntil: undefined })}>End now</button></div>}
+        {risk.killed && <div className="rounded-lg bg-danger-soft p-3 text-[12px] text-danger-fg"><b>Trading locked.</b> {risk.reason}. <button className="underline" onClick={() => setRisk({ killed: false, reason: undefined })}>Unlock (practice mode)</button></div>}
+        {cooling && <div className="rounded-lg bg-attention-soft p-3 text-[12px] text-attention-fg"><b>Taking a break.</b> {risk.cooloffAfter} losses in a row. New entries resume in {Math.ceil((risk.cooloffUntil! - Date.now()) / 60000)} min. <button className="underline" onClick={() => setRisk({ cooloffUntil: undefined })}>End now</button></div>}
         <div>
           <div className="mb-1 flex justify-between text-[12px]"><span className="text-fg-muted">Loss used today</span><span className="num">{inr(lossUsed)} of {inr(risk.maxLoss)}</span></div>
           <MeterBar label="Daily loss used" value={lossUsed} max={risk.maxLoss} warnAt={0.7} valueText={`${inr(lossUsed)} of ${inr(risk.maxLoss)}`} />
@@ -345,10 +345,10 @@ function RiskCenter({ net }: { net: number }) {
           <label htmlFor="r-loss">Max loss a day (₹)</label><input id="r-loss" type="number" step={1000} className={num} defaultValue={risk.maxLoss} onBlur={(e) => setRisk({ maxLoss: Math.max(500, +e.target.value) })} />
           <label htmlFor="r-prof">Lock profit at (₹)</label><input id="r-prof" type="number" step={1000} className={num} defaultValue={risk.maxProfit} onBlur={(e) => setRisk({ maxProfit: Math.max(500, +e.target.value) })} />
           <label htmlFor="r-tr">Max trades a day</label><input id="r-tr" type="number" className={num} defaultValue={risk.maxTrades} onBlur={(e) => setRisk({ maxTrades: Math.max(1, +e.target.value) })} />
-          <label htmlFor="r-co">Cool-off after losses in a row</label><input id="r-co" type="number" className={num} defaultValue={risk.cooloffAfter} onBlur={(e) => setRisk({ cooloffAfter: Math.max(1, +e.target.value) })} />
+          <label htmlFor="r-co">Take a break after losses in a row</label><input id="r-co" type="number" className={num} defaultValue={risk.cooloffAfter} onBlur={(e) => setRisk({ cooloffAfter: Math.max(1, +e.target.value) })} />
         </div>
         <LabeledSwitch label="Instant orders from the chart (Shift+B / Shift+S, no ticket)" checked={instant} onChange={(v) => set({ instant: v })} />
-        <Button variant="danger" size="sm" className="w-full" disabled={risk.killed} onClick={() => setToast(run({ t: 'risk', kill: true }, 'manual'))}>Kill switch: close everything and stop for today</Button>
+        <Button variant="danger" size="sm" className="w-full" disabled={risk.killed} onClick={() => setToast(run({ t: 'risk', kill: true }, 'manual'))}>Emergency stop: close everything and stop for today</Button>
       </div>
     </Popover>
   )
@@ -568,7 +568,7 @@ function Ticket({ sym, side: s0, px: px0, close, place: at = 'absolute z-30 left
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <SegmentedControl size="sm" label="Product" value={prod} onChange={setProd} options={[{ value: 'MIS', label: 'Intraday' }, { value: 'CNC', label: 'Delivery' }]} />
-        <SegmentedControl size="sm" label="Order type" value={ot} onChange={setOt} options={[{ value: 'MARKET', label: 'Market' }, { value: 'LIMIT', label: 'Limit' }, { value: 'SL-M', label: 'Stop entry' }]} />
+        <SegmentedControl size="sm" label="Order type" value={ot} onChange={setOt} options={[{ value: 'MARKET', label: 'Market' }, { value: 'LIMIT', label: 'Limit' }, { value: 'SL-M', label: 'At trigger' }]} />
       </div>
       <div className="mt-3 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-[12px]">
         <label htmlFor="qt-qty" className="text-fg-subtle">Quantity</label>
@@ -651,7 +651,7 @@ function ExitPlan({ k }: { k: string }) {
       <input aria-label="Stop" placeholder="Stop" className={f} value={sl} onChange={(e) => setSl(e.target.value)} />
       <input aria-label="Target" placeholder="Target" className={f} value={tg} onChange={(e) => setTg(e.target.value)} />
       <input aria-label="Trail by points" placeholder="Trail" className={cn(f, 'w-14')} value={tr} onChange={(e) => setTr(e.target.value)} />
-      <IconButton size="sm" label="Save exit plan" onClick={() => { setBracket(k, { sl: sl ? +sl : undefined, tgt: tg ? +tg : undefined, trail: tr ? +tr : undefined, peak: undefined }); setToast(`Exit plan saved for ${labelOf(k)}`); setOpen(false) }}><CheckIcon width={12} height={12} /></IconButton>
+      <IconButton size="sm" label="Save stop & target" onClick={() => { setBracket(k, { sl: sl ? +sl : undefined, tgt: tg ? +tg : undefined, trail: tr ? +tr : undefined, peak: undefined }); setToast(`Stop and target saved for ${labelOf(k)}`); setOpen(false) }}><CheckIcon width={12} height={12} /></IconButton>
       <IconButton size="sm" label="Cancel" onClick={() => setOpen(false)}><XIcon width={10} height={10} /></IconButton>
     </span>
   )
@@ -679,7 +679,7 @@ function Bottom() {
       <div className="flex h-12 shrink-0 items-center gap-4 overflow-x-auto border-b border-line px-4">
         {/* Underline tabs, like a broker's panel: the count rides with each name, and the active one is the only bold thing. */}
         <div role="tablist" aria-label="Panel" className="-mb-px flex h-12 shrink-0 items-stretch gap-4">
-          {([['pos', 'Positions', open], ['ord', 'Orders', working], ['gtt', 'Alerts and GTT', active], ['log', 'Activity', undefined]] as const).map(([v, l, n]) => (
+          {([['pos', 'Positions', open], ['ord', 'Orders', working], ['gtt', 'Alerts and triggers', active], ['log', 'Activity', undefined]] as const).map(([v, l, n]) => (
             <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => setTab(v)}
               className={cn('flex items-center gap-1.5 border-b-2 text-[12px] transition-colors', tab === v && open_ ? 'border-fg font-medium text-fg' : 'border-transparent text-fg-muted hover:text-fg')}>
               {l}{n != null && <span className={cn('num rounded px-1 text-[10px] leading-4', n ? 'bg-sunken text-fg' : 'text-fg-subtle')}>{n}</span>}</button>))}
@@ -689,16 +689,16 @@ function Bottom() {
         <IconButton size="sm" className={cn('shrink-0', !(tab === 'pos' && open > 0) && 'ml-auto')} label={open_ ? 'Fold positions panel ( \\ )' : 'Open positions panel ( \\ )'} onClick={() => s.togglePanel('bottom')}><ChevronIcon width={14} height={14} className={open_ ? 'rotate-90' : '-rotate-90'} /></IconButton>
       </div>
       <div className="scroll-thin min-h-0 flex-1 overflow-auto" hidden={!open_}>
-        {tab === 'pos' && <table className="tbl"><thead><tr><th>Instrument</th><th>Product</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&amp;L</th><th>Exit plan</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
+        {tab === 'pos' && <table className="tbl"><thead><tr><th>Name</th><th>Type</th><th>Qty</th><th>Avg price</th><th>Price</th><th>P&amp;L</th><th>Stop &amp; target</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
           {pos.map((x) => { const l = s.ltp(x.key); const pl = (l - x.avg) * x.qty + x.realized; return <tr key={x.key} className={cn('group cursor-pointer', drawer?.kind === 'pos' && drawer.key === x.key && '[&>td]:!bg-[var(--surface-hover)]')} onClick={(e) => rowClick(e, { kind: 'pos', key: x.key })}>
-            <td className="!font-sans"><button className="hover:underline" onClick={() => { s.setSym(parseKey(x.key).und); s.setView(parseKey(x.key).strike ? 'chain' : 'chart') }}>{labelOf(x.key)}</button>{x.qty ? <TagPicker value={isSetupTag(x.tag) ? x.tag : undefined} onChange={(t) => s.tagPosition(x.key, t)} className="ml-2 align-middle [&>button]:h-6 [&>button]:text-[11px]" /> : isSetupTag(x.tag) && <span className="ml-2 text-[11px] text-fg-subtle">{tagLabel(x.tag!)}</span>}</td><td className="text-fg-muted">{x.product}</td>
+            <td className="!font-sans"><button className="hover:underline" onClick={() => { s.setSym(parseKey(x.key).und); s.setView(parseKey(x.key).strike ? 'chain' : 'chart') }}>{labelOf(x.key)}</button>{x.qty ? <TagPicker value={isSetupTag(x.tag) ? x.tag : undefined} onChange={(t) => s.tagPosition(x.key, t)} className="ml-2 align-middle [&>button]:h-6 [&>button]:text-[11px]" /> : isSetupTag(x.tag) && <span className="ml-2 text-[11px] text-fg-subtle">{tagLabel(x.tag!)}</span>}</td><td className="text-fg-muted">{prodLabel(x.product)}</td>
             <td className={x.qty > 0 ? 'text-up' : x.qty < 0 ? 'text-down' : 'text-fg-subtle'}>{x.qty > 0 ? '+' : ''}{x.qty}</td>
             <td>{x.avg ? x.avg.toFixed(2) : '—'}</td><td>{l.toFixed(2)}</td><td><Money v={pl} /></td><td><ExitPlan k={x.key} /></td>
             <td className="relative w-px">{x.qty !== 0 && <PositionActions k={x.key} onAdd={() => setAddTo(x.key)} onOpen={setDrawer} />}</td></tr> })}
-          {!pos.length && empty(8, <>No positions yet. Press <KeyHint>B</KeyHint> on the chart, or ask the agent: <i>buy 50 sbin with sl 850</i>.</>)}
+          {!pos.length && empty(8, <>No positions yet. Press <KeyHint>B</KeyHint> on the chart, or ask the assistant: <i>buy 50 sbin with sl 850</i>.</>)}
         </tbody></table>}
         {tab === 'ord' && <table className="tbl"><thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th>Qty</th><th>Type</th><th>Price</th><th>Status</th><th>Source</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
-          {s.orders.map((o) => <tr key={o.id} className={cn('cursor-pointer', drawer?.kind === 'order' && drawer.id === o.id && '[&>td]:!bg-[var(--surface-hover)]')} onClick={(e) => rowClick(e, { kind: 'order', id: o.id })} title="Open order details"><td>{o.time}</td><td className="!font-sans">{labelOf(o.key)}{o.tag && <span className="ml-2 text-[11px] text-fg-subtle">{o.tag}</span>}</td><td className={o.side === 'BUY' ? 'text-up' : 'text-down'}>{o.side}</td><td>{o.qty}</td><td>{o.otype} · {o.product}</td>
+          {s.orders.map((o) => <tr key={o.id} className={cn('cursor-pointer', drawer?.kind === 'order' && drawer.id === o.id && '[&>td]:!bg-[var(--surface-hover)]')} onClick={(e) => rowClick(e, { kind: 'order', id: o.id })} title="Open order details"><td>{o.time}</td><td className="!font-sans">{labelOf(o.key)}{o.tag && <span className="ml-2 text-[11px] text-fg-subtle">{o.tag}</span>}</td><td className={o.side === 'BUY' ? 'text-up' : 'text-down'}>{o.side}</td><td>{o.qty}</td><td>{o.otype} · {prodLabel(o.product)}</td>
             <td>{o.status === 'TRIGGER_PENDING' ? `trg ${o.trigger?.toFixed(2)}` : (o.fill ?? o.price).toFixed(2)}</td>
             <td><Badge tone={o.status === 'COMPLETE' ? 'success' : o.status === 'REJECTED' ? 'danger' : 'neutral'} title={o.note}>{statusOf(o)}</Badge>{o.note && <span className="ml-2 font-sans text-[11px] text-down">{o.note}</span>}</td>
             <td className="!font-sans text-fg-subtle">{o.via === 'ai' ? <span className="inline-flex items-center gap-1"><AIMark size={16} />AI</span> : o.via}</td>
@@ -706,7 +706,7 @@ function Bottom() {
           {!s.orders.length && empty(9, 'No orders today.')}
         </tbody></table>}
         {tab === 'gtt' && <table className="tbl"><thead><tr><th>Symbol</th><th>Condition</th><th>Then</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
-          {s.triggers.map((t) => <tr key={t.id}><td className="!font-sans font-bold">{t.sym}</td><td>LTP {t.dir} {t.price}</td><td className="!font-sans">{t.then ? describe(t.then) : 'Notify me'}</td><td><Badge tone={t.done ? 'success' : 'info'}>{t.done ? 'Triggered' : 'Active'}</Badge></td>
+          {s.triggers.map((t) => <tr key={t.id}><td className="!font-sans font-bold">{t.sym}</td><td>Price {t.dir} {t.price}</td><td className="!font-sans">{t.then ? describe(t.then) : 'Notify me'}</td><td><Badge tone={t.done ? 'success' : 'info'}>{t.done ? 'Triggered' : 'Active'}</Badge></td>
             <td><IconButton size="sm" label={`Delete alert on ${t.sym}`} onClick={() => s.removeTrigger(t.id)}><XIcon width={10} height={10} /></IconButton></td></tr>)}
           {!s.triggers.length && empty(5, <>No alerts. Press <KeyHint>Alt</KeyHint>+<KeyHint>A</KeyHint> on the chart, or ask: <i>alert me when nifty crosses 25000</i>.</>)}
         </tbody></table>}
@@ -728,7 +728,7 @@ function describe(a: Action): string {
     case 'legs': return `${a.name ?? 'Strategy'} on ${a.und}: ` + a.legs.map((l) => `${l.side === 'BUY' ? 'buy' : 'sell'} ${l.lots}× ${l.strike} ${l.type}`).join(', ')
     case 'squareoff': return a.key ? `Close ${labelOf(a.key)} at market` : 'Close every open position at market and cancel working orders'
     case 'trigger': return `When ${a.sym} goes ${a.dir} ${a.price}: ${a.then ? describe(a.then).toLowerCase() : 'notify me'}`
-    case 'risk': return a.kill ? 'Kill switch: close all positions, cancel orders, block new entries today' : 'Update risk limits'
+    case 'risk': return a.kill ? 'Emergency stop: close all positions, cancel orders, no new entries today' : 'Update risk limits'
     case 'sip': return `Monthly SIP ₹${a.amount.toLocaleString('en-IN')} into ${a.sym} on day ${a.day ?? 5}`
     default: return a.t
   }
@@ -746,17 +746,17 @@ export function Palette() {
       { label: 'Morning brief', hint: 'AI', run: () => ask('brief me') },
       { label: 'Review my trades', hint: 'AI', run: () => ask('review my trades') },
       { label: 'Explain my P&L', hint: 'AI', run: () => ask('explain my pnl') },
-      { label: 'Exit all positions', hint: 'Command', run: () => ask('square off all') },
-      { label: 'Kill switch', hint: 'Command', run: () => ask('kill switch') },
+      { label: 'Exit all positions', hint: 'Command', run: () => ask('close all positions') },
+      { label: 'Emergency stop', hint: 'Command', run: () => ask('stop trading for today') },
       { label: 'Toggle dark theme', hint: 'Command', run: () => st.toggleTheme() },
-      { label: 'Take the Terminal tour', hint: 'Help', run: () => { useLearn.getState().set({ tour: 'pending' }); switchLayout(false); setTimeout(() => useLearn.getState().set({ tour: 'running' }), 900) } },
+      { label: 'Take the tour of the charts screen', hint: 'Help', run: () => { useLearn.getState().set({ tour: 'pending' }); switchLayout(false); setTimeout(() => useLearn.getState().set({ tour: 'running' }), 900) } },
       { label: 'Getting started checklist', hint: 'Help', run: () => { const l = useLearn.getState(); if (l.started) l.set({ hidden: false, open: true }); else l.start(); switchLayout(true) } },
       { label: 'Keyboard shortcuts', hint: '?', run: () => useStore.setState({ shortcuts: true }) },
-      { label: 'Reset paper account (cash, positions, orders)', hint: 'Account', run: () => { if (window.confirm('Reset the paper account? Positions, orders, alerts and trade history go back to the starting state. Chat and settings stay.')) resetBook() } },
+      { label: 'Reset practice account (cash, positions, orders)', hint: 'Account', run: () => { if (window.confirm('Reset the practice account? Positions, orders, alerts and trade history go back to the starting state. Chat and settings stay.')) resetBook() } },
       { label: 'New conversation (clear chat history)', hint: 'Chat', run: () => { if (window.confirm('Clear the conversation? Positions and orders are not affected.')) st.clearChat() } },
       { label: st.panels.watch ? 'Hide watchlist' : 'Show watchlist', hint: '[', run: () => st.togglePanel('watch') },
-      { label: st.panels.copilot ? 'Hide the AI agent' : 'Show the AI agent', hint: ']', run: () => st.togglePanel('copilot') },
-      { label: st.panels.chatFull ? 'Switch to Terminal' : 'Switch to Agent', hint: 'Layout', run: () => switchLayout(!st.panels.chatFull) },
+      { label: st.panels.copilot ? 'Hide the assistant' : 'Show the assistant', hint: ']', run: () => st.togglePanel('copilot') },
+      { label: st.panels.chatFull ? 'Switch to Charts' : 'Switch to Chat', hint: 'Layout', run: () => switchLayout(!st.panels.chatFull) },
       { label: st.panels.bottom ? 'Fold positions panel' : 'Open positions panel', hint: '\\', run: () => st.togglePanel('bottom') },
       { label: st.panels.focus ? 'Leave focus mode' : 'Focus mode: hide all panels', hint: 'Shift+F', run: () => st.togglePanel('focus') },
       { label: 'Reset layout', hint: 'Command', run: () => { st.setPanels({ watch: true, copilot: true, bottom: true, watchW: 240, copilotW: 380, bottomH: 240, focus: false, chips: true }); try { localStorage.removeItem('sections') } catch { /* storage unavailable */ } st.set({ sections: {} }) } },
@@ -766,7 +766,7 @@ export function Palette() {
     const syms = INSTS.filter((i) => !t || i.sym.toLowerCase().includes(t) || i.name.toLowerCase().includes(t)).slice(0, 6).map((i) => ({ label: `${i.sym}  ·  ${i.name}`, hint: 'Chart', run: () => { st.setSym(i.sym); st.setView('chart') } }))
     const matched = cmds.filter((c) => !t || c.label.toLowerCase().includes(t))
     const out = [...syms, ...matched]
-    if (t) out.unshift({ label: `Ask the agent: “${q}”`, hint: 'AI', run: () => ask(q) })
+    if (t) out.unshift({ label: `Ask the assistant: “${q}”`, hint: 'AI', run: () => ask(q) })
     return out.slice(0, 12)
   }, [q])
   useEffect(() => { if (open) setTimeout(() => input.current?.focus(), 0) }, [open])
@@ -801,7 +801,7 @@ export function FnoDisclosure() {
           <li><b className="text-fg">9 out of 10 individual traders in equity F&amp;O lost money</b> in FY25, according to SEBI's study. The average net loss was about ₹1.1 lakh per person.</li>
           <li>Loss-makers also paid transaction costs on top of their losses. Option STT is 0.15% of premium on the sell side.</li>
           <li>Selling options can lose far more than the premium you collect.</li>
-          <li>This terminal is paper trading on simulated prices. Nothing reaches an exchange.</li>
+          <li>This is practice trading on simulated prices. Nothing reaches an exchange.</li>
         </ul>
         <div className="mt-5 flex gap-2"><Button onClick={accept}>I understand the risks</Button><Button variant="ghost" onClick={() => useStore.setState({ needAck: false })}>Not now</Button></div>
       </div>

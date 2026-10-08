@@ -21,7 +21,7 @@ const sign = (n: number) => (n > 0 ? '+' : '') + inr(n)
 const pc = (n: number) => `${Math.round(n * 100)}%`
 /** Sample option keys carry exp 'PAST'; show them as expired contracts. */
 const label = (key: string) => { const k = parseKey(key); return k.strike ? `${k.und} ${k.strike} ${k.type}${k.exp === 'PAST' ? '' : ' ' + k.exp}` : k.und }
-const kind = (t: Trade) => (parseKey(t.key).strike ? 'Options' : t.product === 'CNC' ? 'Equity delivery' : 'Equity intraday')
+const kind = (t: Trade) => (parseKey(t.key).strike ? 'Options' : t.product === 'CNC' ? 'Stocks, delivery' : 'Stocks, intraday')
 
 type Group = { k: string; n: number; wins: number; net: number }
 function group(ts: T[], key: (t: T) => string, order?: string[]): Group[] {
@@ -128,8 +128,8 @@ export default function Journal() {
           <div className="dense-stats grid grid-cols-2 gap-3 @2xl:grid-cols-3 @6xl:grid-cols-6">
             <StatTile label="Net P&L" serif value={sign(s.net)} detail={`Gross ${sign(s.gross)}`} />
             <StatTile label="Win rate" serif value={pc(s.winRate)} detail={`${s.wins.length} won · ${s.losses.length} lost · ${new Set(ts.map((t) => t.day)).size} days`} />
-            <StatTile label="Profit factor" serif value={Number.isFinite(s.pf) ? s.pf.toFixed(2) : 'No losses'} detail="Won ÷ lost, above 1 is profitable" />
-            <StatTile label="Expectancy" serif value={sign(s.exp)} detail="Average net per trade" />
+            <StatTile label="Profit ratio" serif value={Number.isFinite(s.pf) ? s.pf.toFixed(2) : 'No losses'} detail="Won ÷ lost, above 1 is profitable" />
+            <StatTile label="Average per trade" serif value={sign(s.exp)} detail="What a typical trade earns after charges" />
             <StatTile label="Avg win / avg loss" serif value={`${inrShort(s.avgWin)} / ${inrShort(s.avgLoss)}`} detail={s.avgLoss ? `Reward to risk ${(s.avgWin / s.avgLoss).toFixed(2)}` : undefined} />
             <StatTile label="Charges paid" serif value={inr(s.charges)} needsAction={chPct >= 0.25} actionText="Look at this"
               detail={chPct ? `${pc(chPct)} of gross ${s.gross > 0 ? 'P&L' : 'profit'}` : undefined} />
@@ -147,17 +147,17 @@ export default function Journal() {
 
           <div className="grid items-start gap-4 xl:grid-cols-2">
             <Calendar ts={ts} period={period} />
-            <Section id="journal.equity" title="Equity curve" summary={<>Net <Money v={s.net} /> over {curve.x.length} trading day{curve.x.length === 1 ? '' : 's'}</>}>
+            <Section id="journal.equity" title="Account growth" summary={<>Net <Money v={s.net} /> over {curve.x.length} trading day{curve.x.length === 1 ? '' : 's'}</>}>
               <LineChart series={[{ id: 'eq', label: 'Cumulative net P&L', data: curve.y }]} x={curve.x} formatValue={inrShort} height={200} zeroBaseline ariaLabel="Cumulative net P&L by day" />
             </Section>
           </div>
 
           <Section id="journal.breakdowns" title="Breakdowns" defaultOpen={false} summary="By weekday, setup, source, exit and instrument" bodyClassName="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             <Weekdays rows={br.weekday} />
-            <Breakdown title="By setup" head="Tag" rows={br.tag} />
-            <Breakdown title="By source" head="Placed via" rows={br.via} />
+            <Breakdown title="By strategy" head="Strategy" rows={br.tag} />
+            <Breakdown title="By how it was placed" head="Placed by" rows={br.via} />
             <Breakdown title="By exit" head="Exit reason" rows={br.exit} />
-            <Breakdown title="By instrument" head="Type" rows={br.kind} />
+            <Breakdown title="By type of trade" head="Type" rows={br.kind} />
           </Section>
 
           <Section id="journal.log" title="Trade log" sub={`${log.length} trades`} defaultOpen={false} summary={`${log.length} trade${log.length === 1 ? '' : 's'}`} bodyClassName="!px-0 !pb-0">

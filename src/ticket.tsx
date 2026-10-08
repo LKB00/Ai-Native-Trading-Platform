@@ -103,14 +103,14 @@ export function TagPicker({ value, onChange, className }: { value?: string; onCh
   const opts = useSetupOptions(); const paused = useStore((s) => s.rules.pausedSetups) ?? []
   const [draft, setDraft] = useState('')
   return (
-    <Popover label="Setup" align="start" side="top" className={className} trigger={({ toggle, triggerProps }) => (
+    <Popover label="Reason" align="start" side="top" className={className} trigger={({ toggle, triggerProps }) => (
       <button type="button" onClick={toggle} {...triggerProps} className={cn('inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[12px] transition-colors hover:border-line-strong',
         value ? 'border-line bg-sunken text-fg' : 'border-dashed border-line text-fg-subtle hover:text-fg')}>
-        {value ? <><span className="text-fg-subtle">Setup</span>{tagLabel(value)}</> : '+ Setup'}
+        {value ? <><span className="text-fg-subtle">Reason</span>{tagLabel(value)}</> : '+ Reason'}
       </button>)}>
       {({ close }) => <div className="w-56 p-1.5 text-[12px]">
         <p className="px-2 pb-1.5 pt-1 text-[11px] text-fg-subtle">Why this trade? The journal groups results by it.</p>
-        <div role="listbox" aria-label="Setup" className="flex flex-wrap gap-1 px-1">
+        <div role="listbox" aria-label="Reason" className="flex flex-wrap gap-1 px-1">
           {opts.map((t) => { const off = paused.includes(t)
             return <button key={t} type="button" role="option" aria-selected={value === t} disabled={off} title={off ? `${tagLabel(t)} trades are paused by your rule` : undefined}
               onClick={() => { onChange(value === t ? undefined : t); close() }}

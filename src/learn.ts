@@ -15,7 +15,7 @@ type Learn = {
   done: Partial<Record<StepId, boolean>>
   /** The checklist card above the composer: collapsed or open, or put away. */
   open: boolean; hidden: boolean
-  /** The Terminal tour: waits for the first visit, runs, then stays off until asked for again. */
+  /** The charts tour: waits for the first visit, runs, then stays off until asked for again. */
   tour: 'off' | 'pending' | 'running'
   start: () => void
   set: (p: Partial<Learn>) => void

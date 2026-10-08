@@ -97,14 +97,14 @@ export default function Markets() {
         <div className="grid gap-4 @4xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 space-y-4">
             {/* Breadth */}
-            <Section id="markets.breadth" title="Market breadth" summary={`${a.adv} up · ${a.dec} down`}>
+            <Section id="markets.breadth" title="How many stocks are up" summary={`${a.adv} up · ${a.dec} down`}>
               <div className="flex h-7 overflow-hidden rounded-md text-[12px]" role="img" aria-label={`${a.adv} advancing, ${a.dec} declining`}>
                 <div className="flex items-center bg-success-soft px-3 text-success-fg" style={{ width: `${(a.adv / Math.max(a.adv + a.dec, 1)) * 100}%` }}><span className="num whitespace-nowrap"><Dir up /> {a.adv}</span></div>
                 <div className="flex flex-1 items-center justify-end bg-danger-soft px-3 text-danger-fg"><span className="num whitespace-nowrap"><Dir up={false} /> {a.dec}</span></div>
               </div>
               <div className="mt-1 flex justify-between text-[11px] text-fg-subtle"><span>Advancing</span><span>Declining</span></div>
               <div className="mt-4">
-                <div className="mb-1 flex justify-between text-[12px]"><span className="text-fg-muted">Above 200-day EMA</span><span className="num">{Math.round(a.above200 / Math.max(rows.length, 1) * 100)}%</span></div>
+                <div className="mb-1 flex justify-between text-[12px]"><span className="text-fg-muted">Above 200-day average</span><span className="num">{Math.round(a.above200 / Math.max(rows.length, 1) * 100)}%</span></div>
                 <MeterBar label="Stocks above 200-day EMA" value={a.above200} max={Math.max(rows.length, 1)} valueText={`${a.above200} of ${rows.length} stocks`} />
               </div>
             </Section>
@@ -142,7 +142,7 @@ export default function Markets() {
             <div className="grid gap-4 @2xl:grid-cols-3">
               <Movers id="markets.gainers" title="Top gainers" rows={a.gainers} open={open} />
               <Movers id="markets.losers" title="Top losers" rows={a.losers} open={open} />
-              <Movers id="markets.volume" title="Volume shockers" rows={a.shockers} open={open} vol />
+              <Movers id="markets.volume" title="Unusual volume" rows={a.shockers} open={open} vol />
             </div>
           </div>
 
@@ -190,7 +190,7 @@ export default function Markets() {
               </ul>
             </Section>
 
-            <p className="text-[11px] text-fg-subtle">All prices, flows and events here are simulated for paper trading. The AI briefing is generated and can be wrong; check before acting.</p>
+            <p className="text-[11px] text-fg-subtle">All prices, flows and events here are simulated for practice trading. The AI briefing is generated and can be wrong; check before acting.</p>
           </aside>
         </div>
       </div>

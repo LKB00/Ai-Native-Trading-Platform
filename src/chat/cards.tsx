@@ -470,7 +470,7 @@ function ExitPlanEditor({ k, onDone }: { k: string; onDone: () => void }) {
       </div>
       <p className={cn('mt-3 text-[12px] leading-5', bad ? 'text-danger-fg' : 'text-fg-muted')}>{bad ? `The stop is on the wrong side of the current price (${ltp.toFixed(2)}).` : `${sl ? `Stop risks ${inr(risk)} from your average.` : ''} Defaults are 2× and 4× the 15-minute ATR. Whichever is hit first closes the position.`}</p>
       <div className="mt-3 flex gap-2">
-        <Button size="sm" variant="primary" disabled={!!bad} onClick={() => { s.setBracket(k, { sl: sl ? +sl : undefined, tgt: tg ? +tg : undefined, trail: tr ? +tr : undefined, peak: undefined }); s.log('user', `Exit plan on ${labelOf(k)} from chat`); onDone() }}>Save exit plan</Button>
+        <Button size="sm" variant="primary" disabled={!!bad} onClick={() => { s.setBracket(k, { sl: sl ? +sl : undefined, tgt: tg ? +tg : undefined, trail: tr ? +tr : undefined, peak: undefined }); s.log('user', `Exit plan on ${labelOf(k)} from chat`); onDone() }}>Save stop & target</Button>
         <Button size="sm" variant="ghost" onClick={onDone}>Cancel</Button>
       </div>
     </div>
@@ -552,7 +552,7 @@ export function PositionsCard() {
   const used = Math.max(0, -pnl.net) / risk.maxLoss
   return (
     <Shell pad={false} title="Positions" meta={<span>{open.length} open{closed.length ? ` · ${closed.length} closed` : ''}</span>}
-      foot={<>{open.length > 1 && <Act onClick={() => say('square off all')}>Exit all</Act>}<Act onClick={() => say('explain my pnl')}>Explain my P&L</Act><span className="ml-auto" /><Act icon={<ArrowUpRight size={13} strokeWidth={1.75} />} onClick={() => openCanvas('portfolio')}>Portfolio</Act></>}>
+      foot={<>{open.length > 1 && <Act onClick={() => say('close all positions')}>Exit all</Act>}<Act onClick={() => say('explain my pnl')}>Explain my P&L</Act><span className="ml-auto" /><Act icon={<ArrowUpRight size={13} strokeWidth={1.75} />} onClick={() => openCanvas('portfolio')}>Portfolio</Act></>}>
       <div className="space-y-3 px-3.5 pb-3">
         <Hero label="Today, after charges"><Money v={pnl.net} /></Hero>
         {naked.length > 0 ? <Read tone="attention"><b>{naked.length === 1 ? `${labelOf(naked[0].key)} has no stop.` : `${naked.length} open positions have no stop.`}</b> Add one so a bad move can't run past your plan.</Read>
@@ -577,7 +577,7 @@ export function PositionsCard() {
 export function PositionCard({ k }: { k: string }) {
   const und = parseKey(k).und; const opt = !!parseKey(k).strike
   const exists = useStore((s) => !!s.positions[k])
-  if (!exists) return <Shell title={labelOf(k)}><p className="text-[13px] text-fg-muted">This position is no longer in your book. The paper account was reset after it was opened.</p></Shell>
+  if (!exists) return <Shell title={labelOf(k)}><p className="text-[13px] text-fg-muted">This position is no longer in your book. The practice account was reset after it was opened.</p></Shell>
   return <Shell pad={false} title="Position" meta={<span className="flex items-center gap-1.5"><span className="size-1.5 animate-pulse rounded-full bg-success" aria-hidden />Live</span>}>
     <div className="px-3.5 pb-1"><PositionRow k={k} compact /></div>
     {!opt && <div className="mt-3 border-t border-line px-1 pt-1"><MiniChart sym={und} kind="area" height={170} /></div>}
@@ -845,7 +845,7 @@ function OrderDraft({ msgId, i, a, live }: { msgId: number; i: number; a: OrderA
       {open && <div className="space-y-3 rounded-lg border border-line p-3.5 animate-rise">
         <div className="grid grid-cols-2 gap-3 @lg:grid-cols-3">
           <div className="@max-lg:col-span-2"><p className="text-[11px] text-fg-subtle">Side</p><div className="mt-1"><Seg label="Side" value={a.side} onChange={(side) => set({ side, sl: undefined, tgt: undefined })} options={[{ v: 'BUY', l: 'Buy', tone }, { v: 'SELL', l: 'Sell', tone }]} /></div></div>
-          {opt ? <Stat label="Product">F&O carry (NRML)</Stat>
+          {opt ? <Stat label="Type">Carry forward (options)</Stat>
             : <div><p className="text-[11px] text-fg-subtle">Product</p><div className="mt-1"><Seg label="Product" value={a.product === 'CNC' ? 'CNC' : 'MIS'} onChange={(product) => set({ product })} options={[{ v: 'MIS', l: 'Intraday' }, { v: 'CNC', l: 'Delivery' }]} /></div></div>}
           <div><p className="text-[11px] text-fg-subtle">Type</p><div className="mt-1"><Seg label="Order type" value={a.otype === 'LIMIT' ? 'LIMIT' : 'MARKET'} onChange={(v) => set(v === 'LIMIT' ? { otype: 'LIMIT', price: +ltp.toFixed(1) } : { otype: 'MARKET', price: undefined })} options={[{ v: 'MARKET', l: 'Market' }, { v: 'LIMIT', l: 'Limit' }]} /></div></div>
         </div>
@@ -932,7 +932,7 @@ function StrategyLive({ keys }: { keys: string[] }) {
   )
 }
 
-const TITLE: Record<string, string> = { order: 'Order', legs: 'Strategy', squareoff: 'Exit', trigger: 'Conditional order', risk: 'Kill switch', sip: 'SIP' }
+const TITLE: Record<string, string> = { order: 'Order', legs: 'Strategy', squareoff: 'Exit', trigger: 'Conditional order', risk: 'Emergency stop', sip: 'SIP' }
 /** The draft's title as plain text, for one-line places like the discarded row. */
 function plainTitle(a: Action) {
   if (a.t === 'order') return `${a.side === 'BUY' ? 'Buy' : 'Sell'} ${a.qty} ${a.strike ? `${a.und} ${a.strike} ${a.ot}` : a.und}`
@@ -970,7 +970,7 @@ export function DraftCard({ msgId }: { msgId: number }) {
       <X size={13} strokeWidth={1.75} aria-hidden /><span className="min-w-0 truncate"><span className="text-fg-muted">Discarded</span> · {m.pending.length === 1 ? plainTitle(m.pending[0]) : `${m.pending.length} actions`}</span><span className="ml-auto shrink-0">nothing was sent</span>
     </div>
   )
-  const verb = m.pending[0].t === 'order' ? 'Place order' : m.pending[0].t === 'legs' ? `Place ${m.pending[0].legs.length} orders` : m.pending[0].t === 'squareoff' ? 'Exit' : m.pending[0].t === 'risk' ? 'Turn on kill switch' : m.pending[0].t === 'sip' ? 'Start SIP' : 'Confirm'
+  const verb = m.pending[0].t === 'order' ? 'Place order' : m.pending[0].t === 'legs' ? `Place ${m.pending[0].legs.length} orders` : m.pending[0].t === 'squareoff' ? 'Exit' : m.pending[0].t === 'risk' ? 'Stop trading for today' : m.pending[0].t === 'sip' ? 'Start SIP' : 'Confirm'
   return (
     <Shell className={cn(live && !blocked && '!border-[var(--attention)] ring-1 ring-[var(--attention)]', blocked && 'opacity-80')}
       title={m.pending.length === 1 ? draftTitle(m.pending[0]) : `${m.pending.length} actions`}
@@ -980,11 +980,11 @@ export function DraftCard({ msgId }: { msgId: number }) {
         <Button size="sm" variant="ghost" leading={<X size={12} strokeWidth={1.5} />} onClick={() => dismiss(msgId)}>Discard</Button>
         {blocked && gate ? <span className="ml-auto flex min-w-0 items-center gap-1.5 text-[12px] text-fg-muted" title={gate.why}><GateIcon g={gate} size={12} /><span className="truncate">{gate.short}. This draft can't be placed until entries reopen.</span></span>
           : broken ? <span className="ml-auto text-[12px] text-fg-muted">Breaks one of your rules. Fix it above, or change your rules.</span>
-          : <span className="ml-auto text-[11px] text-fg-subtle">Paper trade · checks run again when you place it</span>}
+          : <span className="ml-auto text-[11px] text-fg-subtle">Practice trade · checks run again when you place it</span>}
       </> : undefined}>
       {live
         ? <div className="space-y-4">{m.pending.map((a, i) => a.t === 'order' ? <OrderDraft key={i} msgId={msgId} i={i} a={a} live /> : a.t === 'legs' ? <StrategyDraft key={i} msgId={msgId} i={i} a={a} /> : <p key={i} className="text-[13px] text-fg">{describeOther(a)}</p>)}</div>
-        : m.state === 'confirmed' && m.orderIds?.length && !known ? <p className="text-[12px] text-fg-subtle">These orders are no longer in your book. The paper account was reset after they were placed.</p>
+        : m.state === 'confirmed' && m.orderIds?.length && !known ? <p className="text-[12px] text-fg-subtle">These orders are no longer in your book. The practice account was reset after they were placed.</p>
         : m.state === 'confirmed' && m.orderIds?.length ? <OrderTracker ids={m.orderIds} />
         : <p className="text-[12px] text-fg-subtle">{m.state === 'confirmed' ? m.pending.map(describeOther).filter(Boolean).join(' ') || 'Done.' : 'Nothing was sent.'}</p>}
     </Shell>
@@ -1141,13 +1141,13 @@ export function SetupCard({ first, onFinish }: { first?: boolean; onFinish?: () 
   const maxLoss = loss ?? (exp === 'new' ? 2000 : exp === 'pro' ? 10000 : 5000)
   const plan = style && exp ? planFor(style, exp, themes, maxLoss) : null
   const chip = (on: boolean) => cn('rounded-md border px-3 py-1.5 text-left text-[13px] transition-colors', on ? 'border-fg bg-fg text-[var(--bg)]' : 'border-line bg-surface text-fg hover:border-line-strong hover:bg-hover')
-  if (done) return <Shell title="Desk set up"><p className="text-[13px] text-fg-muted">Done. Your limits, rules and watchlist are in place; ask to “set up my desk” any time to change them.</p></Shell>
+  if (done) return <Shell title="All set"><p className="text-[13px] text-fg-muted">Done. Your limits, rules and watchlist are in place; ask to “change my setup” any time to change them.</p></Shell>
   return (
-    <Shell pad={false} title={first ? 'Set up your desk' : 'Desk setup'} meta={<span>30 seconds</span>}
-      foot={<><Button size="sm" variant="primary" disabled={!plan} onClick={() => { applySetup(style!, exp!, themes, maxLoss); setDone(true); onFinish?.() }}>Set up my desk</Button>
+    <Shell pad={false} title={first ? 'A few quick questions' : 'Your preferences'} meta={<span>30 seconds</span>}
+      foot={<><Button size="sm" variant="primary" disabled={!plan} onClick={() => { applySetup(style!, exp!, themes, maxLoss); setDone(true); onFinish?.() }}>Save and continue</Button>
         {first && <Button size="sm" variant="ghost" onClick={() => { skipSetup(); setDone(true); onFinish?.() }}>Skip for now</Button>}
         <span className="ml-auto text-[11px] text-fg-subtle">You can change all of this later</span></>}>
-      <div className="px-3.5 pb-3"><Read><b>Four quick questions, so I can set limits and rules that fit how you trade.</b> Paper money, simulated prices, nothing real at stake.</Read></div>
+      <div className="px-3.5 pb-3"><Read><b>Four quick questions, so I can set limits and rules that fit how you trade.</b> Practice money, simulated prices, nothing real at stake.</Read></div>
       <div className="divide-y divide-line border-t border-line">
         <Q n={1} q="How do you trade?">{STYLES.map((o) => <button key={o.v} type="button" aria-pressed={style === o.v} onClick={() => setStyle(o.v)} className={chip(style === o.v)}><span className="block font-medium">{o.l}</span><span className={cn('block text-[11px]', style === o.v ? 'opacity-70' : 'text-fg-subtle')}>{o.d}</span></button>)}</Q>
         <Q n={2} q="How long have you been trading?">{EXPERIENCE.map((o) => <button key={o.v} type="button" aria-pressed={exp === o.v} onClick={() => setExp(o.v)} className={chip(exp === o.v)}>{o.l}</button>)}</Q>
@@ -1177,7 +1177,7 @@ export function SetupsCard() {
   const list = setupsFor(watch, ltp)
   const pct = rules.maxRiskPct ?? 0.5; const budget = cash * pct / 100
   return (
-    <Shell pad={false} title="Today's setups" meta={<span>from your watchlist</span>}>
+    <Shell pad={false} title="Today's trade ideas" meta={<span>from your watchlist</span>}>
       <div className="px-3.5 pb-3"><Read><b>{list.length ? `${list.length} of your ${watch.length} watchlist names are at a decision point.` : 'Nothing on your watchlist is at a decision point right now.'}</b> {list.length ? `Price structure only, not advice. Quantities risk about ${inr(budget)} each (${pct}% of capital) if the stop is hit.` : 'Add names to your watchlist, or ask again later in the session.'}</Read></div>
       {list.length > 0 && <ul className="divide-y divide-line border-t border-line">{list.map((x) => {
         const qty = Math.max(1, Math.floor(budget / Math.max(x.entry - x.stop, 0.05)))
@@ -1189,7 +1189,7 @@ export function SetupsCard() {
               <span className="rounded bg-sunken px-1.5 py-px text-[10px] font-medium text-fg-muted">{x.kind}</span>
               <span className="ml-auto flex gap-1.5">
                 <Act onClick={() => say(`${lower(x.sym)} chart`)}>Chart</Act>
-                <Act onClick={() => propose(`Set a GTT on ${x.sym}`, `When ${x.sym} goes above ₹${fmt(x.entry)}, buy ${qty} with a stop at ₹${fmt(x.stop)} and a target at ₹${fmt(x.target)}. Approve to set it; it then places itself, inside your limits and rules.`, [{ t: 'trigger', sym: x.sym, dir: x.dir, price: x.entry, then: order }])}>Set GTT</Act>
+                <Act onClick={() => propose(`Set a price trigger on ${x.sym}`, `When ${x.sym} goes above ₹${fmt(x.entry)}, buy ${qty} with a stop at ₹${fmt(x.stop)} and a target at ₹${fmt(x.target)}. Approve to set it; it then places itself, inside your limits and rules.`, [{ t: 'trigger', sym: x.sym, dir: x.dir, price: x.entry, then: order }])}>Set price trigger</Act>
               </span>
             </div>
             <p className="mt-0.5 truncate text-[12px] text-fg-subtle">{x.why}</p>

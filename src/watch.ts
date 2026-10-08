@@ -37,7 +37,7 @@ function check() {
     }
     if (toStop != null) once('stop', toStop >= 1 - NEAR_STOP, toStop < 1 - REARM, () => {
       const gap = Math.abs(ltp - br!.sl!) / ltp * 100
-      s.event(`**${label} is ${gap.toFixed(1)}% from your stop** at ${px(br!.sl!)}, now ${px(ltp)} (${inr(pl)} open). If it hits, the stop closes it. Hold, or exit now?`, 'attention', [{ k: 'position', key: p.key }], [`square off ${und}`, `manage ${und}`])
+      s.event(`**${label} is ${gap.toFixed(1)}% from your stop** at ${px(br!.sl!)}, now ${px(ltp)} (${inr(pl)} open). If it hits, the stop closes it. Hold, or exit now?`, 'attention', [{ k: 'position', key: p.key }], [`close ${und}`, `manage ${und}`])
     })
     if (toTarget != null) once('target', toTarget >= 1 - NEAR_TARGET, toTarget < 1 - REARM, () => {
       const trail = +(Math.abs(br!.tgt! - p.avg) * 0.5).toFixed(1)
@@ -46,7 +46,7 @@ function check() {
     if (br?.sl == null && !parseKey(p.key).strike) {
       const against = (long ? p.avg - ltp : ltp - p.avg) / p.avg * 100
       once('naked', against >= NAKED_MOVE, against < NAKED_MOVE / 3, () => {
-        s.event(`**${label} is ${against.toFixed(1)}% against you with no stop** (${inr(pl)} open). Nothing limits the loss from here.`, 'attention', [{ k: 'position', key: p.key }], [`protect my ${und}`, `square off ${und}`])
+        s.event(`**${label} is ${against.toFixed(1)}% against you with no stop** (${inr(pl)} open). Nothing limits the loss from here.`, 'attention', [{ k: 'position', key: p.key }], [`protect my ${und}`, `close ${und}`])
       })
     }
   }

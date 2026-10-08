@@ -139,7 +139,7 @@ type S = {
   set: (p: Partial<S>) => void
 }
 
-const WELCOME: Msg = { id: 0, role: 'ai', text: "I'm your trading copilot. Ask in plain English. I draft orders, scans and plans, and nothing executes until you approve it.\n\nTry:\n- **brief me** for the morning summary\n- **buy 50 sbi with sl 850 target 900**\n- **stocks above 200 ema with rsi over 60 in banks**\n- **iron condor on nifty 2 lots**\n- **draw levels on reliance**\n- **review my trades**" }
+const WELCOME: Msg = { id: 0, role: 'ai', text: "I'm your trading assistant. Ask in plain English. I draft orders, scans and plans, and nothing executes until you approve it.\n\nTry:\n- **brief me** for the morning summary\n- **buy 50 sbi with sl 850 target 900**\n- **stocks above 200 ema with rsi over 60 in banks**\n- **iron condor on nifty 2 lots**\n- **draw levels on reliance**\n- **review my trades**" }
 
 // ---- Paper book: orders, positions, exit plans, alerts, trades, holdings, SIPs, cash and prices, kept in this
 // browser so a reload continues the same trading day instead of starting over.
@@ -407,14 +407,14 @@ export const useStore = create<S>((set, get) => ({
     if (!r.killed && Object.values(get().positions).some((x) => x.qty)) {
       if (pl.net <= -r.maxLoss) { get().squareoff(undefined, 'max loss'); get().setRisk({ killed: true, reason: `Daily loss limit of ₹${r.maxLoss.toLocaleString('en-IN')} reached` }); get().event('**Daily loss limit reached.** I closed all positions and locked new trades for today. Exits still work.', 'bad', [{ k: 'risk' }], ['review my trades']) }
       else if (pl.net >= r.maxProfit) { get().squareoff(undefined, 'max profit'); get().setRisk({ killed: true, reason: `Daily profit target of ₹${r.maxProfit.toLocaleString('en-IN')} locked in` }); get().event('**Profit target reached.** I closed positions and locked the profit for today.', 'good', [{ k: 'risk' }]) }
-      else if (pl.net <= -r.maxLoss * 0.8 && !warned) { warned = true; get().event(`**You're at ${Math.round(-pl.net / r.maxLoss * 100)}% of today's loss limit.** At ₹${r.maxLoss.toLocaleString('en-IN')} I close everything automatically.`, 'attention', [{ k: 'positions' }], ['square off all', 'tighten my stops']) }
+      else if (pl.net <= -r.maxLoss * 0.8 && !warned) { warned = true; get().event(`**You're at ${Math.round(-pl.net / r.maxLoss * 100)}% of today's loss limit.** At ₹${r.maxLoss.toLocaleString('en-IN')} I close everything automatically.`, 'attention', [{ k: 'positions' }], ['close all positions', 'tighten my stops']) }
     }
     // Alerts and GTTs.
     for (const t of get().triggers.filter((t) => !t.done && !t.paused)) {
       const l = p[t.sym].ltp
       if ((t.dir === 'above' && l >= t.price) || (t.dir === 'below' && l <= t.price)) {
         set({ triggers: get().triggers.map((x) => (x.id === t.id ? { ...x, done: true } : x)) })
-        if (t.then) { const ro = get().resolveOrder(t.then); const msg = get().place(ro.key, t.then.side, ro.qty, t.then.otype, t.then.price ?? 0, t.then.product, { via: 'gtt', sl: t.then.sl, tgt: t.then.tgt, trail: t.then.trail, trigger: t.then.trigger, tag: t.then.tag }); get().event(`**GTT triggered:** ${t.sym} went ${t.dir} ${t.price}. ${msg}`, msg.startsWith('Rejected') ? 'bad' : 'good', get().positions[ro.key]?.qty ? [{ k: 'position', key: ro.key }] : undefined) }
+        if (t.then) { const ro = get().resolveOrder(t.then); const msg = get().place(ro.key, t.then.side, ro.qty, t.then.otype, t.then.price ?? 0, t.then.product, { via: 'gtt', sl: t.then.sl, tgt: t.then.tgt, trail: t.then.trail, trigger: t.then.trigger, tag: t.then.tag }); get().event(`**Price trigger hit:** ${t.sym} went ${t.dir} ${t.price}. ${msg}`, msg.startsWith('Rejected') ? 'bad' : 'good', get().positions[ro.key]?.qty ? [{ k: 'position', key: ro.key }] : undefined) }
         else get().event(`**Alert: ${t.sym} is ${t.dir} ${t.price}** (now ${l.toFixed(2)}).`, 'attention', [{ k: 'quote', sym: t.sym }], [`buy ${t.sym.toLowerCase()}`, `analyse ${t.sym.toLowerCase()}`, `why is ${t.sym.toLowerCase()} moving`])
       }
     }
@@ -442,9 +442,9 @@ export const useStore = create<S>((set, get) => ({
     const reducing = (!!pos && ((pos.qty > 0 && side === 'SELL') || (pos.qty < 0 && side === 'BUY')) && qty <= Math.abs(pos.qty)) || !!holding
     if (!reducing) {
       // Pre-trade checks, cheapest first. Exits are never blocked.
-      if (s.risk.killed) return reject(`Trading locked: ${s.risk.reason ?? 'kill switch on'}`)
-      if (product === 'MIS' && !k.strike && (secOfDay() >= SQUARE_OFF || s.misClosed === sessionDay())) return reject('Intraday (MIS) entries stop at 3:20 pm. Choose Delivery, or trade in the next session')
-      if (s.risk.cooloffUntil && Date.now() < s.risk.cooloffUntil) return reject(`Cool-off after ${s.risk.cooloffAfter} losses in a row, ${Math.ceil((s.risk.cooloffUntil - Date.now()) / 60000)} min left`)
+      if (s.risk.killed) return reject(`Trading locked: ${s.risk.reason ?? 'emergency stop on'}`)
+      if (product === 'MIS' && !k.strike && (secOfDay() >= SQUARE_OFF || s.misClosed === sessionDay())) return reject('Intraday entries stop at 3:20 pm. Choose Delivery, or trade in the next session')
+      if (s.risk.cooloffUntil && Date.now() < s.risk.cooloffUntil) return reject(`Taking a break after ${s.risk.cooloffAfter} losses in a row, ${Math.ceil((s.risk.cooloffUntil - Date.now()) / 60000)} min left`)
       if (s.rules.noEntryAfter && secOfDay() >= s.rules.noEntryAfter) return reject(`Your rule: no new entries after ${hhmm(s.rules.noEntryAfter)}`)
       if (s.rules.stopRequired && !k.strike && opts.sl == null && via !== 'sip') return reject('Your rule: every entry needs a stop')
       if (opts.tag && s.rules.pausedSetups?.includes(opts.tag)) return reject(`Your rule: ${opts.tag} trades are paused`)
@@ -537,10 +537,10 @@ export const useStore = create<S>((set, get) => ({
       case 'squareoff': { const n = s.squareoff(a.key); return n ? `Closed ${n} position${n > 1 ? 's' : ''} at market` : 'No open positions' }
       case 'nav': { if (a.sym && bySym(a.sym)) set({ sym: a.sym.toUpperCase() }); if (a.view) set({ view: a.view }); if (a.expiryIdx != null) set({ expiryIdx: a.expiryIdx }); return '' }
       case 'watch': s.watchOp(a.op, a.sym.toUpperCase()); return `${a.op === 'add' ? 'Added' : 'Removed'} ${a.sym}`
-      case 'trigger': s.addTrigger({ sym: a.sym, dir: a.dir, price: a.price, then: a.then, note: a.note }); return a.then ? `GTT set: when ${a.sym} goes ${a.dir} ${a.price}, ${a.then.side.toLowerCase()} ${a.then.qty}` : `Alert set: ${a.sym} ${a.dir} ${a.price}`
+      case 'trigger': s.addTrigger({ sym: a.sym, dir: a.dir, price: a.price, then: a.then, note: a.note }); return a.then ? `Trigger set: when ${a.sym} goes ${a.dir} ${a.price}, ${a.then.side.toLowerCase()} ${a.then.qty}` : `Alert set: ${a.sym} ${a.dir} ${a.price}`
       case 'bracket': { if (!s.positions[a.key]?.qty) return 'No open position to protect'; s.setBracket(a.key, { sl: a.sl, tgt: a.tgt, trail: a.trail, peak: undefined }); return `Exit plan on ${labelOf(a.key)}:${a.sl ? ' stop ' + a.sl : ''}${a.tgt ? ' target ' + a.tgt : ''}${a.trail ? ' trailing ' + a.trail : ''}` }
       case 'risk': {
-        if (a.kill) { const n = s.squareoff(undefined, 'kill switch'); s.setRisk({ killed: true, reason: 'Kill switch turned on' }); return `Kill switch on. Closed ${n} position(s); new trades are blocked for today.` }
+        if (a.kill) { const n = s.squareoff(undefined, 'kill switch'); s.setRisk({ killed: true, reason: 'You stopped trading for today' }); return `Emergency stop on. Closed ${n} position(s); new trades are blocked for today.` }
         const { t: _t, kill: _k, ...rest } = a; s.setRisk(Object.fromEntries(Object.entries(rest).filter(([, v]) => v != null))); return 'Risk limits updated'
       }
       case 'rules': { const { t: _t, off, ...on } = a; s.setRules(off ? { [off]: undefined } : on); return off ? 'Rule turned off' : 'Rule on' }

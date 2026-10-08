@@ -61,7 +61,7 @@ export default function Strategy() {
         <Section id="strategy.legs" title="Legs" bodyClassName="!px-0 !pb-0"
           summary={`${legs.length} leg${legs.length === 1 ? '' : 's'} · net ${prem >= 0 ? 'credit' : 'debit'} ${inr(Math.abs(prem))}`}>
         <div className="overflow-x-auto rounded-b-[10px]">
-          <table className="tbl"><thead><tr><th>Side</th><th>Type</th><th>Strike</th><th>Lots</th><th>LTP</th><th>IV</th><th>Delta</th><th><span className="sr-only">Remove</span></th></tr></thead>
+          <table className="tbl"><thead><tr><th>Side</th><th>Type</th><th>Strike</th><th>Lots</th><th>Price</th><th>IV</th><th>Delta</th><th><span className="sr-only">Remove</span></th></tr></thead>
             <tbody>{legs.map((l, i) => { const k = q(l); return (
               <tr key={i}>
                 <td><button className={pill(true, l.side === 'BUY' ? 'up' : 'down')} aria-label={`Leg ${i + 1} side ${l.side}, switch`} onClick={() => upd(i, { side: l.side === 'BUY' ? 'SELL' : 'BUY' })}>{l.side === 'BUY' ? 'Buy' : 'Sell'}</button></td>
@@ -119,7 +119,7 @@ export default function Strategy() {
         </Section>
         <div className="flex items-center gap-3">
           <Button variant="lime" disabled={!!gate} onClick={() => setToast(run({ t: 'legs', und: sym, legs, expiryIdx: ei, name: stratName }, 'manual'))}>Place {legs.length} orders</Button>
-          {gate ? <GateNote g={gate} /> : <span className="text-[12px] text-fg-subtle">Paper trade at market. Buy legs go first, so hedges cut the margin.</span>}
+          {gate ? <GateNote g={gate} /> : <span className="text-[12px] text-fg-subtle">Practice trade at market. Buy legs go first, so hedges cut the margin.</span>}
         </div>
       </>}
     </div>

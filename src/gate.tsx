@@ -27,7 +27,7 @@ const tradesToday = (s: Pick<S, 'orders'>) => s.orders.filter((o) => o.status ==
 /** Why new positions can't be opened right now, or null when they can. Same order of checks as the store's. */
 export function entryGate(s: Pick<S, 'risk' | 'orders' | 'rules'>, now = Date.now()): Gate | null {
   const r = s.risk
-  if (r.killed) return { kind: 'locked', short: 'Locked today', why: (r.reason ?? 'The kill switch is on').replace(/[.!]$/, '') + '.' }
+  if (r.killed) return { kind: 'locked', short: 'Locked today', why: (r.reason ?? 'You stopped trading for today').replace(/[.!]$/, '') + '.' }
   if (r.cooloffUntil && now < r.cooloffUntil) {
     const min = Math.ceil((r.cooloffUntil - now) / 60000)
     return { kind: 'cooloff', short: `Paused · ${min} min`, why: `${r.cooloffAfter} losses in a row, so new entries pause for ${min} more minute${min === 1 ? '' : 's'}.`, until: r.cooloffUntil }

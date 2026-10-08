@@ -198,7 +198,7 @@ function debrief(): string {
   if (noStop.length) o += `
 - **${noStop.length} losing trade${noStop.length === 1 ? ' was' : 's were'} closed without a stop doing it**, so the loss ran until you or a rule stepped in.`
   if (g) o += `
-- **${g.kind === 'locked' ? 'Your limit did its job' : g.kind === 'cooloff' ? 'The cool-off stepped in' : g.kind === 'rule' ? 'Your rule stepped in' : 'You used every trade for today'}:** ${g.why}`
+- **${g.kind === 'locked' ? 'Your limit did its job' : g.kind === 'cooloff' ? 'The break stepped in' : g.kind === 'rule' ? 'Your rule stepped in' : 'You used every trade for today'}:** ${g.why}`
   o += `
 
 **For tomorrow:** ${noStop.length ? 'put a stop on every entry before you place it, so a rule exits a bad trade before the daily limit has to.' : worst && net(worst) < 0 && p.net < 0 && net(worst) / p.net > 0.6 ? `one trade made most of the loss. Consider a smaller size for ${labelOf(worst.key)}-type setups.` : 'keep the same limits; they held.'} Exits and stops still work today; new entries ${g?.kind === 'cooloff' ? 'come back when the pause ends' : g ? 'open again next session' : 'are open'}.`
@@ -229,7 +229,7 @@ export function localAI(input: string): AIResult {
   const named = findSym(t); const sym = named ?? s.sym
   const expiryIdx = /next (week|expiry)|2nd|second/.test(t) ? 1 : /month(ly)?/.test(t) && sym === 'NIFTY' ? nextExpiries('NIFTY').findIndex((e) => !e.weekly) : 0
 
-  if (/^(help|\?|what can you do)/.test(t)) return { reply: "Here's what I can do:\n- **Trade**: \"buy 50 sbi with sl 850 target 900\", \"sell 2 lots nifty atm ce\", \"bull call spread on nifty\"\n- **Protect**: \"add stop 1400 to reliance\", \"trail my tcs stop by 20\", \"square off all\"\n- **Scan**: \"stocks near 52 week high with volume 2x in IT\"\n- **Analyse**: \"analyse hdfc bank\", \"draw levels on reliance\", \"why is bel up\"\n- **Review**: \"brief me\", \"explain my pnl\", \"review my trades\"\n- **Risk**: \"set max loss 5000\", \"kill switch\"\n- **Rules**: \"always use a stop\", \"no trades after 2 pm\", \"risk 1% per trade\", \"my rules\"\n- **Invest**: \"sip 5000 in niftybees\", \"show my holdings\"", actions: [] }
+  if (/^(help|\?|what can you do)/.test(t)) return { reply: "Here's what I can do:\n- **Trade**: \"buy 50 sbi with sl 850 target 900\", \"sell 2 lots nifty atm ce\", \"bull call spread on nifty\"\n- **Protect**: \"add stop 1400 to reliance\", \"trail my tcs stop by 20\", \"close all positions\"\n- **Scan**: \"stocks near 52 week high with volume 2x in IT\"\n- **Analyse**: \"analyse hdfc bank\", \"draw levels on reliance\", \"why is bel up\"\n- **Review**: \"brief me\", \"explain my pnl\", \"review my trades\"\n- **Risk**: \"set max loss 5000\", \"stop trading for today\"\n- **Rules**: \"always use a stop\", \"no trades after 2 pm\", \"risk 1% per trade\", \"my rules\"\n- **Invest**: \"sip 5000 in niftybees\", \"show my holdings\"", actions: [] }
 
   // Advice guard: reframe stock-tip requests as education.
   if (/should i (buy|sell)|best stock|multibagger|tips?\b|which stock (to|will)|recommend|guaranteed|sure.?shot/.test(t))
@@ -239,7 +239,7 @@ export function localAI(input: string): AIResult {
   const ml = t.match(/max(?:imum)? (?:daily )?loss (?:to |of |at )?(\d+)/), mp = t.match(/max(?:imum)? (?:daily )?profit (?:to |of |at )?(\d+)/), mt = t.match(/max(?:imum)? (\d+) trades|max(?:imum)? trades (?:to |of )?(\d+)/)
   if ((ml || mp || mt) && !/bullish|bearish|range|sideways|volatile|big move/.test(t)) return { reply: `Updating your daily limits${ml ? `: positions close automatically if today's loss reaches ${inr(+ml[1])}` : ''}${mp ? `${ml ? ',' : ':'} profits lock in at ${inr(+mp[1])}` : ''}${mt ? `, maximum ${mt[1] ?? mt[2]} trades a day` : ''}.`, actions: [{ t: 'risk', maxLoss: ml ? +ml[1] : undefined, maxProfit: mp ? +mp[1] : undefined, maxTrades: mt ? +(mt[1] ?? mt[2]) : undefined }], cards: [{ k: 'risk' }] }
 
-  if (/square ?off|exit all|close (all|everything|my positions?)|flatten/.test(t)) {
+  if (/square ?off|exit all|close (all|everything|my positions?)|flatten/.test(t) || (named && /^(close|exit) (my )?[a-z&.]+( position)?$/.test(t))) {
     const keys = Object.values(s.positions).filter((p) => p.qty && (!named || parseKey(p.key).und === named))
     return { reply: keys.length ? `This closes ${keys.length} position${keys.length > 1 ? 's' : ''} at market and cancels their working orders.` : 'You have no open positions.', actions: keys.length ? [{ t: 'squareoff', key: named && keys.length === 1 ? keys[0].key : undefined }] : [], cards: keys.length ? [{ k: 'positions' }] : undefined }
   }
@@ -277,7 +277,7 @@ export function localAI(input: string): AIResult {
   }
   if (/review (my )?(today|day)|debrief|what went wrong today|today'?s review/.test(t)) return { reply: debrief(), actions: [], follow: ['show my positions', 'review my trades', 'my rules'] }
   if (/review (my )?trades|journal|how am i doing|my (trading )?mistakes|win rate/.test(t)) return { reply: reviewTrades(), actions: [{ t: 'nav', view: 'journal' }], cards: [{ k: 'journal' }], follow: ['my rules', 'set max loss 5000'] }
-  if (/p&?l|pnl|positions?|margin|funds|balance|holdings?|portfolio/.test(t) && !/\b(buy|sell|add|stop|sl)\b/.test(t)) return { reply: s.mode === 'chat' ? '' : portfolio(), actions: /holding|portfolio/.test(t) ? [{ t: 'nav', view: 'portfolio' }] : [], cards: /holding|portfolio/.test(t) ? [{ k: 'funds' }] : /margin|funds|balance/.test(t) ? [{ k: 'funds' }] : [{ k: 'positions' }], follow: ['explain my pnl', 'square off all'] }
+  if (/p&?l|pnl|positions?|margin|funds|balance|holdings?|portfolio/.test(t) && !/\b(buy|sell|add|stop|sl)\b/.test(t)) return { reply: s.mode === 'chat' ? '' : portfolio(), actions: /holding|portfolio/.test(t) ? [{ t: 'nav', view: 'portfolio' }] : [], cards: /holding|portfolio/.test(t) ? [{ k: 'funds' }] : /margin|funds|balance/.test(t) ? [{ k: 'funds' }] : [{ k: 'positions' }], follow: ['explain my pnl', 'close all positions'] }
   if (named && /why .*(up|down|moving|rally|fall|fell|jump|crash)|what.?s (up|happening) with/.test(t)) return { reply: whyMove(sym), actions: [{ t: 'chart', sym }], cards: [{ k: 'chart', sym, tf: '5m' }], follow: [`analyse ${sym.toLowerCase()}`, `buy ${sym.toLowerCase()}`, `alert me if ${sym.toLowerCase()} crosses ${Math.ceil(s.prices[sym].high)}`] }
 
   // Position sizing.
@@ -287,7 +287,7 @@ export function localAI(input: string): AIResult {
   // Exit plan on an existing position.
   const posKey = Object.values(s.positions).find((p) => p.qty && parseKey(p.key).und === sym)?.key
   const slM = t.match(/\b(?:sl|stop(?: ?loss)?)\s*(?:at|of|to)?\s*(\d+(?:\.\d+)?)/), tgM = t.match(/\b(?:target|tgt|tp)\s*(?:at|of|to)?\s*(\d+(?:\.\d+)?)/), trM = t.match(/trail(?:ing)?\b[^\d]*?(\d+(?:\.\d+)?)/)
-  if (posKey && !/\b(buy|sell|short|long)\b/.test(t) && (slM || tgM || trM)) return { reply: `Exit plan for your ${labelOf(posKey)} position: ${[slM && `stop ${slM[1]}`, tgM && `target ${tgM[1]}`, trM && `trailing ${trM[1]} points`].filter(Boolean).join(', ')}. Whichever is hit first closes it.`, actions: [{ t: 'bracket', key: posKey, sl: slM ? +slM[1] : undefined, tgt: tgM ? +tgM[1] : undefined, trail: trM ? +trM[1] : undefined }], cards: [{ k: 'position', key: posKey }] }
+  if (posKey && !/\b(buy|sell|short|long)\b/.test(t) && (slM || tgM || trM)) return { reply: `Stop and target for your ${labelOf(posKey)} position: ${[slM && `stop ${slM[1]}`, tgM && `target ${tgM[1]}`, trM && `trailing ${trM[1]} points`].filter(Boolean).join(', ')}. Whichever is hit first closes it.`, actions: [{ t: 'bracket', key: posKey, sl: slM ? +slM[1] : undefined, tgt: tgM ? +tgM[1] : undefined, trail: trM ? +trM[1] : undefined }], cards: [{ k: 'position', key: posKey }] }
 
   // Protect or manage a position without numbers: show it with its exit-plan controls.
   if (posKey && !/\b(buy|sell|short|long)\b/.test(t) && /\b(stop|sl|protect|exit plan|trail|target|manage)\b/.test(t)) return { reply: `Here's your ${labelOf(posKey)} position. **Add stop and target** suggests levels from recent volatility; change them before you save.`, actions: [], cards: [{ k: 'position', key: posKey }] }
@@ -368,7 +368,7 @@ export function localAI(input: string): AIResult {
     const what = strikeM ? `${qty} lot${qty > 1 ? 's' : ''} (${qty * inst.lot} qty) ${sym} ${strikeM[1]} ${a.ot}` : `${qty} ${sym}`
     const plan = a.sl || a.tgt ? ` with ${[a.sl && `stop ${a.sl}`, a.tgt && `target ${a.tgt}`, a.trail && `trailing ${a.trail}`].filter(Boolean).join(', ')}` : ''
     const risk = !strikeM && a.sl ? ` Risk if stopped: ${inr(Math.abs(ref - a.sl) * qty)}${a.tgt ? `, reward ${inr(Math.abs(a.tgt - ref) * qty)} (1 : ${(Math.abs(a.tgt - ref) / Math.abs(ref - a.sl)).toFixed(1)})` : ''}.` : !strikeM ? ' No stop set. Add "sl 850" to attach one.' : ''
-    if (cond && trigDir) return { reply: `GTT: when ${sym} ${trigNote ? `${trigNote} from yesterday's close (₹${trigPrice.toLocaleString('en-IN')})` : `goes ${trigDir} ${trigPrice}`}, I'll ${side.toLowerCase()} ${what}${plan} automatically, within your limits and rules.`, actions: [{ t: 'trigger', sym, dir: trigDir, price: trigPrice, then: a, note: trigNote }] }
+    if (cond && trigDir) return { reply: `Price trigger: when ${sym} ${trigNote ? `${trigNote} from yesterday's close (₹${trigPrice.toLocaleString('en-IN')})` : `goes ${trigDir} ${trigPrice}`}, I'll ${side.toLowerCase()} ${what}${plan} automatically, within your limits and rules.`, actions: [{ t: 'trigger', sym, dir: trigDir, price: trigPrice, then: a, note: trigNote }] }
     // In chat the draft card shows every number, so the reply only says what to do with it instead of repeating it.
     if (s.mode === 'chat') return { reply: a.sl || strikeM ? 'Here it is. Check it over, then place it.' : 'Here it is, without a stop for now. Add one before you place it.', actions: [a] }
     return { reply: `${side === 'BUY' ? 'Buy' : 'Sell'} ${what} ${limit ? `at limit ${limit}` : 'at market'}${plan} · ${a.product === 'MIS' ? 'intraday' : a.product === 'CNC' ? 'delivery' : 'F&O'}.${risk}`, actions: [a] }
@@ -382,7 +382,7 @@ export function localAI(input: string): AIResult {
   }
 
   // Navigation.
-  if (/scanner|screener/.test(t)) return { reply: 'Opening the Scanner.', actions: [{ t: 'nav', view: 'scanner' }] }
+  if (/scanner|screener/.test(t)) return { reply: 'Opening Find stocks.', actions: [{ t: 'nav', view: 'scanner' }] }
   if (/heat ?map|sectors?|market view|markets/.test(t)) return { reply: 'Opening Markets.', actions: [{ t: 'nav', view: 'markets' }] }
   if (/chain|\boi\b|open interest/.test(t)) { const u = bySym(sym)?.fno ? sym : 'NIFTY'; return { reply: `${u} options, ${nextExpiries(u)[expiryIdx]?.label ?? nextExpiries(u)[0].label} expiry. Tap a price to draft an order.`, actions: [{ t: 'nav', view: 'chain', sym: u, expiryIdx }], cards: [{ k: 'chain', und: u, expiryIdx }], follow: [`iron condor on ${u.toLowerCase()}`, `bull call spread on ${u.toLowerCase()}`] } }
   if (/strateg|payoff|builder|greeks/.test(t)) return { reply: 'Opening the Strategy builder.', actions: [{ t: 'nav', view: 'strategy' }] }
