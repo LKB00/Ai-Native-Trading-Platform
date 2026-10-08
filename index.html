@@ -7,9 +7,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Sandstone typography: Geist for the interface and headings, Geist Mono for prices and other numbers. -->
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet" />
-    <!-- Dark by default, like most trading screens; a saved choice from the theme button wins. -->
-    <!-- A first visit is always dark, whatever an earlier app on this address saved. After that the choice from the theme button wins. -->
-    <script>try{if(!localStorage.getItem('visited'))localStorage.setItem('theme','dark');if((localStorage.getItem('theme')||'dark')==='dark')document.documentElement.classList.add('dark')}catch(e){document.documentElement.classList.add('dark')}</script>
+    <!-- A first visit is always light, whatever an earlier app on this address saved. After that the choice from the theme button wins. -->
+    <script>try{if(!localStorage.getItem('visited'))localStorage.setItem('theme','light');if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}</script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />

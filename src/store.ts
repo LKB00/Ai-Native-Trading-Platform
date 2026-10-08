@@ -283,7 +283,7 @@ const INITIAL_CHATS = loadChats()
 const loadKey = () => { try { return localStorage.getItem('anthropic_key') || '' } catch { return '' } }
 const loadJSON = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : d } catch { return d } }
 const saveJSON = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* storage unavailable */ } }
-/** The first time this browser opens this version: start in Chat, in dark mode (index.html sets the theme). Then remember we've been. */
+/** The first time this browser opens this version: start in Chat, in light mode (index.html sets the theme). Then remember we've been. */
 const FIRST_VISIT = (() => { try { const first = !localStorage.getItem('visited'); if (first) { localStorage.setItem('visited', '1'); localStorage.removeItem('cockpit-panels') } return first } catch { return false } })()
 
 function initPrices(): Record<string, Quote> {
