@@ -46,7 +46,7 @@ function Story() {
       </Beat>
       <Beat label="Done" caption="I watch it for you" last>
         <Pic className="items-center gap-1">
-          <span className="flex size-7 items-center justify-center rounded-full bg-success text-white"><Check size={15} strokeWidth={3} /></span>
+          <span className="flex size-7 items-center justify-center rounded-full bg-success text-on-success"><Check size={15} strokeWidth={3} /></span>
           <p className="mt-0.5 text-[12px] text-fg-muted">SBIN hit your target</p>
           <p className="num text-[20px] font-semibold text-up">+₹2,480</p>
         </Pic>
@@ -143,7 +143,7 @@ export function GettingStarted({ compact = false }: { compact?: boolean }) {
       {open && <ul className="border-t border-line">
         {STEPS.map((id, i) => { const s = STEP_INFO[id]; const ok = !!done[id]; const cur = id === next
           return <li key={id} className={cn('flex items-center gap-3 px-3 py-2', cur && 'bg-sunken')}>
-            <span aria-hidden className={cn('flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold', ok ? 'bg-success text-white' : 'border border-[var(--border-strong)] text-fg-subtle')}>{ok ? <Check size={12} strokeWidth={3} /> : i + 1}</span>
+            <span aria-hidden className={cn('flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold', ok ? 'bg-success text-on-success' : 'border border-[var(--border-strong)] text-fg-subtle')}>{ok ? <Check size={12} strokeWidth={3} /> : i + 1}</span>
             <div className="min-w-0 flex-1"><p className={cn('text-[13px]', ok ? 'text-fg-subtle line-through decoration-[var(--border-strong)]' : 'font-medium text-fg')}>{s.title}<span className="sr-only">{ok ? ', done' : ''}</span></p>
               {!ok && <p className="text-[12px] leading-4 text-fg-muted">{s.hint}</p>}</div>
             {!ok && <Button size="sm" variant={cur ? 'primary' : 'secondary'} className="shrink-0" onClick={s.run}>{s.go}</Button>}
@@ -201,7 +201,7 @@ export function Tour() {
   return createPortal(
     <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={`Tour, step ${i + 1} of ${steps.length}: ${cur.title}`}>
       <div className="absolute inset-0" />
-      <div aria-hidden className="pointer-events-none absolute rounded-[10px] ring-2 ring-white/80 transition-all duration-200" style={{ ...hole, boxShadow: '0 0 0 9999px rgba(8,8,12,.55)' }} />
+      <div aria-hidden className="pointer-events-none absolute rounded-[10px] ring-2 ring-[var(--on-scrim)] transition-all duration-200" style={{ ...hole, boxShadow: '0 0 0 9999px var(--scrim-spot)' }} />
       <div className="absolute rounded-[12px] border border-line bg-raised p-4 shadow-lg animate-rise" style={{ left, top, width: W }}>
         <p className="text-[11px] font-medium text-fg-subtle">Tour · {i + 1} of {steps.length}</p>
         <h2 className="mt-1 text-[15px] font-semibold text-fg">{cur.title}</h2>

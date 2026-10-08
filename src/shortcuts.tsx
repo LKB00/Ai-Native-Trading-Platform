@@ -83,7 +83,7 @@ export function ShortcutsSheet() {
   }, [q])
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[8vh] animate-fade max-md:hidden" onMouseDown={(e) => { if (e.target === e.currentTarget) close() }}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-scrim px-4 pt-[8vh] animate-fade max-md:hidden" onMouseDown={(e) => { if (e.target === e.currentTarget) close() }}>
       <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="flex max-h-[80vh] w-full max-w-[760px] flex-col overflow-hidden rounded-[10px] border border-line bg-raised shadow-lg animate-rise">
         <header className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3">
           <h2 className="text-[15px] font-semibold text-fg">Keyboard shortcuts</h2>

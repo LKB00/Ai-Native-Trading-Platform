@@ -261,8 +261,8 @@ function TradeButtons({ sym }: { sym: string }) {
   if (g) return <GatePill g={g} />
   return (
     <div className="flex gap-2">
-      <button type="button" onClick={() => draftEquity(sym, 'BUY')} className="h-8 min-w-20 rounded-md bg-success px-4 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 dark:text-[var(--bg)]">Buy</button>
-      <button type="button" onClick={() => draftEquity(sym, 'SELL')} className="h-8 min-w-20 rounded-md bg-danger px-4 text-[12px] font-semibold text-white transition-opacity hover:opacity-90 dark:text-[var(--bg)]">Sell</button>
+      <button type="button" onClick={() => draftEquity(sym, 'BUY')} className="h-8 min-w-20 rounded-md bg-success px-4 text-[12px] font-semibold text-on-success transition-opacity hover:opacity-90">Buy</button>
+      <button type="button" onClick={() => draftEquity(sym, 'SELL')} className="h-8 min-w-20 rounded-md bg-danger px-4 text-[12px] font-semibold text-on-danger transition-opacity hover:opacity-90">Sell</button>
     </div>
   )
 }
@@ -608,7 +608,7 @@ export function ScanCard({ filters, name }: { filters: Filter[]; name?: string }
           <td className="font-medium">₹{fmt(r.ltp)}</td><td><ChangePill pct={r.chg} /></td><td className="text-fg-muted @max-lg:hidden">{r.volx.toFixed(1)}×</td>
           <td className="@max-lg:hidden"><span className="inline-flex items-center gap-2"><span className="relative h-1 w-10 rounded-full bg-sunken" aria-hidden><span className="absolute inset-y-0 left-0 rounded-full bg-[var(--fg-subtle)]" style={{ width: `${r.rsi}%` }} /></span><span className="w-5 text-right text-fg-muted">{r.rsi.toFixed(0)}</span></span></td>
           <td>{gate ? <span className="inline-flex size-7 items-center justify-center text-fg-subtle" title={`${gate.short}. ${gate.why}`}><GateIcon g={gate} /><span className="sr-only">{gate.short}</span></span>
-            : <button type="button" className="h-7 rounded-md bg-success-soft px-3 text-[12px] font-semibold text-success-fg transition-colors hover:bg-success hover:text-white" onClick={(e) => { e.stopPropagation(); draftEquity(r.sym, 'BUY') }}>Buy</button>}</td>
+            : <button type="button" className="h-7 rounded-md bg-success-soft px-3 text-[12px] font-semibold text-success-fg transition-colors hover:bg-success hover:text-on-success" onClick={(e) => { e.stopPropagation(); draftEquity(r.sym, 'BUY') }}>Buy</button>}</td>
         </tr>)}</tbody></table></div>}
       {rows.length === 0 && <p className="border-t border-line px-3.5 py-4 text-[13px] text-fg-muted">Nothing matches right now. Loosen a condition and ask again.</p>}
     </Shell>
@@ -797,7 +797,7 @@ function OrderDraft({ msgId, i, a, live }: { msgId: number; i: number; a: OrderA
   const risk = a.sl != null && !slBad ? Math.abs(ref - a.sl) * shares : 0, reward = a.tgt != null && !tgBad ? Math.abs(a.tgt - ref) * shares : 0
   const atrPts = useMemo(() => opt ? ltp * 0.25 : atr(history(inst, '15m', 60, s.prices[a.und].ltp)).at(-1)! * 2, [a.und, opt]) // eslint-disable-line react-hooks/exhaustive-deps
   const short = margin > avail
-  const tone = long ? 'bg-success text-white shadow-sm dark:text-[var(--bg)]' : 'bg-danger text-white shadow-sm dark:text-[var(--bg)]'
+  const tone = long ? 'bg-success text-on-success shadow-sm' : 'bg-danger text-on-danger shadow-sm'
   // Approve in one look: the summary is the decision; every field sits behind Adjust. Errors open it themselves.
   const [adjust, setAdjust] = useState(false); const open = adjust || slBad || tgBad
   const rules = useStore((st) => st.rules); const brk = ruleBreak(a); const gate = useEntryGate()

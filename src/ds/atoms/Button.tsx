@@ -10,7 +10,7 @@ const variants: Record<ButtonVariant, string> = {
   secondary: "bg-surface text-fg border border-line hover:bg-bg hover:border-line-strong",
   ghost: "text-fg-muted hover:bg-hover hover:text-fg",
   danger: "bg-danger text-on-danger hover:opacity-90",
-  success: "bg-success text-on-danger hover:opacity-90",
+  success: "bg-success text-on-success hover:opacity-90",
 };
 const sizes: Record<ButtonSize, string> = {
   sm: "h-8 px-3 text-xs gap-1.5 max-md:h-10 max-md:px-3.5 max-md:text-[13px]",

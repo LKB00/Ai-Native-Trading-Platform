@@ -232,7 +232,7 @@ export function PhonePositions({ onOpen, onStock, onOrder, holdings }: { onOpen:
         {confirm === '*' && <div className="mt-3 flex items-center gap-2 rounded-lg bg-danger-soft p-2.5 text-[13px] text-danger-fg">
           <span className="flex-1">Close {open} position{open > 1 ? 's' : ''} at market?</span>
           <button type="button" className="h-9 rounded-md px-3 font-medium" onClick={() => setConfirm(null)}>Keep</button>
-          <button type="button" className="h-9 rounded-md bg-danger px-3 font-semibold text-white dark:text-[var(--bg)]" onClick={() => { s.setToast(`Closed ${s.squareoff()} position(s)`); setConfirm(null) }}>Exit all</button>
+          <button type="button" className="h-9 rounded-md bg-danger px-3 font-semibold text-on-danger" onClick={() => { s.setToast(`Closed ${s.squareoff()} position(s)`); setConfirm(null) }}>Exit all</button>
         </div>}
         <div role="tablist" aria-label="Positions or orders" className="mt-3 flex rounded-lg bg-sunken p-1">
           {([['pos', `Positions ${open}`], ['ord', `Orders ${s.orders.length}`], ['hold', `Holdings ${s.holdings.length}`]] as const).map(([v, l]) => <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => setTab(v)}
@@ -256,7 +256,7 @@ export function PhonePositions({ onOpen, onStock, onOrder, holdings }: { onOpen:
                 {confirm === x.key
                   ? <div className="flex items-center gap-2 rounded-lg bg-danger-soft p-2.5 text-[13px] text-danger-fg"><span className="flex-1">Exit {Math.abs(x.qty)} at market?</span>
                       <button type="button" className="h-9 rounded-md px-3 font-medium" onClick={() => setConfirm(null)}>Keep</button>
-                      <button type="button" className="h-9 rounded-md bg-danger px-3 font-semibold text-white dark:text-[var(--bg)]" onClick={() => { s.setToast(s.place(x.key, x.qty > 0 ? 'SELL' : 'BUY', Math.abs(x.qty), 'MARKET', 0, x.product)); setConfirm(null) }}>Exit</button></div>
+                      <button type="button" className="h-9 rounded-md bg-danger px-3 font-semibold text-on-danger" onClick={() => { s.setToast(s.place(x.key, x.qty > 0 ? 'SELL' : 'BUY', Math.abs(x.qty), 'MARKET', 0, x.product)); setConfirm(null) }}>Exit</button></div>
                   : <div className="flex gap-2">
                       <button type="button" className={cn(act, 'border-[var(--danger)] text-down')} onClick={() => setConfirm(x.key)}><LogOut size={15} strokeWidth={2} />Exit</button>
                       <button type="button" className={act} onClick={() => onOpen({ kind: 'pos', key: x.key, focus: 'plan' })}><Target size={15} strokeWidth={2} />{b?.sl || b?.tgt ? 'Edit SL/T' : 'Add SL/T'}</button>

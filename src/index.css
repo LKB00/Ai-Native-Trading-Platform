@@ -32,7 +32,7 @@
 /* Modal backdrop. Always a dark veil: tinting with --fg (as before) washed the page out grey in dark mode. */
 :root { --scrim: rgb(24 26 29 / 0.32); }
 .dark { --scrim: rgb(0 0 0 / 0.6); }
-@theme inline { --color-up: var(--up); --color-down: var(--down); --color-scrim: var(--scrim); }
+@theme inline { --color-up: var(--up); --color-down: var(--down); --color-scrim: var(--scrim); --color-on-success: var(--on-success); --color-knob: var(--knob); }
 
 html, body, #root { height: 100%; }
 body { margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font-size: 13px; }
@@ -65,8 +65,8 @@ body { margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); fon
 /* Numbers inside cards use the interface font with tabular figures (Geist), like the quote card's price,
    instead of the terminal's monospace; columns still line up. */
 .premium .num { font-family: var(--ds-font-sans); font-variant-numeric: tabular-nums; }
-.card-shadow { box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.08); }
-.dark .card-shadow { box-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5); }
+.card-shadow { box-shadow: 0 1px 2px rgb(var(--shadow-ink) / 0.04), 0 8px 24px -12px rgb(var(--shadow-ink) / 0.08); }
+.dark .card-shadow { box-shadow: 0 1px 2px rgb(var(--shadow-ink) / 0.3), 0 8px 24px -12px rgb(var(--shadow-ink) / 0.5); }
 /* Card tables: roomy rows, quiet headers, edges aligned with the card's 20px padding. */
 .tbl-card { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl-card th { font-weight: 500; font-size: 11px; color: var(--fg-subtle); text-align: right; padding: 8px 12px; border-bottom: var(--hair) solid var(--border); white-space: nowrap; }
@@ -109,6 +109,11 @@ html.switching *, html.switching *::before, html.switching *::after { animation:
   .tbl th:last-child, .tbl td:last-child { padding-right: 12px; }
   button, a { -webkit-tap-highlight-color: transparent; }
 }
+
+/* Text on the solid green and red fills (Buy, Sell, Exit, confirmations). White on light, the page colour on dark. One place, so no
+   component spells out white. Also: the switch knob, the spotlight in the tour, and the neutral ink behind every shadow. */
+:root { --on-success: #ffffff; --on-danger: #ffffff; --knob: #ffffff; --on-scrim: #ffffff; --scrim-spot: rgb(8 8 12 / 0.55); --shadow-ink: 0 0 0; }
+:root.dark, :root[data-theme="dark"], [data-palette] .dark, [data-palette] [data-theme="dark"] { --on-success: var(--bg); --on-danger: var(--bg); }
 
 /* Brand mark: a dark tile on light screens, a light tile on dark ones. The green deepens on the light tile to keep 3:1. */
 :root { --brand-tile: #111116; --brand-ink: #ffffff; --brand-mark: #2ee6b0; }

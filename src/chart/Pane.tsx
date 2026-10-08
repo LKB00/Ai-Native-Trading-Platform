@@ -64,7 +64,7 @@ function QuickTrade({ k, ltp, onTrade }: { k: string; ltp: number; onTrade: (sid
           <button type="button" onClick={() => ok && onTrade(side)} aria-disabled={!ok || undefined}
             title={ok ? (gate ? (useStore.getState().positions[k]?.qty ? `Close your ${labelOf(k)} position` : `Sell from your ${labelOf(k)} holding`) : undefined) : `${gate!.short}. ${gate!.why} Exits still work.`}
             aria-label={`${buy ? 'Buy' : 'Sell'} ${labelOf(k)} at ${px.toFixed(2)}${ok ? '' : `: ${gate!.short}`}`}
-            className={cn('flex h-7 min-w-[72px] flex-col items-center justify-center rounded-md px-2.5 font-sans leading-none', ok ? (buy ? 'bg-success-soft text-success-fg hover:bg-success hover:text-white' : 'bg-danger-soft text-danger-fg hover:bg-danger hover:text-white') : 'cursor-not-allowed bg-sunken text-fg-subtle')}>
+            className={cn('flex h-7 min-w-[72px] flex-col items-center justify-center rounded-md px-2.5 font-sans leading-none', ok ? (buy ? 'bg-success-soft text-success-fg hover:bg-success hover:text-on-success' : 'bg-danger-soft text-danger-fg hover:bg-danger hover:text-on-danger') : 'cursor-not-allowed bg-sunken text-fg-subtle')}>
             <span className="text-[9px]">{buy ? 'Buy' : 'Sell'}</span><span className="num text-[11px] font-bold">{px.toFixed(2)}</span></button>
         </Fragment> })}
     </div>

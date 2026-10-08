@@ -415,7 +415,7 @@ function WatchRow({ w, sel, active, first, depthOpen, onAct, drag }: {
   const tradeBtn = (side: 'BUY' | 'SELL') => { const ok = allowed(side); const buy = side === 'BUY'
     return <button type="button" tabIndex={-1} aria-label={ok ? `${buy ? 'Buy' : 'Sell'} ${w}` : `${buy ? 'Buy' : 'Sell'} ${w}: ${gate!.short}`} aria-disabled={!ok || undefined}
       onClick={() => ok && onAct(side)}
-      className={cn('group/b relative h-6 w-6 rounded text-[11px] font-semibold', ok ? (buy ? 'bg-success' : 'bg-danger') + ' text-white dark:text-[var(--bg)]' : 'cursor-not-allowed bg-sunken text-fg-subtle')}>{buy ? 'B' : 'S'}
+      className={cn('group/b relative h-6 w-6 rounded text-[11px] font-semibold', ok ? (buy ? 'bg-success text-on-success' : 'bg-danger text-on-danger') : 'cursor-not-allowed bg-sunken text-fg-subtle')}>{buy ? 'B' : 'S'}
       {!ok && <span aria-hidden className="absolute -bottom-1 -right-1 flex size-3.5 items-center justify-center rounded-full border border-line bg-raised text-fg-muted"><GateIcon g={gate!} size={8} /></span>}
       {ok ? tip(gate ? (pos?.qty ? `Close your ${w} position` : `Sell from your holding`) : buy ? 'Buy' : 'Sell', buy ? 'B' : 'S') : tip(`${gate!.short} · exits still work`)}
     </button> }

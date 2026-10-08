@@ -22,7 +22,7 @@ export function PhoneTop({ title, onSearch, onBell, unread }: { title: ReactNode
       <h1 className="min-w-0 flex-1 truncate text-[20px] font-semibold tracking-[-0.01em] text-fg">{title}</h1>
       <button type="button" aria-label="Search stocks" onClick={onSearch} className="flex size-11 items-center justify-center rounded-full text-fg active:bg-hover"><Search size={21} strokeWidth={1.75} /></button>
       <button type="button" aria-label={unread ? `Notifications, ${unread} new` : 'Notifications'} onClick={onBell} className="relative flex size-11 items-center justify-center rounded-full text-fg active:bg-hover">
-        <Bell size={21} strokeWidth={1.75} />{unread > 0 && <span className="num absolute right-1.5 top-1.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">{unread}</span>}
+        <Bell size={21} strokeWidth={1.75} />{unread > 0 && <span className="num absolute right-1.5 top-1.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-on-danger">{unread}</span>}
       </button>
     </header>
   )

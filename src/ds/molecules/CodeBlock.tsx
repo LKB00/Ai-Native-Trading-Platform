@@ -8,7 +8,7 @@ export function CodeBlock({ code, language = "text" }: { code: string; language?
   };
   return (
     <figure className="overflow-hidden rounded-2xl border border-line bg-code text-code-fg">
-      <figcaption className="flex items-center justify-between border-b border-white/10 px-3 py-1.5 text-xs text-code-muted">
+      <figcaption className="flex items-center justify-between border-b border-code-fg/10 px-3 py-1.5 text-xs text-code-muted">
         <span className="font-mono">{language}</span>
         <button type="button" onClick={copy} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:text-code-fg">
           {copied ? <CheckIcon width={12} height={12} /> : <CopyIcon width={12} height={12} />}

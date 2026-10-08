@@ -22,7 +22,7 @@ export function Sheet({ open, onClose, label, children, className }: { open: boo
   // Rendered at the top of the page, so no animated or scrolling parent can clip it or stack the tab bar over it.
   return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/40 animate-fade" />
+      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-scrim animate-fade" />
       <div role="dialog" aria-modal="true" aria-label={label}
         className={cn('relative max-h-[88dvh] overflow-y-auto rounded-t-[14px] border-t border-line bg-raised pb-[calc(12px+env(safe-area-inset-bottom))] shadow-lg animate-rise', className)}>
         <span aria-hidden className="mx-auto mt-2 block h-1 w-9 rounded-full bg-[var(--border-strong)]" />
@@ -43,7 +43,7 @@ export function TradeBar({ sym, onTrade, onDepth }: { sym: string; onTrade: (sid
   const ok = (side: 'BUY' | 'SELL') => !gate || !opensPosition(sym, side, 1, 'MIS') || !opensPosition(sym, side, 1, 'CNC')
   const btn = (side: 'BUY' | 'SELL') => { const buy = side === 'BUY'; const live = ok(side); const px = buy ? d.asks[0].price : d.bids[0].price
     return <button type="button" aria-disabled={!live || undefined} onClick={() => live && onTrade(side)} title={live ? undefined : `${gate!.short}. ${gate!.why}`}
-      className={cn('flex h-12 flex-1 flex-col items-center justify-center rounded-lg leading-tight', live ? (buy ? 'bg-success text-white dark:text-[var(--bg)]' : 'bg-danger text-white dark:text-[var(--bg)]') : 'bg-sunken text-fg-subtle')}>
+      className={cn('flex h-12 flex-1 flex-col items-center justify-center rounded-lg leading-tight', live ? (buy ? 'bg-success text-on-success' : 'bg-danger text-on-danger') : 'bg-sunken text-fg-subtle')}>
       <span className="flex items-center gap-1 text-[12px] font-semibold">{!live && <GateIcon g={gate!} size={11} />}{buy ? 'Buy' : 'Sell'}</span><span className="num text-[13px] font-semibold">{fmt(px)}</span>
     </button> }
   return (
@@ -129,7 +129,7 @@ export function SlideToConfirm({ label, tone, onConfirm }: { label: string; tone
         onPointerDown={(e) => { try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId) } catch { /* synthetic pointer */ } dragging.current = true; start.current = e.clientX - pos.current; setDrag(true) }}
         onPointerMove={(e) => { if (dragging.current) move(e.clientX - start.current) }}
         onPointerUp={end} onPointerLeave={end} onPointerCancel={() => { dragging.current = false; setDrag(false); move(0) }}
-        className={cn('absolute left-1 top-1 flex size-12 touch-none items-center justify-center rounded-full text-white shadow-md dark:text-[var(--bg)]', bg, !drag && 'transition-transform duration-200')}
+        className={cn('absolute left-1 top-1 flex size-12 touch-none items-center justify-center rounded-full shadow-md', tone === 'buy' ? 'text-on-success' : 'text-on-danger', bg, !drag && 'transition-transform duration-200')}
         style={{ transform: `translateX(${x}px)` }}><ChevronsRight size={22} strokeWidth={2} /></button>
     </div>
   )

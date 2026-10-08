@@ -113,7 +113,7 @@ export function OrderPad({ sym, side: s0, px: px0, onBack, onPlaced }: { sym: st
       </>}>
       <div className="space-y-5 px-4 py-4">
         <div role="radiogroup" aria-label="Side" className="flex gap-1 rounded-lg bg-sunken p-1">
-          {(['BUY', 'SELL'] as const).map((v) => <button key={v} type="button" role="radio" aria-checked={side === v} onClick={() => setSide(v)} className={seg(side === v, v === 'BUY' ? 'bg-success text-white dark:text-[var(--bg)]' : 'bg-danger text-white dark:text-[var(--bg)]')}>{v === 'BUY' ? 'Buy' : 'Sell'}</button>)}
+          {(['BUY', 'SELL'] as const).map((v) => <button key={v} type="button" role="radio" aria-checked={side === v} onClick={() => setSide(v)} className={seg(side === v, v === 'BUY' ? 'bg-success text-on-success' : 'bg-danger text-on-danger')}>{v === 'BUY' ? 'Buy' : 'Sell'}</button>)}
         </div>
         <div>
           <label htmlFor="op-qty" className="text-[12px] text-fg-subtle">Quantity{closing ? ' · prefilled with what you hold' : ''}</label>

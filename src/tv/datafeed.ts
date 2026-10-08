@@ -170,7 +170,7 @@ function fillMarks(name: string, from: number, to: number): Mark[] {
     .map((o) => ({
       id: o.id, time: Math.floor(o.st!), color: o.side === 'BUY' ? 'green' as const : 'red' as const,
       text: `${o.side === 'BUY' ? 'Bought' : 'Sold'} ${o.qty} at ₹${(o.fill ?? o.price).toFixed(2)}${o.tag ? ` · ${o.tag}` : ''}${o.via === 'ai' ? ' · drafted by AI, approved by you' : ''}`,
-      label: o.side === 'BUY' ? 'B' : 'S', labelFontColor: '#ffffff', minSize: 14,
+      label: o.side === 'BUY' ? 'B' : 'S', labelFontColor: getComputedStyle(document.documentElement).getPropertyValue('--on-success').trim() || 'inherit', minSize: 14,
     }))
 }
 
