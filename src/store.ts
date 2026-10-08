@@ -283,6 +283,8 @@ const INITIAL_CHATS = loadChats()
 const loadKey = () => { try { return localStorage.getItem('anthropic_key') || '' } catch { return '' } }
 const loadJSON = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : d } catch { return d } }
 const saveJSON = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* storage unavailable */ } }
+/** The first time this browser opens this version: start in Chat, in dark mode (index.html sets the theme). Then remember we've been. */
+const FIRST_VISIT = (() => { try { const first = !localStorage.getItem('visited'); if (first) { localStorage.setItem('visited', '1'); localStorage.removeItem('cockpit-panels') } return first } catch { return false } })()
 
 function initPrices(): Record<string, Quote> {
   return Object.fromEntries(INSTS.map((i) => {
@@ -358,7 +360,7 @@ export const useStore = create<S>((set, get) => ({
   // 'cockpit-panels': a new key, so the cockpit opens with every panel showing instead of the old Terminal's folds.
   // A first visit (no desk set up, no saved layout) opens in Chat with the empty positions panel folded, so setup has
   // room; the Terminal is one tap away.
-  panels: { ...DEFAULT_PANELS, ...(!loadJSON('cockpit-panels', null) && !loadJSON('profile', null) ? { chatFull: true, bottom: false } : {}), ...loadJSON('cockpit-panels', {}), focus: false },
+  panels: { ...DEFAULT_PANELS, ...(!loadJSON('cockpit-panels', null) && !loadJSON('profile', null) ? { chatFull: true, bottom: false } : {}), ...(FIRST_VISIT ? {} : loadJSON('cockpit-panels', {})), ...(FIRST_VISIT ? { chatFull: true, bottom: false } : {}), focus: false },
   setPanels: (p) => { const panels = { ...get().panels, ...p }; saveJSON('cockpit-panels', panels); set({ panels }) },
   togglePanel: (k) => {
     const pn = get().panels
