@@ -45,6 +45,8 @@ export type Msg = {
   restored?: boolean
 }
 /** Chat is the AI-native home: the conversation is the terminal. Terminal is the classic multi-panel layout. */
+/** One saved conversation. `renamed` stops the title following the first question. */
+export type ChatMeta = { id: string; title: string; ts: number; updated: number; renamed?: boolean; msgs: Msg[] }
 export type Mode = 'chat' | 'terminal'
 /** What the chat's side canvas shows: one full tool, opened from a card. */
 export type Canvas = { view: ViewName } | null
@@ -97,8 +99,13 @@ type S = {
   shapes: Record<string, Drawing[]>; history: Record<string, { undo: Drawing[][]; redo: Drawing[][] }>; snapshot: (k: string) => void; undo: (k: string) => void; redo: (k: string) => void
   addShape: (k: string, d: Omit<Drawing, 'id'>) => string; updateShape: (k: string, id: string, d: Partial<Drawing>) => void; removeShape: (k: string, id?: string) => void
   msgs: Msg[]; toast: string; apiKey: string; busy: boolean
-  /** Start a new conversation: clears the thread and its saved copy. */
-  clearChat: () => void
+  /** Every conversation, newest activity first. The open one is kept in step with `msgs`. */
+  chats: ChatMeta[]; activeChat: string
+  /** Start a fresh conversation. The current one stays in the history; an empty one is reused instead of piling up. */
+  newChat: () => void
+  openChat: (id: string) => void
+  deleteChat: (id: string) => void
+  renameChat: (id: string, title: string) => void
   mode: Mode; setMode: (m: Mode) => void; canvas: Canvas; setCanvas: (c: Canvas) => void
   /** The agent reports something that happened without being asked. Also shows a toast. */
   event: (text: string, tone?: Msg['event'], cards?: Card[], follow?: string[]) => void
@@ -217,30 +224,62 @@ function saveBook() {
   bookTimer = setTimeout(() => { bookTimer = undefined; if (skipSave) return; try { localStorage.setItem(BOOK_KEY, JSON.stringify(bookSnapshot())) } catch { /* storage unavailable */ } }, 2000)
 }
 
-// ---- Chat history: kept in this browser so the conversation survives a reload.
-const CHAT_KEY = 'chat'
-const CHAT_MAX = 200
+// ---- Chat history: every conversation is kept in this browser, like any AI app, so you can start a new one for another
+// stock or topic and come back to the old ones. `msgs` is always the open conversation; `chats` holds them all.
+const CHAT_KEY = 'chat'        // the old single thread, read once to migrate
+const CHATS_KEY = 'chats'
+const CHAT_MAX = 200           // messages kept per conversation
+const CHATS_MAX = 60           // conversations kept
 /**
  * Saved messages come back marked `restored`. Orders are saved too (see loadBook), so order trackers keep
  * working; if the book was cleared, the card says the order is gone. Approval drafts are kept: placing one
  * re-runs every pre-trade check at current prices.
  */
-function loadChat(): Msg[] {
+const tidy = (raw: unknown): Msg[] => (Array.isArray(raw) ? (raw as Msg[]) : []).filter((m) => m && m.id > 0 && (m.role === 'user' || m.role === 'ai')).slice(-CHAT_MAX)
+const newId = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+const titleOf = (msgs: Msg[]) => {
+  const q = msgs.find((m) => m.role === 'user')?.text.replace(/\s+/g, ' ').trim()
+  if (!q) return 'New chat'
+  const t = q.length > 46 ? q.slice(0, 44).trimEnd() + '…' : q
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+const blank = (): ChatMeta => ({ id: newId(), title: 'New chat', ts: Date.now(), updated: Date.now(), msgs: [] })
+function loadChats(): { chats: ChatMeta[]; active: string } {
+  let chats: ChatMeta[] = []; let active = ''
   try {
-    const raw = localStorage.getItem(CHAT_KEY); if (!raw) return []
-    const saved = (JSON.parse(raw) as Msg[]).filter((m) => m && m.id > 0 && (m.role === 'user' || m.role === 'ai')).slice(-CHAT_MAX)
-    mid = Math.max(mid, ...saved.map((m) => m.id))
-    return saved.map((m) => ({ ...m, restored: true }))
-  } catch { return [] }
+    const raw = localStorage.getItem(CHATS_KEY)
+    if (raw) {
+      const j = JSON.parse(raw) as { active?: string; chats?: ChatMeta[] }
+      chats = (j.chats ?? []).filter((c) => c && c.id).map((c) => ({ ...c, msgs: tidy(c.msgs).map((m) => ({ ...m, restored: true })) }))
+      active = j.active ?? ''
+    } else {
+      // Before conversations existed there was one thread; it becomes the first entry.
+      const old = tidy(JSON.parse(localStorage.getItem(CHAT_KEY) || '[]')).map((m) => ({ ...m, restored: true }))
+      if (old.length) chats = [{ id: newId(), title: titleOf(old), ts: old[0].ts ?? Date.now(), updated: old[old.length - 1].ts ?? Date.now(), msgs: old }]
+    }
+  } catch { /* unreadable: start clean */ }
+  for (const c of chats) for (const m of c.msgs) mid = Math.max(mid, m.id)
+  if (!chats.some((c) => c.id === active)) { const f = blank(); chats = [f, ...chats]; active = f.id }
+  return { chats, active }
 }
 let saveTimer: ReturnType<typeof setTimeout> | undefined
-function saveChat(msgs: Msg[]) {
+const persistable = (chats: ChatMeta[], active: string) => ({ active, chats: chats.filter((c) => c.id === active || c.msgs.length).slice(0, CHATS_MAX).map((c) => ({ ...c, msgs: c.msgs.filter((m) => m.id > 0).slice(-CHAT_MAX).map(({ restored: _r, ...m }) => m) })) })
+function saveChats(chats: ChatMeta[], active: string) {
   clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(CHAT_KEY, JSON.stringify(msgs.filter((m) => m.id > 0).slice(-CHAT_MAX))) } catch { /* storage full or unavailable: history just won't persist */ }
+    try { localStorage.setItem(CHATS_KEY, JSON.stringify(persistable(chats, active))) } catch { /* storage full or unavailable: history just won't persist */ }
   }, 400)
 }
+/** Keep the open conversation's entry in step with the live thread. */
+function syncActive(msgs: Msg[], chats: ChatMeta[], active: string): ChatMeta[] {
+  const real = msgs.filter((m) => m.id > 0); const i = chats.findIndex((c) => c.id === active); if (i < 0) return chats
+  const cur = chats[i]
+  const next: ChatMeta = { ...cur, msgs: real, title: cur.renamed ? cur.title : titleOf(real), updated: real.length ? (real[real.length - 1].ts ?? Date.now()) : cur.updated }
+  const rest = chats.filter((_, k) => k !== i)
+  return [next, ...rest].sort((a, b) => (b.id === active ? 1 : 0) - (a.id === active ? 1 : 0) || b.updated - a.updated).sort((a, b) => b.updated - a.updated)
+}
 
+const INITIAL_CHATS = loadChats()
 const loadKey = () => { try { return localStorage.getItem('anthropic_key') || '' } catch { return '' } }
 const loadJSON = <T,>(k: string, d: T): T => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) as T : d } catch { return d } }
 const saveJSON = (k: string, v: unknown) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* storage unavailable */ } }
@@ -347,8 +386,26 @@ export const useStore = create<S>((set, get) => ({
   event: (text, tone = 'info', cards, follow) => { get().addMsg({ role: 'ai', text, event: tone, cards, follow }); get().setToast(text.replace(/\*\*/g, '')) },
   // Saved paper trading state overrides the fresh defaults above.
   ...loadBook(),
-  msgs: [WELCOME, ...loadChat()],
-  clearChat: () => { try { localStorage.removeItem(CHAT_KEY) } catch { /* storage unavailable */ } set({ msgs: [WELCOME] }) },
+  msgs: [WELCOME, ...INITIAL_CHATS.chats.find((c) => c.id === INITIAL_CHATS.active)!.msgs],
+  chats: INITIAL_CHATS.chats, activeChat: INITIAL_CHATS.active,
+  newChat: () => {
+    const s = get(); if (!s.msgs.some((m) => m.id > 0)) return   // already on an empty one
+    const f = blank(); set({ chats: [f, ...s.chats], activeChat: f.id, msgs: [WELCOME] })
+  },
+  openChat: (id) => {
+    const s = get(); const c = s.chats.find((x) => x.id === id); if (!c || id === s.activeChat) return
+    // Leaving an empty conversation drops it, so "New chat" never leaves blanks behind.
+    const chats = s.msgs.some((m) => m.id > 0) ? s.chats : s.chats.filter((x) => x.id !== s.activeChat)
+    set({ chats, activeChat: id, msgs: [WELCOME, ...c.msgs], busy: false })
+  },
+  deleteChat: (id) => {
+    const s = get(); const rest = s.chats.filter((c) => c.id !== id)
+    if (id !== s.activeChat) { set({ chats: rest }); return }
+    const next = rest.find((c) => c.msgs.length)
+    if (next) set({ chats: rest, activeChat: next.id, msgs: [WELCOME, ...next.msgs], busy: false })
+    else { const f = blank(); set({ chats: [f, ...rest], activeChat: f.id, msgs: [WELCOME], busy: false }) }
+  },
+  renameChat: (id, title) => { const t = title.trim(); if (!t) return; set({ chats: get().chats.map((c) => (c.id === id ? { ...c, title: t.slice(0, 80), renamed: true } : c)) }) },
   toast: '', apiKey: loadKey(), busy: false,
   theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
   toggleTheme: () => {
@@ -567,13 +624,14 @@ if (bookNotice) { const n = bookNotice; setTimeout(() => useStore.getState().eve
 
 // Save the conversation whenever it changes.
 useStore.subscribe((s, prev) => {
-  if (s.msgs !== prev.msgs) saveChat(s.msgs)
+  if (s.msgs !== prev.msgs && s.activeChat === prev.activeChat) { const chats = syncActive(s.msgs, s.chats, s.activeChat); useStore.setState({ chats }) }
+  if (s.chats !== prev.chats || s.activeChat !== prev.activeChat) saveChats(s.chats, s.activeChat)
   if (BOOK_FIELDS.some((k) => s[k] !== prev[k])) saveBook()
 })
 // Flush a pending save when the tab closes.
 addEventListener('pagehide', () => {
   clearTimeout(saveTimer); clearTimeout(bookTimer); if (skipSave) return
-  try { localStorage.setItem(CHAT_KEY, JSON.stringify(useStore.getState().msgs.filter((m) => m.id > 0).slice(-CHAT_MAX))); localStorage.setItem(BOOK_KEY, JSON.stringify(bookSnapshot())) } catch { /* storage unavailable */ }
+  try { { const st = useStore.getState(); localStorage.setItem(CHATS_KEY, JSON.stringify(persistable(syncActive(st.msgs, st.chats, st.activeChat), st.activeChat))) }; localStorage.setItem(BOOK_KEY, JSON.stringify(bookSnapshot())) } catch { /* storage unavailable */ }
 })
 /** Start the paper account over: fresh cash, no positions or orders. Settings, chat and drawings stay. */
 export function resetBook() {

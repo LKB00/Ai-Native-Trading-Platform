@@ -5,7 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type R
 import { ArrowUp, Bell, SquarePen, CircleAlert, CircleCheck, Mic, PanelRightClose, Square, Crosshair, ChevronDown, SquareSlash, CornerDownRight, Check } from 'lucide-react'
 import { AIMark, Badge, IconButton, Markdown, TypingIndicator, KeyHint, cn } from '../ds'
 import { useStore, type Msg } from '../store'
-import { actionablePending, usePendingCount, useEntryGate, GateIcon } from '../gate'
+import { usePendingCount, useEntryGate, GateIcon } from '../gate'
 import { INSTS, bySym, fmtIST, labelOf, parseKey } from '../market'
 import { progress } from '../watch'
 import { useShallow } from 'zustand/react/shallow'
@@ -13,20 +13,19 @@ import { ask } from '../ai'
 import { Chg, Money, pct } from '../ui'
 import { CardView, DraftCard, say } from './cards'
 import { GettingStarted, Welcome } from '../welcome'
+import { ChatHistory, startNewChat } from './History'
+import { saved } from './scroll'
 import { DeskBar } from '../agent/Desk'
 
 /** Starting over drops drafts that are still waiting for approval, so say so first. */
-function confirmClear() {
-  const waiting = actionablePending(useStore.getState())
-  return confirm(waiting ? `Start a new conversation? ${waiting} draft${waiting > 1 ? 's' : ''} waiting for approval will be discarded. Positions and orders are not affected.` : 'Start a new conversation? Positions and orders are not affected.')
-}
 
 /** Chat-layout actions for the top bar: drafts waiting on you, and a new conversation. */
 export function ChatTopActions() {
   const pending = usePendingCount(); const hasChat = useStore((s) => s.msgs.length > 1)
   return <>
     {pending > 0 && <button type="button" onClick={() => document.querySelector('[data-pending]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}><Badge tone="warning">{pending} waiting for you</Badge></button>}
-    <IconButton label="New conversation" disabled={!hasChat} onClick={() => { if (confirmClear()) useStore.getState().clearChat() }}><SquarePen size={16} strokeWidth={1.5} /></IconButton>
+    <ChatHistory />
+    <IconButton label="New chat" disabled={!hasChat} onClick={startNewChat}><SquarePen size={16} strokeWidth={1.5} /></IconButton>
   </>
 }
 
@@ -48,7 +47,8 @@ export function ChatPanel({ overlay, resize, full = false }: { overlay: boolean;
         {pending > 0 && <button type="button" onClick={() => document.querySelector('[data-pending]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}><Badge tone="warning">{pending} waiting for you</Badge></button>}
         <span className="ml-auto flex items-center gap-0.5">
           <KeyHint className="mr-1 max-lg:hidden">/</KeyHint>
-          <IconButton size="sm" label="New conversation" disabled={!hasChat} onClick={() => { if (confirmClear()) useStore.getState().clearChat() }}><SquarePen size={15} strokeWidth={1.5} /></IconButton>
+          <ChatHistory size="sm" />
+          <IconButton size="sm" label="New chat" disabled={!hasChat} onClick={startNewChat}><SquarePen size={15} strokeWidth={1.5} /></IconButton>
           <IconButton size="sm" className="max-md:hidden" label="Hide the assistant ( ] )" onClick={() => useStore.getState().togglePanel('copilot')}><PanelRightClose size={15} strokeWidth={1.5} /></IconButton>
         </span>
       </header>}
@@ -59,7 +59,6 @@ export function ChatPanel({ overlay, resize, full = false }: { overlay: boolean;
 }
 
 /** Where the thread was scrolled, kept across remounts (switching Agent/Terminal views). */
-const saved: { pinned: boolean; top: number | null } = { pinned: true, top: null }
 
 function Thread({ full = false }: { full?: boolean }) {
   const msgs = useStore((s) => s.msgs); const busy = useStore((s) => s.busy)

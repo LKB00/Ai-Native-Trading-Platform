@@ -20,6 +20,7 @@ import Markets from './Markets'
 import Portfolio from './Portfolio'
 import Journal from './Journal'
 import { ChatPanel, ChatTopActions } from './chat/Chat'
+import { startNewChat } from './chat/History'
 import { DeskRail } from './agent/Desk'
 import { CostLine, LevelInput, TagPicker, priceBand, useOrderCost } from './ticket'
 import { DepthView } from './depth'
@@ -753,7 +754,7 @@ export function Palette() {
       { label: 'Getting started checklist', hint: 'Help', run: () => { const l = useLearn.getState(); if (l.started) l.set({ hidden: false, open: true }); else l.start(); switchLayout(true) } },
       { label: 'Keyboard shortcuts', hint: '?', run: () => useStore.setState({ shortcuts: true }) },
       { label: 'Reset practice account (cash, positions, orders)', hint: 'Account', run: () => { if (window.confirm('Reset the practice account? Positions, orders, alerts and trade history go back to the starting state. Chat and settings stay.')) resetBook() } },
-      { label: 'New conversation (clear chat history)', hint: 'Chat', run: () => { if (window.confirm('Clear the conversation? Positions and orders are not affected.')) st.clearChat() } },
+      { label: 'New chat', hint: 'Chat', run: () => startNewChat() },
       { label: st.panels.watch ? 'Hide watchlist' : 'Show watchlist', hint: '[', run: () => st.togglePanel('watch') },
       { label: st.panels.copilot ? 'Hide the assistant' : 'Show the assistant', hint: ']', run: () => st.togglePanel('copilot') },
       { label: st.panels.chatFull ? 'Switch to Charts' : 'Switch to Chat', hint: 'Layout', run: () => switchLayout(!st.panels.chatFull) },

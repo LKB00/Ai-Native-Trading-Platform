@@ -2,63 +2,77 @@
 //   Welcome         the first screen: how the product works in one look, then the desk setup.
 //   GettingStarted  a checklist above the composer that ticks itself as the user does each thing.
 //   Tour            a spotlight walk through the Terminal the first time it opens.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Check, ChevronDown, ChevronUp, LayoutDashboard, MessagesSquare, ShieldCheck, X } from 'lucide-react'
+import { Activity, ArrowRight, CandlestickChart, Check, ChevronDown, ChevronUp, Hand, MessageSquare, ShieldCheck, Wallet, X } from 'lucide-react'
 import { useStore } from './store'
-import { Badge, Button, cn } from './ds'
-import { BrandMark, BRAND } from './brand'
+import { AIMark, Button, cn } from './ds'
+import { BRAND } from './brand'
 import { SetupCard, say } from './chat/cards'
 import { skipSetup } from './setup'
 import { STEPS, progress, useLearn, type StepId } from './learn'
 
 /* ------------------------------------------------------------------ welcome */
 
-function Num({ n }: { n: number }) {
-  return <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-fg text-[11px] font-semibold text-[var(--bg)]">{n}</span>
-}
-
-/** The three beats of every trade, each with a small picture of what you will see. The pictures are not clickable. */
-function HowItWorks() {
+/** The product in three pictures. Every column has the same parts: a label, a picture on a tinted panel, a caption. */
+function Beat({ label, caption, last, children }: { label: string; caption: string; last?: boolean; children: ReactNode }) {
   return (
-    <div className="grid gap-3 @2xl:grid-cols-3">
-      <section className="flex flex-col rounded-[10px] border border-line bg-surface p-3.5">
-        <h3 className="flex items-center gap-2 text-[13px] font-semibold text-fg"><Num n={1} />Say what you want</h3>
-        <p className="mt-1.5 text-[12px] leading-5 text-fg-muted">Plain words, no forms. Ask for a stock, a scan, an option strategy or an order.</p>
-        <div aria-hidden className="mt-auto space-y-2 pt-3"><div className="ml-auto w-fit max-w-full rounded-xl rounded-br-sm bg-sunken px-3 py-2 text-[12px] text-fg">buy 50 sbin with sl 850 target 900</div><p className="text-[12px] text-fg-subtle">Checking SBIN and sizing it to your risk…</p></div>
-      </section>
-      <section className="flex flex-col rounded-[10px] border border-line bg-surface p-3.5">
-        <h3 className="flex items-center gap-2 text-[13px] font-semibold text-fg"><Num n={2} />Check the draft</h3>
-        <p className="mt-1.5 text-[12px] leading-5 text-fg-muted">I reply with a ready order, sized to your risk, with a stop and a target. Nothing is sent yet.</p>
-        <div aria-hidden className="mt-auto pt-3"><div className="rounded-lg border border-line bg-bg p-2.5 text-[12px]">
-          <div className="flex items-center justify-between"><span className="font-semibold text-fg">Buy 50 SBIN</span><Badge tone="warning">Waiting for you</Badge></div>
-          <p className="num mt-1 text-fg-muted">Stop 850 · Target 900 · Risk ₹1,250</p>
-          <div className="mt-2 flex gap-1.5"><span className="rounded-md bg-accent px-2.5 py-1 text-[11px] font-medium text-on-accent">Approve</span><span className="rounded-md border border-line px-2.5 py-1 text-[11px] text-fg-muted">Edit</span></div>
-        </div></div>
-      </section>
-      <section className="flex flex-col rounded-[10px] border border-line bg-surface p-3.5">
-        <h3 className="flex items-center gap-2 text-[13px] font-semibold text-fg"><Num n={3} />Approve, then I watch it</h3>
-        <p className="mt-1.5 text-[12px] leading-5 text-fg-muted">Only your approval places the order. After that I track it and tell you when a stop, target or alert is hit.</p>
-        <div aria-hidden className="mt-auto pt-3"><div className="rounded-lg border border-line bg-bg p-2.5 text-[12px]">
-          <p className="flex items-center gap-1.5 font-medium text-up"><Check size={13} strokeWidth={2.25} />SBIN reached your target</p>
-          <p className="num mt-1 text-fg-muted">Sold 50 at 900 · <span className="text-up">+₹2,480</span> after charges</p>
-        </div></div>
-      </section>
+    <section className="relative min-w-0 cursor-default select-none">
+      <h3 className="text-[13px] font-semibold text-fg">{label}</h3>
+      <div aria-hidden className="mt-2 flex h-[124px] items-center @2xl:h-[152px] justify-center rounded-[14px] bg-sunken p-3.5">{children}</div>
+      <p className="mt-2 text-[12px] leading-4 text-fg-muted">{caption}</p>
+      {!last && <ArrowRight aria-hidden size={16} strokeWidth={1.75} className="absolute -right-[22px] top-[96px] hidden text-fg-subtle @2xl:block" />}
+    </section>
+  )
+}
+/** The picture inside a panel: one white card, the same size in every column. */
+const Pic = ({ children, className }: { children: ReactNode; className?: string }) => <div className={cn('flex h-full w-full flex-col justify-center rounded-[10px] bg-surface p-3 shadow-sm', className)}>{children}</div>
+
+function Story() {
+  return (
+    <div className="grid gap-5 @2xl:grid-cols-3 @2xl:gap-11">
+      <Beat label="Ask" caption="In plain words">
+        <Pic className="gap-2.5">
+          <div className="ml-auto w-fit max-w-full rounded-xl rounded-br-sm bg-sunken px-3 py-1.5 text-[12px] text-fg">buy 50 sbin, stop 850</div>
+          <div className="flex items-center gap-1.5"><span className="flex size-6 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={16} /></span><span className="flex gap-1 rounded-xl rounded-bl-sm bg-sunken px-3 py-2"><i className="size-1 rounded-full bg-fg-subtle" /><i className="size-1 rounded-full bg-fg-subtle opacity-60" /><i className="size-1 rounded-full bg-fg-subtle opacity-30" /></span></div>
+        </Pic>
+      </Beat>
+      <Beat label="Review" caption="Nothing is sent until you approve">
+        <Pic className="gap-2">
+          <p className="text-[13px] font-semibold text-fg">Buy 50 SBIN</p>
+          <p className="flex flex-wrap gap-1.5 text-[11px]"><span className="rounded bg-danger-soft px-1.5 py-0.5 font-medium text-danger-fg">Stop 850</span><span className="rounded bg-success-soft px-1.5 py-0.5 font-medium text-success-fg">Target 900</span></p>
+          <span className="w-fit rounded-md bg-sunken px-3 py-1 text-[11px] font-medium text-fg">Approve</span>
+        </Pic>
+      </Beat>
+      <Beat label="Done" caption="I watch it for you" last>
+        <Pic className="items-center gap-1">
+          <span className="flex size-7 items-center justify-center rounded-full bg-success text-white"><Check size={15} strokeWidth={3} /></span>
+          <p className="mt-0.5 text-[12px] text-fg-muted">SBIN hit your target</p>
+          <p className="num text-[20px] font-semibold text-up">+₹2,480</p>
+        </Pic>
+      </Beat>
     </div>
   )
 }
 
-function TwoWays() {
-  const row = (Icon: typeof MessagesSquare, title: string, text: string) => (
-    <div className="flex items-start gap-3 rounded-[10px] border border-line bg-surface p-3.5">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sunken text-fg"><Icon size={16} strokeWidth={1.75} /></span>
-      <div className="min-w-0"><p className="text-[13px] font-semibold text-fg">{title}</p><p className="mt-0.5 text-[12px] leading-5 text-fg-muted">{text}</p></div>
+/** Under the story, three short columns on the same grid, each built the same way: a heading and two one-line facts. */
+type Fact = { Icon: typeof MessageSquare; title: string; detail: string }
+function FactCol({ heading, facts }: { heading: string; facts: [Fact, Fact] }) {
+  return (
+    <div className="min-w-0">
+      <h4 className="text-[11px] font-medium uppercase tracking-[0.04em] text-fg-subtle">{heading}</h4>
+      <ul className="mt-2.5 space-y-2">{facts.map(({ Icon, title, detail }) => (
+        <li key={title} className="flex h-5 items-center gap-2.5 whitespace-nowrap text-[13px]"><Icon size={16} strokeWidth={1.75} className="shrink-0 text-fg-muted" aria-hidden /><span className="min-w-0 truncate text-fg"><b className="font-semibold">{title}</b><span className="text-fg-muted"> · {detail}</span></span></li>))}
+      </ul>
     </div>
   )
+}
+function Facts() {
   return (
-    <div className="grid gap-3 @2xl:grid-cols-2">
-      {row(MessagesSquare, 'Chat: just ask', 'This screen. Anything you can do on the charts screen, you can ask for here, and it keeps your money, positions and alerts in view.')}
-      {row(LayoutDashboard, 'Charts: see and click', 'Charts, your watchlist, the order ticket, options and your positions, with the assistant beside them. Switch any time from the top-left.')}
+    <div className="grid gap-5 border-t border-line pt-5 @2xl:grid-cols-3 @2xl:gap-11">
+      <FactCol heading="Two ways to use it" facts={[{ Icon: MessageSquare, title: 'Chat', detail: 'just ask' }, { Icon: CandlestickChart, title: 'Charts', detail: 'see and click' }]} />
+      <FactCol heading="You stay in control" facts={[{ Icon: ShieldCheck, title: 'Loss limit', detail: 'you set it' }, { Icon: Hand, title: 'Approvals', detail: 'every order' }]} />
+      <FactCol heading="Nothing is real" facts={[{ Icon: Wallet, title: 'Play money', detail: '₹10,00,000' }, { Icon: Activity, title: 'Prices', detail: 'simulated' }]} />
     </div>
   )
 }
@@ -71,28 +85,20 @@ export function Welcome() {
   const finish = () => start()
   return (
     <div ref={top} className="pt-4 @2xl:pt-[5vh]">
-      <BrandMark size={44} />
+      <span className="inline-flex size-9 items-center justify-center rounded-full bg-lime text-on-lime"><AIMark size={22} /></span>
       <h1 className="mt-4 text-[22px] font-semibold leading-tight tracking-[-0.02em] @2xl:text-[34px]">Welcome to {BRAND}.</h1>
-      <p className="mt-2 max-w-xl text-[13px] leading-5 text-fg-muted @2xl:text-[15px] @2xl:leading-6">Practice trading for the Indian markets, where you chat with an assistant instead of filling in forms. You start with <b className="font-medium text-fg">₹10,00,000 of practice money</b> and simulated NSE prices, so nothing here is real.</p>
+      <p className="mt-2 text-[14px] leading-5 text-fg-muted @2xl:text-[16px]">Practice trading with <b className="font-medium text-fg">₹10,00,000 of play money</b>. Just ask.</p>
 
-      <ol aria-label="Steps" className="mt-6 flex items-center gap-2 text-[12px]">
-        {['How it works', 'Your limits'].map((t, i) => <li key={t} className="flex items-center gap-2" aria-current={step === i ? 'step' : undefined}>
-          {i > 0 && <span aria-hidden className="h-px w-6 bg-[var(--border-strong)]" />}
-          <span className={cn('flex size-5 items-center justify-center rounded-full text-[11px] font-semibold', step === i ? 'bg-fg text-[var(--bg)]' : i < step ? 'bg-success text-white' : 'border border-line text-fg-subtle')}>{i < step ? <Check size={11} strokeWidth={3} /> : i + 1}</span>
-          <span className={step === i ? 'font-medium text-fg' : 'text-fg-subtle'}>{t}</span>
-        </li>)}
-      </ol>
 
-      {step === 0 ? <div className="mt-4 space-y-3">
-        <HowItWorks />
-        <TwoWays />
-        <p className="flex items-start gap-2 text-[12px] leading-5 text-fg-muted"><ShieldCheck size={14} strokeWidth={1.75} className="mt-[3px] shrink-0 text-fg-subtle" aria-hidden />You are always protected: you set a daily loss limit next, every entry can require a stop, and I close everything at your limit. Exits always work.</p>
-        <div className="flex flex-wrap items-center gap-2 pt-1">
+      {step === 0 ? <div className="mt-8 space-y-6">
+        <Story />
+        <Facts />
+        <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 bg-gradient-to-t from-bg from-70% to-transparent px-1 pb-1 pt-5">
           <Button size="md" variant="primary" trailing={<ArrowRight size={14} strokeWidth={2} />} onClick={() => setStep(1)}>Set my limits</Button>
           <Button size="md" variant="ghost" onClick={() => { skipSetup(); finish() }}>Skip intro</Button>
-          <span className="ml-auto text-[11px] text-fg-subtle">About a minute</span>
+          <span className="ml-auto text-[12px] text-fg-subtle">Step 1 of 2 · about a minute</span>
         </div>
-      </div> : <div className="mt-4">
+      </div> : <div className="mt-8">
         <SetupCard first onFinish={finish} />
         <button type="button" onClick={() => setStep(0)} className="mt-3 text-[12px] text-fg-muted hover:text-fg hover:underline">Back to how it works</button>
       </div>}
